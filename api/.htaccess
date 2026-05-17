@@ -1,0 +1,9 @@
+# Deny access to sensitive files
+<FilesMatch "\.(sql|md|env)$">
+  Require all denied
+</FilesMatch>
+
+# Deny browsing
+Options -Indexes
+
+# Allow CORS headers via PHP (config.php handles it)
