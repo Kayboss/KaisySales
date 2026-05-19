@@ -1,13 +1,17 @@
 /**
  * KaisySales Universal Backend Client
  *
- * Auto-detects PHP API availability. Falls back to localStorage mock
- * when the PHP server is not reachable (e.g., local development).
+ * Auto-detects API availability. Falls back to localStorage mock
+ * when the Node.js or PHP server is not reachable (e.g., local dev).
  *
  * Exports identical authService & dbService interface as the old firebase.js.
+ *
+ * Works with both:
+ *   - Node.js backend: server.js (Express + SQLite)
+ *   - PHP backend: api/ (Apache + MySQL)
  */
 
-const API_BASE = '/KaisySales/api';
+const API_BASE = '/api';
 
 const LS_TOKEN  = 'kaisysales_php_token';
 const LS_USER   = 'kaisysales_php_user';
@@ -48,7 +52,7 @@ async function apiFetch(endpoint, options = {}) {
 
 async function testApi() {
   try {
-    await fetch(`${API_BASE}/auth/verify.php`, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
+          await fetch(`${API_BASE}/auth/verify`, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
     apiAvailable = true;
   } catch {
     apiAvailable = false;
@@ -80,7 +84,7 @@ export const authService = {
   async signUp(email, password) {
     await testApi();
     if (apiAvailable) {
-      const body = await apiFetch('/auth/signup.php', {
+      const body = await apiFetch('/auth/signup', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
@@ -109,7 +113,7 @@ export const authService = {
   async signIn(email, password) {
     await testApi();
     if (apiAvailable) {
-      const body = await apiFetch('/auth/login.php', {
+      const body = await apiFetch('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
@@ -243,25 +247,25 @@ async function apiMock(operation, uid, collectionName, ...rest) {
     try {
       switch (operation) {
         case 'fetch': {
-          const body = await apiFetch(`/records.php?collection=${collectionName}`);
+          const body = await apiFetch(`/records/${collectionName}`);
           return body.data;
         }
         case 'create': {
-          const body = await apiFetch(`/records.php?collection=${collectionName}`, {
+          const body = await apiFetch(`/records/${collectionName}`, {
             method: 'POST',
             body: JSON.stringify(rest[0]),
           });
           return body.data;
         }
         case 'update': {
-          const body = await apiFetch(`/records.php?collection=${collectionName}&id=${rest[0]}`, {
+          const body = await apiFetch(`/records/${collectionName}/${rest[0]}`, {
             method: 'PUT',
             body: JSON.stringify(rest[1]),
           });
           return body.data;
         }
         case 'delete': {
-          await apiFetch(`/records.php?collection=${collectionName}&id=${rest[0]}`, {
+          await apiFetch(`/records/${collectionName}/${rest[0]}`, {
             method: 'DELETE',
           });
           return true;
@@ -278,7 +282,7 @@ export const dbService = {
   async getUserProfile(uid) {
     if (apiAvailable) {
       try {
-        const body = await apiFetch('/profile.php');
+        const body = await apiFetch('/profile');
         return body.data;
       } catch { /* fall through */ }
     }
@@ -289,7 +293,7 @@ export const dbService = {
   async saveUserProfile(uid, profileData) {
     if (apiAvailable) {
       try {
-        const body = await apiFetch('/profile.php', {
+        const body = await apiFetch('/profile', {
           method: 'PUT',
           body: JSON.stringify(profileData),
         });
