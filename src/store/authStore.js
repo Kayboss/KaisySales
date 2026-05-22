@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authService } from '../services/phpBackend';
+import { authService } from '../services/supabase';
 
 /**
  * Auth Store

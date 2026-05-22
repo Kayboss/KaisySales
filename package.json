@@ -8,16 +8,12 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy": "node deploy/deploy-ftp.js",
-    "start": "node server.cjs"
+    "deploy": "node deploy/deploy-ftp.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@supabase/supabase-js": "^2.106.1",
     "@tanstack/react-query": "^5.100.9",
-    "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.10.0",
-    "express": "^5.2.1",
-    "firebase": "^12.13.0",
     "lucide-react": "^1.14.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
@@ -34,7 +30,6 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
-    "basic-ftp": "^6.0.1",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",

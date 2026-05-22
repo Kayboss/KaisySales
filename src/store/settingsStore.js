@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { dbService } from '../services/phpBackend';
+import { dbService } from '../services/supabase';
 
 /**
  * Settings Store

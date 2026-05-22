@@ -1,4 +1,4 @@
-import { dbService, authService } from './phpBackend';
+import { dbService, authService } from './supabase';
 import { useAuthStore } from '../store/authStore';
 
 

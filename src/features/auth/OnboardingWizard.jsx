@@ -2,7 +2,7 @@ import { useState } from 'react';
 import styled from 'styled-components';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
-import { dbService } from '../../services/phpBackend';
+import { dbService } from '../../services/supabase';
 import { 
   Sparkles, 
   ArrowRight, 
