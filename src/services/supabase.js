@@ -118,7 +118,8 @@ export const authService = {
       });
       return () => data.subscription.unsubscribe();
     }
-    // Mock — emit nothing until signIn/signUp
+    // Mock — emit null immediately so isInitialized becomes true
+    setTimeout(() => callback(null), 0);
     return () => { authListeners = authListeners.filter(fn => fn !== callback); };
   },
 
@@ -134,10 +135,10 @@ export const authService = {
     if (supabase) {
       const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
       if (error) throw error;
-      // On redirect, auth state change will notify listeners
       return null;
     }
-    throw new Error('Google sign-in requires Supabase configuration');
+    alert('Google sign-in is not configured. Please sign up with email and password instead.');
+    return null;
   },
 
   async resetPassword(email) {
