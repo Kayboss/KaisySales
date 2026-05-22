@@ -71,6 +71,50 @@ function mockSet(collection, data) {
   localStorage.setItem(`kaisysales_mock_${uid}_${collection}`, JSON.stringify(data));
 }
 
+/**
+ * Migrates all localStorage mock data to Supabase for the given user.
+ * Called automatically after sign-in/sign-up when Supabase is active.
+ */
+async function migrateLocalData(newUid) {
+  const collections = ['sales', 'invoices', 'expenses', 'inventory', 'stores', 'categories'];
+  let migrated = false;
+
+  for (const col of collections) {
+    // Search for any mock key pattern for this collection
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('kaisysales_mock_') && key.endsWith(`_${col}`)) {
+        const records = JSON.parse(localStorage.getItem(key) || '[]');
+        if (records.length > 0) {
+          for (const record of records) {
+            const { id, createdAt, updatedAt, ...rest } = record;
+            await supabase.from(col).insert({ user_id: newUid, ...rest }).select().single();
+          }
+          localStorage.removeItem(key);
+          migrated = true;
+        }
+      }
+    }
+  }
+
+  // Migrate profile
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('kaisysales_mock_profile_')) {
+      const profile = JSON.parse(localStorage.getItem(key) || '{}');
+      if (Object.keys(profile).length > 0) {
+        await supabase.from('profiles').upsert({ id: newUid, ...profile, updated_at: new Date().toISOString() });
+        localStorage.removeItem(key);
+        migrated = true;
+      }
+    }
+  }
+
+  if (migrated) {
+    console.log('Local data migrated to Supabase successfully');
+  }
+}
+
 // ----------------------------------------------------------------
 // AUTH SERVICE
 // ----------------------------------------------------------------
@@ -80,6 +124,7 @@ export const authService = {
     if (supabase) {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
+      if (data.user) migrateLocalData(data.user.id);
       return mapUser(data.user);
     }
     // Mock
@@ -93,6 +138,7 @@ export const authService = {
     if (supabase) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      if (data.user) migrateLocalData(data.user.id);
       return mapUser(data.user);
     }
     // Mock
