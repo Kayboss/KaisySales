@@ -190,6 +190,8 @@ const DailySales = () => {
   
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  const [saving, setSaving] = useState(false);
+
   const [formData, setFormData] = useState({
     item: '', category: '', quantity: 1, unitPrice: '', paymentMethod: 'Cash', newCategory: ''
   });
@@ -211,6 +213,7 @@ const DailySales = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    setSaving(true);
     let selectedCategory = formData.category;
     
     // Handle new category creation
@@ -247,6 +250,9 @@ const DailySales = () => {
       closeModal();
     } catch (error) {
       console.error('Failed to save sale', error);
+      alert('Failed to save sale: ' + error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -412,7 +418,7 @@ const DailySales = () => {
           </FormRow>
           <ModalActions>
             <button type="button" className="cancel" onClick={closeModal}>Cancel</button>
-            <button type="submit" className="save">{isEditing ? "Update Sale" : "Save Sale"}</button>
+            <button type="submit" className="save" disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update Sale" : "Save Sale")}</button>
           </ModalActions>
         </form>
       </Modal>

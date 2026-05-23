@@ -177,6 +177,8 @@ const ExpenseTracking = () => {
   const [editId, setEditId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  const [saving, setSaving] = useState(false);
+
   const [formData, setFormData] = useState({
     title: '', category: '', quantity: 1, unitPrice: '', date: '', newCategory: ''
   });
@@ -198,6 +200,7 @@ const ExpenseTracking = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    setSaving(true);
     let selectedCategory = formData.category;
     
     // Handle new category creation
@@ -233,6 +236,9 @@ const ExpenseTracking = () => {
       closeModal();
     } catch (error) {
       console.error('Failed to save expense', error);
+      alert('Failed to save expense: ' + error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -408,7 +414,7 @@ const ExpenseTracking = () => {
           </FormRow>
           <ModalActions>
             <button type="button" className="cancel" onClick={closeModal}>Cancel</button>
-            <button type="submit" className="save">{isEditing ? "Update Expense" : "Save Expense"}</button>
+            <button type="submit" className="save" disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update Expense" : "Save Expense")}</button>
           </ModalActions>
         </form>
       </Modal>
