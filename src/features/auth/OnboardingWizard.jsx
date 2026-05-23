@@ -368,10 +368,10 @@ const OnboardingWizard = () => {
 
     // 1. Seed Categories
     const categories = [
-      { name: 'General', slug: 'general' },
-      { name: 'Premium', slug: 'premium' },
-      { name: 'Raw Materials', slug: 'raw-materials' },
-      { name: 'Custom Orders', slug: 'custom-orders' }
+      { name: 'General' },
+      { name: 'Premium' },
+      { name: 'Raw Materials' },
+      { name: 'Custom Orders' }
     ];
     for (const cat of categories) {
       promises.push(dbService.createUserRecord(uid, 'categories', cat));
@@ -381,27 +381,24 @@ const OnboardingWizard = () => {
     const inventoryItems = [
       {
         name: 'Premium Product (Sika Futuro)',
-        sku: 'PRM-SF-01',
         quantity: 12,
-        price: 380,
-        category: 'General',
-        description: 'High-quality product with premium finish and elegant presentation.'
+        unit: 'pcs',
+        status: 'In Stock',
+        category: 'General'
       },
       {
         name: 'Royal Special (Lome Double Weave)',
-        sku: 'SPC-LM-04',
         quantity: 3,
-        price: 1800,
-        category: 'Premium',
-        description: 'Elite quality item for special occasions and ceremonies.'
+        unit: 'pcs',
+        status: 'In Stock',
+        category: 'Premium'
       },
       {
         name: 'Organic Cotton Supply (Ochre Yellow)',
-        sku: 'RWM-YL-15',
         quantity: 45,
-        price: 25,
-        category: 'Raw Materials',
-        description: 'Premium organic raw materials for production.'
+        unit: 'yards',
+        status: 'In Stock',
+        category: 'Raw Materials'
       }
     ];
     for (const item of inventoryItems) {
@@ -413,14 +410,14 @@ const OnboardingWizard = () => {
       {
         name: 'Main Street Market Stall A-12',
         location: 'Central Accra',
-        contact: '+233 24 456 7890',
-        active: true
+        phone: '+233 24 456 7890',
+        status: 'Active'
       },
       {
         name: 'City Centre Boutique',
         location: 'Kumasi, Ashanti',
-        contact: '+233 20 112 2334',
-        active: true
+        phone: '+233 20 112 2334',
+        status: 'Active'
       }
     ];
     for (const store of stores) {
@@ -429,39 +426,33 @@ const OnboardingWizard = () => {
 
     // 4. Seed a Sale
     const sale = {
-      items: [
-        { name: 'Premium Product (Sika Futuro)', price: 380, quantity: 1 }
-      ],
-      total: 380,
+      item: 'Premium Product (Sika Futuro)',
+      category: 'General',
+      quantity: 1,
+      unitPrice: 380,
+      amount: '380',
       paymentMethod: 'Mobile Money (MTN)',
-      customerName: 'Ama Serwah',
-      customerPhone: '+233 55 987 6543',
-      date: new Date().toISOString()
+      date: new Date().toISOString().split('T')[0]
     };
     promises.push(dbService.createUserRecord(uid, 'sales', sale));
 
     // 5. Seed an Expense
     const expense = {
+      title: 'Raw Materials Purchase',
       category: 'Raw Materials',
       amount: 250,
-      description: 'Purchased premium raw materials from local supplier.',
-      date: new Date().toISOString(),
-      status: 'Paid'
+      date: new Date().toISOString().split('T')[0],
+      trend: 'down'
     };
     promises.push(dbService.createUserRecord(uid, 'expenses', expense));
 
     // 6. Seed an Invoice
     const invoice = {
-      invoiceNumber: 'INV-2026-001',
-      customerName: 'Kofi Mensah',
-      customerEmail: 'kofi.mensah@gmail.com',
-      items: [
-        { name: 'Royal Special (Lome Double Weave)', price: 1800, quantity: 1 }
-      ],
-      total: 1800,
+      customer: 'Kofi Mensah',
       status: 'Pending',
-      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      createdAt: new Date().toISOString()
+      total: 1800,
+      date: new Date().toISOString().split('T')[0],
+      items: [{ name: 'Royal Special (Lome Double Weave)', price: 1800, quantity: 1 }]
     };
     promises.push(dbService.createUserRecord(uid, 'invoices', invoice));
 

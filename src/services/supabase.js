@@ -196,6 +196,26 @@ export const authService = {
 };
 
 // ----------------------------------------------------------------
+// Helpers: camelCase <-> snake_case
+// ----------------------------------------------------------------
+
+const toSnakeCase = (obj) => {
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[key.replace(/([A-Z])/g, '_$1').toLowerCase()] = value;
+  }
+  return result;
+};
+
+const toCamelCase = (obj) => {
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[key.replace(/_([a-z])/g, (_, c) => c.toUpperCase())] = value;
+  }
+  return result;
+};
+
+// ----------------------------------------------------------------
 // DATABASE SERVICE
 // ----------------------------------------------------------------
 
@@ -204,7 +224,7 @@ export const dbService = {
     if (supabase) {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
       if (error && error.code !== 'PGRST116') throw error;
-      return data || null;
+      return data ? toCamelCase(data) : null;
     }
     const raw = localStorage.getItem(`kaisysales_mock_profile_${uid}`);
     return raw ? JSON.parse(raw) : null;
@@ -214,11 +234,11 @@ export const dbService = {
     if (supabase) {
       const { data, error } = await supabase.from('profiles').upsert({
         id: uid,
-        ...profileData,
+        ...toSnakeCase(profileData),
         updated_at: new Date().toISOString(),
       }).select().single();
       if (error) throw error;
-      return data;
+      return toCamelCase(data);
     }
     const current = JSON.parse(localStorage.getItem(`kaisysales_mock_profile_${uid}`) || '{}');
     const merged = { ...current, ...profileData, updatedAt: new Date().toISOString() };
@@ -234,7 +254,7 @@ export const dbService = {
         .eq('user_id', uid)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data.map(r => ({ ...r, id: String(r.id) }));
+      return data.map(r => ({ ...toCamelCase(r), id: String(r.id) }));
     }
     return mockGet(collection);
   },
@@ -243,11 +263,11 @@ export const dbService = {
     if (supabase) {
       const { data, error } = await supabase
         .from(collection)
-        .insert({ user_id: uid, ...recordData })
+        .insert({ user_id: uid, ...toSnakeCase(recordData) })
         .select()
         .single();
       if (error) throw error;
-      return { ...data, id: String(data.id) };
+      return { ...toCamelCase(data), id: String(data.id) };
     }
     const records = mockGet(collection);
     const newRecord = { ...recordData, id: 'rec-' + Math.random().toString(36).substr(2, 9), user_id: uid };
@@ -260,13 +280,13 @@ export const dbService = {
     if (supabase) {
       const { data, error } = await supabase
         .from(collection)
-        .update(recordData)
+        .update(toSnakeCase(recordData))
         .eq('id', recordId)
         .eq('user_id', uid)
         .select()
         .single();
       if (error) throw error;
-      return { ...data, id: String(data.id) };
+      return { ...toCamelCase(data), id: String(data.id) };
     }
     const records = mockGet(collection);
     const idx = records.findIndex(r => String(r.id) === String(recordId));
