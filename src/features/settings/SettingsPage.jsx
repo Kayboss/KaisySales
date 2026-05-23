@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
-import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase } from 'lucide-react';
+import { fetchCategories, updateCategory, deleteCategory } from '../../services/api';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check } from 'lucide-react';
 
 const Header = styled.div`
   display: flex;
@@ -123,6 +125,75 @@ const SuccessMessage = styled.div`
   font-size: 0.875rem;
 `;
 
+const CatCard = styled(FormCard)`
+  margin-top: 2rem;
+`;
+
+const CatHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+`;
+
+const CatList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const CatRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  background: ${({ theme }) => theme.colors.background.main};
+`;
+
+const CatName = styled.span`
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text.main};
+`;
+
+const CatActions = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const IconBtn = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: ${props => props.$danger ? '#BA1A1A' : '#89726C'};
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+
+  &:hover {
+    background: rgba(0,0,0,0.05);
+  }
+`;
+
+const EditInput = styled.input`
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid ${({ theme }) => theme.colors.primary};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+`;
+
+const EmptyState = styled.p`
+  color: ${({ theme }) => theme.colors.text.muted};
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 2rem;
+`;
+
 const SettingsPage = () => {
   const { user } = useAuthStore();
   const settings = useSettingsStore();
@@ -137,6 +208,56 @@ const SettingsPage = () => {
   });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const [categories, setCategories] = useState([]);
+  const [editingCatId, setEditingCatId] = useState(null);
+  const [editingCatName, setEditingCatName] = useState('');
+  const [deleteCatTarget, setDeleteCatTarget] = useState(null);
+
+  const loadCategories = async () => {
+    try {
+      const data = await fetchCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error('Failed to load categories', error);
+    }
+  };
+
+  useEffect(() => { loadCategories(); }, []);
+
+  const handleEditCategory = (cat) => {
+    setEditingCatId(cat.id);
+    setEditingCatName(cat.name);
+  };
+
+  const handleSaveCategory = async (id) => {
+    if (!editingCatName.trim()) return;
+    try {
+      await updateCategory(id, { name: editingCatName.trim() });
+      setEditingCatId(null);
+      setEditingCatName('');
+      await loadCategories();
+    } catch (error) {
+      console.error('Failed to update category', error);
+      alert('Failed to update category: ' + error.message);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCatId(null);
+    setEditingCatName('');
+  };
+
+  const handleDeleteCategory = async (id) => {
+    try {
+      await deleteCategory(id);
+      setDeleteCatTarget(null);
+      await loadCategories();
+    } catch (error) {
+      console.error('Failed to delete category', error);
+      alert('Failed to delete category: ' + error.message);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -284,6 +405,64 @@ const SettingsPage = () => {
           </ActionButton>
         </form>
       </FormCard>
+
+      <CatCard>
+        <CatHeader>
+          <div>
+            <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Manage Categories</h2>
+            <p style={{ color: '#55423D', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+              Edit or remove categories used across sales, expenses, and inventory.
+            </p>
+          </div>
+        </CatHeader>
+
+        {categories.length === 0 ? (
+          <EmptyState>No categories yet. Create one from a sales, expense, or inventory form.</EmptyState>
+        ) : (
+          <CatList>
+            {categories.map(cat => (
+              <CatRow key={cat.id}>
+                {editingCatId === cat.id ? (
+                  <>
+                    <EditInput
+                      type="text"
+                      value={editingCatName}
+                      onChange={e => setEditingCatName(e.target.value)}
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveCategory(cat.id); if (e.key === 'Escape') handleCancelEdit(); }}
+                    />
+                    <CatActions>
+                      <IconBtn onClick={() => handleSaveCategory(cat.id)}><Check size={16} /></IconBtn>
+                      <IconBtn onClick={handleCancelEdit}><X size={16} /></IconBtn>
+                    </CatActions>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <Tag size={16} color="#89726C" />
+                      <CatName>{cat.name}</CatName>
+                    </div>
+                    <CatActions>
+                      <IconBtn onClick={() => handleEditCategory(cat)}><Edit2 size={16} /></IconBtn>
+                      <IconBtn $danger onClick={() => setDeleteCatTarget(cat)}><Trash2 size={16} /></IconBtn>
+                    </CatActions>
+                  </>
+                )}
+              </CatRow>
+            ))}
+          </CatList>
+        )}
+      </CatCard>
+
+      {deleteCatTarget && (
+        <ConfirmDialog
+          title="Delete Category"
+          message={`Delete "${deleteCatTarget.name}"? This cannot be undone.`}
+          confirmLabel="Delete"
+          onConfirm={() => handleDeleteCategory(deleteCatTarget.id)}
+          onCancel={() => setDeleteCatTarget(null)}
+        />
+      )}
     </div>
   );
 };

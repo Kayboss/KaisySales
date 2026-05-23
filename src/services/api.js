@@ -175,3 +175,13 @@ export const createCategory = async (category) => {
   const uid = getUid();
   return await dbService.createUserRecord(uid, 'categories', category);
 };
+
+export const updateCategory = async (id, category) => {
+  const uid = getUid();
+  return await dbService.updateUserRecord(uid, 'categories', id, category);
+};
+
+export const deleteCategory = async (id) => {
+  const uid = getUid();
+  await dbService.deleteUserRecord(uid, 'categories', id);
+};
