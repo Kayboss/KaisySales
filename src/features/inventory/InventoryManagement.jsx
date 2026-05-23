@@ -156,6 +156,8 @@ const InventoryManagement = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [saving, setSaving] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '', category: '', stock: '', price: '', newCategory: ''
   });
@@ -178,6 +180,7 @@ const InventoryManagement = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    setSaving(true);
     let selectedCategory = formData.category;
     
     if (selectedCategory === 'new_category' && formData.newCategory) {
@@ -209,6 +212,9 @@ const InventoryManagement = () => {
       closeModal();
     } catch (error) {
       console.error('Failed to save inventory item', error);
+      alert('Failed to save inventory item: ' + error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -316,7 +322,7 @@ const InventoryManagement = () => {
           </FormRow>
           <ModalActions>
             <button type="button" className="cancel" onClick={closeModal}>Cancel</button>
-            <button type="submit" className="save">{isEditing ? "Update Item" : "Save Item"}</button>
+            <button type="submit" className="save" disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update Item" : "Save Item")}</button>
           </ModalActions>
         </form>
       </Modal>

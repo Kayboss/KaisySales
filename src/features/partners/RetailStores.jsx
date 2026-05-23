@@ -196,6 +196,8 @@ const RetailStores = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [saving, setSaving] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '', type: '', location: '', phone: '', contactName: ''
   });
@@ -220,6 +222,7 @@ const RetailStores = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    setSaving(true);
     const storePayload = {
       ...formData,
       status: 'Active'
@@ -235,6 +238,9 @@ const RetailStores = () => {
       closeModal();
     } catch (error) {
       console.error('Failed to save store', error);
+      alert('Failed to save store: ' + error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -363,7 +369,7 @@ const RetailStores = () => {
           </FormRow>
           <ModalActions>
             <button type="button" className="cancel" onClick={closeModal}>Cancel</button>
-            <button type="submit" className="save">{isEditing ? "Update Store" : "Save Store"}</button>
+            <button type="submit" className="save" disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update Store" : "Save Store")}</button>
           </ModalActions>
         </form>
       </Modal>

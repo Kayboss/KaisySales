@@ -149,6 +149,7 @@ const Invoices = () => {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [previewInvoice, setPreviewInvoice] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     customer: '', date: '', quantity: 1, unitPrice: '', status: 'pending'
@@ -169,6 +170,7 @@ const Invoices = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    setSaving(true);
     const totalAmount = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
     
     const invoicePayload = {
@@ -190,6 +192,9 @@ const Invoices = () => {
       closeModal();
     } catch (error) {
       console.error('Failed to save invoice', error);
+      alert('Failed to save invoice: ' + error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -319,7 +324,7 @@ const Invoices = () => {
           </FormRow>
           <ModalActions>
             <button type="button" className="cancel" onClick={closeModal}>Cancel</button>
-            <button type="submit" className="save">{isEditing ? "Update Invoice" : "Save Invoice"}</button>
+            <button type="submit" className="save" disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update Invoice" : "Save Invoice")}</button>
           </ModalActions>
         </form>
       </Modal>
