@@ -12,7 +12,7 @@ export const useSettingsStore = create((set) => ({
   phone: '',
   location: '',
   category: '',
-  isOnboarded: false,
+  isOnboarded: null,
   isLoading: false,
 
   /**
@@ -30,7 +30,7 @@ export const useSettingsStore = create((set) => ({
           phone: profile.phone || '',
           location: profile.location || '',
           category: profile.category || '',
-          isOnboarded: profile.isOnboarded || false,
+          isOnboarded: profile.isOnboarded === true,
           isLoading: false
         });
       } else {
@@ -48,7 +48,7 @@ export const useSettingsStore = create((set) => ({
       }
     } catch (error) {
       console.error('🔥 Error loading settings from Firestore:', error);
-      set({ isLoading: false });
+      set({ isLoading: false, isOnboarded: false });
     }
   },
 
@@ -81,7 +81,7 @@ export const useSettingsStore = create((set) => ({
     phone: '',
     location: '',
     category: '',
-    isOnboarded: false,
+    isOnboarded: null,
     isLoading: false
   })
 }));

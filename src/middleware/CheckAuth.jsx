@@ -49,8 +49,8 @@ const CheckAuth = () => {
     }
   }, [isAuthenticated, user?.uid, loadSettings, clearSettings]);
 
-  // Show a premium loading state if auth state is initializing or settings are fetching
-  if (!isInitialized || (isAuthenticated && isLoading)) {
+  // Show a premium loading state while auth initializes, profile loads, or onboarding status is undetermined
+  if (!isInitialized || (isAuthenticated && (isLoading || isOnboarded === null))) {
     return (
       <LoaderContainer>
         <Spinner />

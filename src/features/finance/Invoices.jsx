@@ -4,7 +4,7 @@ import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2 } from 'lucid
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
-import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice } from '../../services/api';
+import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
 const Header = styled.div`
@@ -143,6 +143,7 @@ const ModalActions = styled.div`
 
 const Invoices = () => {
   const [invoices, setInvoices] = useState([]);
+  const [stores, setStores] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -157,8 +158,9 @@ const Invoices = () => {
 
   const loadData = async () => {
     try {
-      const data = await fetchInvoices();
+      const [data, storeData] = await Promise.all([fetchInvoices(), fetchStores()]);
       setInvoices(data.reverse());
+      setStores(storeData);
     } catch (error) {
       console.error('Failed to load invoices', error);
     }
@@ -263,14 +265,24 @@ const Invoices = () => {
       <Modal isOpen={isModalOpen} onClose={closeModal} title={isEditing ? "Edit Invoice" : "Create New Invoice"}>
         <form onSubmit={handleSave}>
           <FormGroup>
-            <label>Customer Name</label>
-            <input 
-              type="text" 
-              required 
-              value={formData.customer}
-              onChange={e => setFormData({...formData, customer: e.target.value})}
-              placeholder="e.g. Heritage Boutique" 
-            />
+            <label>Customer (Retail Store)</label>
+            {stores.length === 0 ? (
+              <div style={{ padding: '0.75rem', background: '#FFF8F0', borderRadius: '8px', border: '1px solid #F0EEE8', fontSize: '0.9rem', color: '#55423D' }}>
+                No retail stores saved yet.{' '}
+                <a href="/retail-stores" style={{ color: '#6F240A', fontWeight: 700 }}>Add a store first</a>.
+              </div>
+            ) : (
+              <select 
+                required 
+                value={formData.customer}
+                onChange={e => setFormData({...formData, customer: e.target.value})}
+              >
+                <option value="">-- Select a store --</option>
+                {stores.map(store => (
+                  <option key={store.id} value={store.name}>{store.name}</option>
+                ))}
+              </select>
+            )}
           </FormGroup>
           <FormGroup>
             <label>Due Date</label>
