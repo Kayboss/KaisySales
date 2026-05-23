@@ -203,7 +203,7 @@ const ExpenseTracking = () => {
     // Handle new category creation
     if (selectedCategory === 'new_category' && formData.newCategory) {
       try {
-        const newCat = await createCategory({ id: Math.random().toString(), name: formData.newCategory });
+        const newCat = await createCategory({ name: formData.newCategory });
         selectedCategory = newCat.name;
         await loadData();
       } catch (err) {
@@ -227,7 +227,7 @@ const ExpenseTracking = () => {
       if (isEditing) {
         await updateExpense(editId, expensePayload);
       } else {
-        await createExpense({ ...expensePayload, id: Math.random().toString() });
+        await createExpense(expensePayload);
       }
       await loadData();
       closeModal();

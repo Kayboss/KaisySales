@@ -182,7 +182,7 @@ const InventoryManagement = () => {
     
     if (selectedCategory === 'new_category' && formData.newCategory) {
       try {
-        const newCat = await createCategory({ id: Math.random().toString(), name: formData.newCategory });
+        const newCat = await createCategory({ name: formData.newCategory });
         selectedCategory = newCat.name;
         await loadData();
       } catch (err) {
@@ -203,7 +203,7 @@ const InventoryManagement = () => {
       if (isEditing) {
         await updateInventoryItem(editId, itemPayload);
       } else {
-        await createInventoryItem({ ...itemPayload, id: Math.random().toString() });
+        await createInventoryItem(itemPayload);
       }
       await loadData();
       closeModal();

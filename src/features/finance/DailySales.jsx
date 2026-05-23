@@ -216,7 +216,7 @@ const DailySales = () => {
     // Handle new category creation
     if (selectedCategory === 'new_category' && formData.newCategory) {
       try {
-        const newCat = await createCategory({ id: Math.random().toString(), name: formData.newCategory });
+        const newCat = await createCategory({ name: formData.newCategory });
         selectedCategory = newCat.name;
         await loadData(); // refresh categories
       } catch (err) {
@@ -241,7 +241,7 @@ const DailySales = () => {
       if (isEditing) {
         await updateSale(editId, salePayload);
       } else {
-        await createSale({ ...salePayload, id: `SA-0${Math.floor(100 + Math.random() * 900)}` });
+        await createSale(salePayload);
       }
       await loadData();
       closeModal();

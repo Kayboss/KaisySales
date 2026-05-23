@@ -184,7 +184,7 @@ const Invoices = () => {
       if (isEditing) {
         await updateInvoice(editId, invoicePayload);
       } else {
-        await createInvoice({ ...invoicePayload, id: `INV-00${Math.floor(10 + Math.random() * 90)}` });
+        await createInvoice(invoicePayload);
       }
       await loadData();
       closeModal();

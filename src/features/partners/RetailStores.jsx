@@ -229,7 +229,7 @@ const RetailStores = () => {
       if (isEditing) {
         await updateStore(editId, storePayload);
       } else {
-        await createStore({ ...storePayload, id: Math.random().toString() });
+        await createStore(storePayload);
       }
       await loadData();
       closeModal();
