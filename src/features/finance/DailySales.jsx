@@ -184,6 +184,7 @@ const DailySales = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sales, setSales] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [inventoryItems, setInventoryItems] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -198,10 +199,12 @@ const DailySales = () => {
 
   const loadData = async () => {
     try {
-      const data = await fetchSales();
+      const [data, cats, inv] = await Promise.all([
+        fetchSales(), fetchCategories('sales'), fetchInventory()
+      ]);
       setSales(data.reverse());
-      const cats = await fetchCategories('sales');
       setCategories(cats);
+      setInventoryItems(inv);
     } catch (error) {
       console.error('Failed to load sales or categories', error);
     }
@@ -361,14 +364,34 @@ const DailySales = () => {
       <Modal isOpen={isModalOpen} onClose={closeModal} title={isEditing ? "Edit Sale" : "Record New Sale"}>
         <form onSubmit={handleSave}>
           <FormGroup>
-            <label>Item Name</label>
-            <input 
-              type="text" 
-              required 
-              value={formData.item}
-              onChange={e => setFormData({...formData, item: e.target.value})}
-              placeholder="e.g. Kente Cloth - Royal Gold" 
-            />
+            <label>Item Sold</label>
+            {inventoryItems.length === 0 ? (
+              <div style={{ padding: '0.75rem', background: '#FFF8F0', borderRadius: '8px', border: '1px solid #F0EEE8', fontSize: '0.9rem', color: '#55423D' }}>
+                No inventory items available.{' '}
+                <a href="/inventory" style={{ color: '#6F240A', fontWeight: 700 }}>Add inventory first</a>.
+              </div>
+            ) : (
+              <select 
+                required 
+                value={formData.item}
+                onChange={e => {
+                  const selected = inventoryItems.find(i => i.name === e.target.value);
+                  setFormData(prev => ({
+                    ...prev,
+                    item: e.target.value,
+                    category: selected?.category || prev.category,
+                    unitPrice: selected?.price ? parseFloat(selected.price.replace(/[^0-9.]/g, '')) : prev.unitPrice
+                  }));
+                }}
+              >
+                <option value="">-- Select an item --</option>
+                {inventoryItems.map(item => (
+                  <option key={item.id} value={item.name}>
+                    {item.name} {item.stock > 0 ? `(${item.stock} in stock)` : '(out of stock)'}
+                  </option>
+                ))}
+              </select>
+            )}
           </FormGroup>
           <FormGroup>
             <label>Category</label>
