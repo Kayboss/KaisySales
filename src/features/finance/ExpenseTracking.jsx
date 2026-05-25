@@ -187,7 +187,7 @@ const ExpenseTracking = () => {
     try {
       const data = await fetchExpenses();
       setExpenses(data.reverse());
-      const cats = await fetchCategories();
+      const cats = await fetchCategories('expense');
       setCategories(cats);
     } catch (error) {
       console.error('Failed to load expenses or categories', error);
@@ -206,7 +206,7 @@ const ExpenseTracking = () => {
     // Handle new category creation
     if (selectedCategory === 'new_category' && formData.newCategory) {
       try {
-        const newCat = await createCategory({ name: formData.newCategory });
+        const newCat = await createCategory({ name: formData.newCategory, type: 'expense' });
         selectedCategory = newCat.name;
         await loadData();
       } catch (err) {

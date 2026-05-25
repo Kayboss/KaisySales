@@ -161,10 +161,11 @@ export const deleteStore = async (id) => {
 // ====================================================
 // 6. CATEGORIES
 // ====================================================
-export const fetchCategories = async () => {
+export const fetchCategories = async (type) => {
   try {
     const uid = getUid();
-    return await dbService.fetchUserRecords(uid, 'categories');
+    const all = await dbService.fetchUserRecords(uid, 'categories');
+    return type ? all.filter(c => c.type === type) : all;
   } catch (error) {
     console.error('🔥 Error fetching categories:', error);
     return [];

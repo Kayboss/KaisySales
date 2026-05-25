@@ -200,7 +200,7 @@ const DailySales = () => {
     try {
       const data = await fetchSales();
       setSales(data.reverse());
-      const cats = await fetchCategories();
+      const cats = await fetchCategories('sales');
       setCategories(cats);
     } catch (error) {
       console.error('Failed to load sales or categories', error);
@@ -219,7 +219,7 @@ const DailySales = () => {
     // Handle new category creation
     if (selectedCategory === 'new_category' && formData.newCategory) {
       try {
-        const newCat = await createCategory({ name: formData.newCategory });
+        const newCat = await createCategory({ name: formData.newCategory, type: 'sales' });
         selectedCategory = newCat.name;
         await loadData(); // refresh categories
       } catch (err) {

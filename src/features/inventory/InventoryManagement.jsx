@@ -166,7 +166,7 @@ const InventoryManagement = () => {
     try {
       const data = await fetchInventory();
       setInventory(data.reverse());
-      const cats = await fetchCategories();
+      const cats = await fetchCategories('inventory');
       setCategories(cats);
     } catch (error) {
       console.error('Failed to load inventory', error);
@@ -185,7 +185,7 @@ const InventoryManagement = () => {
     
     if (selectedCategory === 'new_category' && formData.newCategory) {
       try {
-        const newCat = await createCategory({ name: formData.newCategory });
+        const newCat = await createCategory({ name: formData.newCategory, type: 'inventory' });
         selectedCategory = newCat.name;
         await loadData();
       } catch (err) {

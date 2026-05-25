@@ -194,6 +194,34 @@ const EmptyState = styled.p`
   padding: 2rem;
 `;
 
+const TypeBadge = styled.span`
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: ${props =>
+    props.$type === 'expense' ? 'rgba(186, 26, 26, 0.1)' :
+    props.$type === 'inventory' ? 'rgba(37, 67, 47, 0.1)' :
+    'rgba(111, 36, 10, 0.1)'};
+  color: ${props =>
+    props.$type === 'expense' ? '#BA1A1A' :
+    props.$type === 'inventory' ? '#25432F' :
+    '#6F240A'};
+`;
+
+const GroupLabel = styled.div`
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: ${({ theme }) => theme.colors.text.muted};
+  padding: 0.75rem 0 0.25rem;
+
+  &:first-child { padding-top: 0; }
+`;
+
 const SettingsPage = () => {
   const { user } = useAuthStore();
   const settings = useSettingsStore();
@@ -420,36 +448,46 @@ const SettingsPage = () => {
           <EmptyState>No categories yet. Create one from a sales, expense, or inventory form.</EmptyState>
         ) : (
           <CatList>
-            {categories.map(cat => (
-              <CatRow key={cat.id}>
-                {editingCatId === cat.id ? (
-                  <>
-                    <EditInput
-                      type="text"
-                      value={editingCatName}
-                      onChange={e => setEditingCatName(e.target.value)}
-                      autoFocus
-                      onKeyDown={e => { if (e.key === 'Enter') handleSaveCategory(cat.id); if (e.key === 'Escape') handleCancelEdit(); }}
-                    />
-                    <CatActions>
-                      <IconBtn onClick={() => handleSaveCategory(cat.id)}><Check size={16} /></IconBtn>
-                      <IconBtn onClick={handleCancelEdit}><X size={16} /></IconBtn>
-                    </CatActions>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <Tag size={16} color="#89726C" />
-                      <CatName>{cat.name}</CatName>
-                    </div>
-                    <CatActions>
-                      <IconBtn onClick={() => handleEditCategory(cat)}><Edit2 size={16} /></IconBtn>
-                      <IconBtn $danger onClick={() => setDeleteCatTarget(cat)}><Trash2 size={16} /></IconBtn>
-                    </CatActions>
-                  </>
-                )}
-              </CatRow>
-            ))}
+            {['sales', 'expense', 'inventory'].map(group => {
+              const grouped = categories.filter(c => (c.type || 'sales') === group);
+              if (grouped.length === 0) return null;
+              return (
+                <div key={group}>
+                  <GroupLabel>{group} categories</GroupLabel>
+                  {grouped.map(cat => (
+                    <CatRow key={cat.id}>
+                      {editingCatId === cat.id ? (
+                        <>
+                          <EditInput
+                            type="text"
+                            value={editingCatName}
+                            onChange={e => setEditingCatName(e.target.value)}
+                            autoFocus
+                            onKeyDown={e => { if (e.key === 'Enter') handleSaveCategory(cat.id); if (e.key === 'Escape') handleCancelEdit(); }}
+                          />
+                          <CatActions>
+                            <IconBtn onClick={() => handleSaveCategory(cat.id)}><Check size={16} /></IconBtn>
+                            <IconBtn onClick={handleCancelEdit}><X size={16} /></IconBtn>
+                          </CatActions>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <Tag size={16} color="#89726C" />
+                            <CatName>{cat.name}</CatName>
+                            <TypeBadge $type={cat.type || 'sales'}>{cat.type || 'sales'}</TypeBadge>
+                          </div>
+                          <CatActions>
+                            <IconBtn onClick={() => handleEditCategory(cat)}><Edit2 size={16} /></IconBtn>
+                            <IconBtn $danger onClick={() => setDeleteCatTarget(cat)}><Trash2 size={16} /></IconBtn>
+                          </CatActions>
+                        </>
+                      )}
+                    </CatRow>
+                  ))}
+                </div>
+              );
+            })}
           </CatList>
         )}
       </CatCard>
