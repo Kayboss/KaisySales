@@ -470,7 +470,7 @@ const ExpenseTracking = () => {
                   <div style={{ fontSize: '0.75rem', color: '#55423D' }}>{expense.date}</div>
                 </div>
               </div>
-              <div style={{ fontWeight: 700, color: '#6F240A', textAlign: 'right' }} className="data-tabular">
+              <div style={{ fontWeight: 700, color: '#6F240A', textAlign: 'center' }} className="data-tabular">
                 {expense.amount}
               </div>
               <div style={{ whiteSpace: 'nowrap' }}>
