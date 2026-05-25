@@ -302,6 +302,15 @@ const InvoicePreview = ({ invoice, onClose }) => {
   const quantity = parseInt(invoice.quantity) || 1;
   const unitPrice = parseFloat(invoice.unitPrice) || (quantity > 0 ? totalAmount / quantity : 0);
 
+  const getDescription = () => {
+    try {
+      const items = typeof invoice.items === 'string' ? JSON.parse(invoice.items) : invoice.items;
+      return items?.[0]?.name || `${invoice.customer} - Order`;
+    } catch {
+      return `${invoice.customer} - Order`;
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -380,7 +389,7 @@ const InvoicePreview = ({ invoice, onClose }) => {
             </thead>
             <tbody>
               <tr>
-                <Td>{invoice.customer} - Order</Td>
+                <Td>{getDescription()}</Td>
                 <Td style={{ textAlign: 'right' }}>{quantity}</Td>
                 <Td style={{ textAlign: 'right' }}>GH₵{unitPrice.toFixed(2)}</Td>
                 <Td style={{ textAlign: 'right', fontWeight: 700 }}>{invoice.amount}</Td>

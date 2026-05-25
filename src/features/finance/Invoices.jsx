@@ -4,7 +4,7 @@ import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2 } from 'lucid
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
-import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores } from '../../services/api';
+import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
 const Header = styled.div`
@@ -151,16 +151,18 @@ const Invoices = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [previewInvoice, setPreviewInvoice] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [inventoryItems, setInventoryItems] = useState([]);
 
   const [formData, setFormData] = useState({
-    customer: '', date: '', quantity: 1, unitPrice: '', status: 'pending'
+    customer: '', date: '', item: '', quantity: 1, unitPrice: '', status: 'pending', discount: 0
   });
 
   const loadData = async () => {
     try {
-      const [data, storeData] = await Promise.all([fetchInvoices(), fetchStores()]);
+      const [data, storeData, inv] = await Promise.all([fetchInvoices(), fetchStores(), fetchInventory()]);
       setInvoices(data.reverse());
       setStores(storeData);
+      setInventoryItems(inv);
     } catch (error) {
       console.error('Failed to load invoices', error);
     }
@@ -173,7 +175,9 @@ const Invoices = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
-    const totalAmount = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
+    const subtotal = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
+    const discountPct = parseFloat(formData.discount) || 0;
+    const totalAmount = subtotal * (1 - discountPct / 100);
     
     const invoicePayload = {
       customer: formData.customer,
@@ -181,7 +185,8 @@ const Invoices = () => {
       quantity: formData.quantity,
       unitPrice: formData.unitPrice,
       status: formData.status,
-      amount: `GH₵${totalAmount.toFixed(2)}`
+      amount: `GH₵${totalAmount.toFixed(2)}`,
+      items: formData.item ? [{ name: formData.item, quantity: parseInt(formData.quantity), unitPrice: parseFloat(formData.unitPrice) }] : null
     };
     
     try {
@@ -201,12 +206,15 @@ const Invoices = () => {
   };
 
   const handleEdit = (invoice) => {
+    const itemInfo = Array.isArray(invoice.items) && invoice.items.length > 0 ? invoice.items[0] : null;
     setFormData({
       customer: invoice.customer,
       date: invoice.date,
+      item: itemInfo?.name || '',
       quantity: invoice.quantity || 1,
       unitPrice: invoice.unitPrice || parseFloat(invoice.amount.replace('GH₵', '').replace(',', '')),
-      status: invoice.status
+      status: invoice.status,
+      discount: 0
     });
     setEditId(invoice.id);
     setIsEditing(true);
@@ -227,7 +235,7 @@ const Invoices = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
-    setFormData({ customer: '', date: '', quantity: 1, unitPrice: '', status: 'pending' });
+    setFormData({ customer: '', date: '', item: '', quantity: 1, unitPrice: '', status: 'pending', discount: 0 });
   };
 
   const handleExport = () => {
@@ -285,6 +293,35 @@ const Invoices = () => {
             )}
           </FormGroup>
           <FormGroup>
+            <label>Item Sold</label>
+            {inventoryItems.length === 0 ? (
+              <div style={{ padding: '0.75rem', background: '#FFF8F0', borderRadius: '8px', border: '1px solid #F0EEE8', fontSize: '0.9rem', color: '#55423D' }}>
+                No inventory items available.{' '}
+                <a href="/inventory" style={{ color: '#6F240A', fontWeight: 700 }}>Add inventory first</a>.
+              </div>
+            ) : (
+              <select 
+                required 
+                value={formData.item}
+                onChange={e => {
+                  const selected = inventoryItems.find(i => i.name === e.target.value);
+                  setFormData(prev => ({
+                    ...prev,
+                    item: e.target.value,
+                    unitPrice: selected?.price ? parseFloat(selected.price.replace(/[^0-9.]/g, '')) : prev.unitPrice
+                  }));
+                }}
+              >
+                <option value="">-- Select an item --</option>
+                {inventoryItems.map(item => (
+                  <option key={item.id} value={item.name}>
+                    {item.name} {item.stock > 0 ? `(${item.stock} in stock)` : '(out of stock)'}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FormGroup>
+          <FormGroup>
             <label>Due Date</label>
             <input 
               type="date" 
@@ -318,12 +355,15 @@ const Invoices = () => {
           </FormRow>
           <FormRow>
             <FormGroup>
-              <label>Total Amount (GH₵)</label>
+              <label>Discount (%)</label>
               <input 
-                type="text" 
-                readOnly 
-                value={(formData.quantity && formData.unitPrice) ? (formData.quantity * formData.unitPrice).toFixed(2) : '0.00'}
-                style={{ background: '#f5f5f5', cursor: 'not-allowed' }}
+                type="number" 
+                min="0" 
+                max="100" 
+                step="0.5" 
+                value={formData.discount}
+                onChange={e => setFormData({...formData, discount: e.target.value})}
+                placeholder="0" 
               />
             </FormGroup>
             <FormGroup>
@@ -334,6 +374,19 @@ const Invoices = () => {
               </select>
             </FormGroup>
           </FormRow>
+          <FormGroup>
+            <label>Total Amount (GH₵)</label>
+            <input 
+              type="text" 
+              readOnly 
+              value={(formData.quantity && formData.unitPrice) ? (() => {
+                const sub = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
+                const disc = parseFloat(formData.discount) || 0;
+                return (sub * (1 - disc / 100)).toFixed(2);
+              })() : '0.00'}
+              style={{ background: '#f5f5f5', cursor: 'not-allowed' }}
+            />
+          </FormGroup>
           <ModalActions>
             <button type="button" className="cancel" onClick={closeModal}>Cancel</button>
             <button type="submit" className="save" disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update Invoice" : "Save Invoice")}</button>

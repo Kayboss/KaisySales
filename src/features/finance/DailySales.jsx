@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Plus, Search, Tag, TrendingUp, Calendar, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchSales, createSale, updateSale, deleteSale, fetchCategories, createCategory, fetchInventory, updateInventoryItem } from '../../services/api';
+import { fetchSales, createSale, updateSale, deleteSale, fetchInventory, updateInventoryItem } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
 const Header = styled.div`
@@ -183,7 +183,6 @@ const ModalActions = styled.div`
 const DailySales = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sales, setSales] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -194,19 +193,18 @@ const DailySales = () => {
   const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
-    item: '', category: '', quantity: 1, unitPrice: '', paymentMethod: 'Cash', newCategory: ''
+    item: '', quantity: 1, unitPrice: '', paymentMethod: 'Cash', discount: 0
   });
 
   const loadData = async () => {
     try {
-      const [data, cats, inv] = await Promise.all([
-        fetchSales(), fetchCategories('sales'), fetchInventory()
+      const [data, inv] = await Promise.all([
+        fetchSales(), fetchInventory()
       ]);
       setSales(data.reverse());
-      setCategories(cats);
       setInventoryItems(inv);
     } catch (error) {
-      console.error('Failed to load sales or categories', error);
+      console.error('Failed to load data', error);
     }
   };
 
@@ -217,24 +215,13 @@ const DailySales = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
-    let selectedCategory = formData.category;
-    
-    // Handle new category creation
-    if (selectedCategory === 'new_category' && formData.newCategory) {
-      try {
-        const newCat = await createCategory({ name: formData.newCategory, type: 'sales' });
-        selectedCategory = newCat.name;
-        await loadData(); // refresh categories
-      } catch (err) {
-        console.error('Failed to create category', err);
-      }
-    }
 
-    const totalAmount = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
+    const subtotal = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
+    const discountPct = parseFloat(formData.discount) || 0;
+    const totalAmount = subtotal * (1 - discountPct / 100);
     
     const salePayload = {
       item: formData.item,
-      category: selectedCategory,
       quantity: formData.quantity,
       unitPrice: formData.unitPrice,
       paymentMethod: formData.paymentMethod,
@@ -280,11 +267,10 @@ const DailySales = () => {
   const handleEdit = (sale) => {
     setFormData({
       item: sale.item,
-      category: sale.category,
       quantity: sale.quantity || 1,
       unitPrice: sale.unitPrice || parseFloat(sale.amount.replace('GH₵', '').replace(',', '')),
       paymentMethod: sale.paymentMethod,
-      newCategory: ''
+      discount: 0
     });
     setEditId(sale.id);
     setIsEditing(true);
@@ -306,7 +292,7 @@ const DailySales = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
-    setFormData({ item: '', category: '', quantity: 1, unitPrice: '', paymentMethod: 'Cash', newCategory: '' });
+    setFormData({ item: '', quantity: 1, unitPrice: '', paymentMethod: 'Cash', discount: 0 });
   };
 
   const filteredSales = sales.filter(sale => 
@@ -393,28 +379,6 @@ const DailySales = () => {
               </select>
             )}
           </FormGroup>
-          <FormGroup>
-            <label>Category</label>
-            <select required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
-              <option value="">Select Category</option>
-              {categories.map(cat => (
-                <option key={cat.id} value={cat.name}>{cat.name}</option>
-              ))}
-              <option value="new_category">+ Add New Category...</option>
-            </select>
-          </FormGroup>
-          {formData.category === 'new_category' && (
-            <FormGroup>
-              <label>New Category Name</label>
-              <input 
-                type="text" 
-                required 
-                value={formData.newCategory}
-                onChange={e => setFormData({...formData, newCategory: e.target.value})}
-                placeholder="e.g. Handmade Goods" 
-              />
-            </FormGroup>
-          )}
           <FormRow>
             <FormGroup>
               <label>Quantity</label>
@@ -440,12 +404,15 @@ const DailySales = () => {
           </FormRow>
           <FormRow>
             <FormGroup>
-              <label>Total Amount (GH₵)</label>
+              <label>Discount (%)</label>
               <input 
-                type="text" 
-                readOnly 
-                value={(formData.quantity && formData.unitPrice) ? (formData.quantity * formData.unitPrice).toFixed(2) : '0.00'}
-                style={{ background: '#f5f5f5', cursor: 'not-allowed' }}
+                type="number" 
+                min="0" 
+                max="100" 
+                step="0.5" 
+                value={formData.discount}
+                onChange={e => setFormData({...formData, discount: e.target.value})}
+                placeholder="0" 
               />
             </FormGroup>
             <FormGroup>
@@ -457,6 +424,19 @@ const DailySales = () => {
               </select>
             </FormGroup>
           </FormRow>
+          <FormGroup>
+            <label>Total Amount (GH₵)</label>
+            <input 
+              type="text" 
+              readOnly 
+              value={(formData.quantity && formData.unitPrice) ? (() => {
+                const sub = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
+                const disc = parseFloat(formData.discount) || 0;
+                return (sub * (1 - disc / 100)).toFixed(2);
+              })() : '0.00'}
+              style={{ background: '#f5f5f5', cursor: 'not-allowed' }}
+            />
+          </FormGroup>
           <ModalActions>
             <button type="button" className="cancel" onClick={closeModal}>Cancel</button>
             <button type="submit" className="save" disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update Sale" : "Save Sale")}</button>
