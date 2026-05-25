@@ -302,14 +302,13 @@ const InvoicePreview = ({ invoice, onClose }) => {
   const quantity = parseInt(invoice.quantity) || 1;
   const unitPrice = parseFloat(invoice.unitPrice) || (quantity > 0 ? totalAmount / quantity : 0);
 
-  const getDescription = () => {
+  const lineItems = (() => {
     try {
       const items = typeof invoice.items === 'string' ? JSON.parse(invoice.items) : invoice.items;
-      return items?.[0]?.name || `${invoice.customer} - Order`;
-    } catch {
-      return `${invoice.customer} - Order`;
-    }
-  };
+      if (Array.isArray(items) && items.length > 0) return items;
+    } catch {}
+    return [{ name: `${invoice.customer} - Order`, quantity, unitPrice, amount: totalAmount }];
+  })();
 
   const handlePrint = () => {
     window.print();
@@ -388,12 +387,16 @@ const InvoicePreview = ({ invoice, onClose }) => {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <Td>{getDescription()}</Td>
-                <Td style={{ textAlign: 'right' }}>{quantity}</Td>
-                <Td style={{ textAlign: 'right' }}>GH₵{unitPrice.toFixed(2)}</Td>
-                <Td style={{ textAlign: 'right', fontWeight: 700 }}>{invoice.amount}</Td>
-              </tr>
+              {lineItems.map((item, idx) => (
+                <tr key={idx}>
+                  <Td>{item.name}</Td>
+                  <Td style={{ textAlign: 'right' }}>{parseInt(item.quantity) || 1}</Td>
+                  <Td style={{ textAlign: 'right' }}>GH₵{(parseFloat(item.unitPrice) || 0).toFixed(2)}</Td>
+                  <Td style={{ textAlign: 'right', fontWeight: 700 }}>
+                    GH₵{((parseInt(item.quantity) || 1) * (parseFloat(item.unitPrice) || 0)).toFixed(2)}
+                  </Td>
+                </tr>
+              ))}
             </tbody>
           </Table>
 

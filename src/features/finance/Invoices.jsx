@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircle } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
@@ -113,6 +113,14 @@ const FormRow = styled.div`
   gap: 1rem;
 `;
 
+const LineItemRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 80px 100px 100px 36px;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 0.75rem;
+`;
+
 const ModalActions = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -154,8 +162,40 @@ const Invoices = () => {
   const [inventoryItems, setInventoryItems] = useState([]);
 
   const [formData, setFormData] = useState({
-    customer: '', date: '', item: '', quantity: 1, unitPrice: '', status: 'pending', discount: 0
+    customer: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0
   });
+
+  const addItem = () => {
+    setFormData(prev => ({ ...prev, items: [...prev.items, { name: '', quantity: 1, unitPrice: '' }] }));
+  };
+
+  const removeItem = (index) => {
+    setFormData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
+  };
+
+  const updateItem = (index, field, value) => {
+    setFormData(prev => {
+      const items = [...prev.items];
+      items[index] = { ...items[index], [field]: value };
+      if (field === 'name') {
+        const selected = inventoryItems.find(i => i.name === value);
+        if (selected?.price) {
+          items[index].unitPrice = parseFloat(selected.price.replace(/[^0-9.]/g, ''));
+        }
+      }
+      return { ...prev, items };
+    });
+  };
+
+  const lineTotal = (item) => {
+    const q = parseFloat(item.quantity) || 0;
+    const p = parseFloat(item.unitPrice) || 0;
+    return q * p;
+  };
+
+  const invoiceSubtotal = formData.items.reduce((sum, i) => sum + lineTotal(i), 0);
+  const discountPct = parseFloat(formData.discount) || 0;
+  const invoiceTotal = invoiceSubtotal * (1 - discountPct / 100);
 
   const loadData = async () => {
     try {
@@ -175,18 +215,20 @@ const Invoices = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
-    const subtotal = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
+    const items = formData.items.filter(i => i.name);
+    const subtotal = items.reduce((sum, i) => sum + (parseFloat(i.quantity) * parseFloat(i.unitPrice)), 0);
+    const totalQty = items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0);
     const discountPct = parseFloat(formData.discount) || 0;
     const totalAmount = subtotal * (1 - discountPct / 100);
     
     const invoicePayload = {
       customer: formData.customer,
       date: formData.date,
-      quantity: formData.quantity,
-      unitPrice: formData.unitPrice,
+      quantity: totalQty,
+      unitPrice: items[0]?.unitPrice || '',
       status: formData.status,
       amount: `GH₵${totalAmount.toFixed(2)}`,
-      items: formData.item ? [{ name: formData.item, quantity: parseInt(formData.quantity), unitPrice: parseFloat(formData.unitPrice) }] : null
+      items: items.map(i => ({ name: i.name, quantity: parseInt(i.quantity), unitPrice: parseFloat(i.unitPrice) }))
     };
     
     try {
@@ -206,13 +248,13 @@ const Invoices = () => {
   };
 
   const handleEdit = (invoice) => {
-    const itemInfo = Array.isArray(invoice.items) && invoice.items.length > 0 ? invoice.items[0] : null;
+    const savedItems = Array.isArray(invoice.items) && invoice.items.length > 0
+      ? invoice.items.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice }))
+      : [{ name: '', quantity: invoice.quantity || 1, unitPrice: invoice.unitPrice || parseFloat(invoice.amount.replace('GH₵', '').replace(',', '')) }];
     setFormData({
       customer: invoice.customer,
       date: invoice.date,
-      item: itemInfo?.name || '',
-      quantity: invoice.quantity || 1,
-      unitPrice: invoice.unitPrice || parseFloat(invoice.amount.replace('GH₵', '').replace(',', '')),
+      items: savedItems,
       status: invoice.status,
       discount: 0
     });
@@ -235,7 +277,7 @@ const Invoices = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
-    setFormData({ customer: '', date: '', item: '', quantity: 1, unitPrice: '', status: 'pending', discount: 0 });
+    setFormData({ customer: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0 });
   };
 
   const handleExport = () => {
@@ -293,35 +335,6 @@ const Invoices = () => {
             )}
           </FormGroup>
           <FormGroup>
-            <label>Item Sold</label>
-            {inventoryItems.length === 0 ? (
-              <div style={{ padding: '0.75rem', background: '#FFF8F0', borderRadius: '8px', border: '1px solid #F0EEE8', fontSize: '0.9rem', color: '#55423D' }}>
-                No inventory items available.{' '}
-                <a href="/inventory" style={{ color: '#6F240A', fontWeight: 700 }}>Add inventory first</a>.
-              </div>
-            ) : (
-              <select 
-                required 
-                value={formData.item}
-                onChange={e => {
-                  const selected = inventoryItems.find(i => i.name === e.target.value);
-                  setFormData(prev => ({
-                    ...prev,
-                    item: e.target.value,
-                    unitPrice: selected?.price ? parseFloat(selected.price.replace(/[^0-9.]/g, '')) : prev.unitPrice
-                  }));
-                }}
-              >
-                <option value="">-- Select an item --</option>
-                {inventoryItems.map(item => (
-                  <option key={item.id} value={item.name}>
-                    {item.name} {item.stock > 0 ? `(${item.stock} in stock)` : '(out of stock)'}
-                  </option>
-                ))}
-              </select>
-            )}
-          </FormGroup>
-          <FormGroup>
             <label>Due Date</label>
             <input 
               type="date" 
@@ -330,29 +343,74 @@ const Invoices = () => {
               onChange={e => setFormData({...formData, date: e.target.value})}
             />
           </FormGroup>
-          <FormRow>
-            <FormGroup>
-              <label>Quantity</label>
-              <input 
-                type="number" 
-                min="1"
-                required 
-                value={formData.quantity}
-                onChange={e => setFormData({...formData, quantity: e.target.value})}
-              />
-            </FormGroup>
-            <FormGroup>
-              <label>Unit Price (GH₵)</label>
-              <input 
-                type="number" 
-                step="0.01" 
-                required 
-                value={formData.unitPrice}
-                onChange={e => setFormData({...formData, unitPrice: e.target.value})}
-                placeholder="0.00" 
-              />
-            </FormGroup>
-          </FormRow>
+
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <label style={{ fontWeight: 600, color: '#1C1C18' }}>Items</label>
+              <button type="button" onClick={addItem} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'none', border: '1px solid #D0C8C4', borderRadius: '6px', padding: '0.35rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: '#6F240A' }}>
+                <PlusCircle size={14} /> Add Item
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 100px 36px', gap: '0.75rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 700, color: '#89726C' }}>
+              <span>Item</span>
+              <span style={{ textAlign: 'right' }}>Qty</span>
+              <span style={{ textAlign: 'right' }}>Price</span>
+              <span style={{ textAlign: 'right' }}>Total</span>
+              <span></span>
+            </div>
+            {formData.items.map((item, idx) => (
+              <LineItemRow key={idx}>
+                {inventoryItems.length === 0 ? (
+                  <div style={{ padding: '0.5rem', background: '#FFF8F0', borderRadius: '6px', border: '1px solid #F0EEE8', fontSize: '0.8rem', color: '#55423D' }}>
+                    <a href="/inventory" style={{ color: '#6F240A', fontWeight: 700 }}>Add inventory first</a>.
+                  </div>
+                ) : (
+                  <select 
+                    required={idx === 0}
+                    value={item.name}
+                    onChange={e => updateItem(idx, 'name', e.target.value)}
+                    style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit' }}
+                  >
+                    <option value="">-- Select --</option>
+                    {inventoryItems.map(inv => (
+                      <option key={inv.id} value={inv.name}>
+                        {inv.name} {inv.stock > 0 ? `(${inv.stock})` : '(0)'}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <input 
+                  type="number" 
+                  min="1"
+                  required={idx === 0}
+                  value={item.quantity}
+                  onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', textAlign: 'right' }}
+                />
+                <input 
+                  type="number" 
+                  step="0.01"
+                  required={idx === 0}
+                  value={item.unitPrice}
+                  onChange={e => updateItem(idx, 'unitPrice', e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', textAlign: 'right' }}
+                  placeholder="0.00"
+                />
+                <div style={{ padding: '0.6rem 0', textAlign: 'right', fontWeight: 700, color: '#6F240A', fontSize: '0.85rem' }}>
+                  GH₵{lineTotal(item).toFixed(2)}
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => removeItem(idx)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BA1A1A', padding: '0.6rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  title="Remove item"
+                >
+                  <X size={16} />
+                </button>
+              </LineItemRow>
+            ))}
+          </div>
+
           <FormRow>
             <FormGroup>
               <label>Discount (%)</label>
@@ -379,12 +437,8 @@ const Invoices = () => {
             <input 
               type="text" 
               readOnly 
-              value={(formData.quantity && formData.unitPrice) ? (() => {
-                const sub = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
-                const disc = parseFloat(formData.discount) || 0;
-                return (sub * (1 - disc / 100)).toFixed(2);
-              })() : '0.00'}
-              style={{ background: '#f5f5f5', cursor: 'not-allowed' }}
+              value={`GH₵${invoiceTotal.toFixed(2)}`}
+              style={{ background: '#f5f5f5', cursor: 'not-allowed', fontWeight: 800, fontSize: '1.1rem', color: '#6F240A' }}
             />
           </FormGroup>
           <ModalActions>
