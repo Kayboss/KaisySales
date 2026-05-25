@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircle } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
-import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory } from '../../services/api';
+import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory, updateInventoryItem, createSale } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
 const Header = styled.div`
@@ -160,6 +160,7 @@ const Invoices = () => {
   const [previewInvoice, setPreviewInvoice] = useState(null);
   const [saving, setSaving] = useState(false);
   const [inventoryItems, setInventoryItems] = useState([]);
+  const prevStatus = useRef('pending');
 
   const [formData, setFormData] = useState({
     customer: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0
@@ -220,6 +221,7 @@ const Invoices = () => {
     const totalQty = items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0);
     const discountPct = parseFloat(formData.discount) || 0;
     const totalAmount = subtotal * (1 - discountPct / 100);
+    const isPaid = formData.status === 'paid';
     
     const invoicePayload = {
       customer: formData.customer,
@@ -237,6 +239,45 @@ const Invoices = () => {
       } else {
         await createInvoice(invoicePayload);
       }
+
+      // Deduct inventory
+      try {
+        const inv = await fetchInventory();
+        for (const item of items) {
+          const match = inv.find(i => i.name.toLowerCase() === item.name.toLowerCase());
+          if (match) {
+            const qty = parseInt(item.quantity) || 1;
+            const newStock = Math.max(0, (parseInt(match.stock) || 0) - qty);
+            await updateInventoryItem(match.id, {
+              ...match,
+              stock: newStock,
+              status: newStock > 5 ? 'In Stock' : newStock > 0 ? 'Low Stock' : 'Out of Stock'
+            });
+          }
+        }
+      } catch (invErr) {
+        console.warn('Inventory auto-deduct skipped:', invErr);
+      }
+
+      // Create sale if newly paid
+      const shouldCreateSale = isPaid && (!isEditing || prevStatus.current !== 'paid');
+      if (shouldCreateSale) {
+        try {
+          await createSale({
+            item: items[0]?.name || '',
+            category: '',
+            quantity: totalQty,
+            unitPrice: items[0]?.unitPrice || '',
+            paymentMethod: 'Invoice',
+            date: formData.date || new Date().toISOString().split('T')[0],
+            time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
+            amount: `GH₵${totalAmount.toFixed(2)}`
+          });
+        } catch (saleErr) {
+          console.warn('Sale creation from invoice skipped:', saleErr);
+        }
+      }
+
       await loadData();
       closeModal();
     } catch (error) {
@@ -251,6 +292,7 @@ const Invoices = () => {
     const savedItems = Array.isArray(invoice.items) && invoice.items.length > 0
       ? invoice.items.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice }))
       : [{ name: '', quantity: invoice.quantity || 1, unitPrice: invoice.unitPrice || parseFloat(invoice.amount.replace('GH₵', '').replace(',', '')) }];
+    prevStatus.current = invoice.status;
     setFormData({
       customer: invoice.customer,
       date: invoice.date,
@@ -267,16 +309,18 @@ const Invoices = () => {
     try {
       await deleteInvoice(id);
       await loadData();
+      setDeleteTarget(null);
     } catch (error) {
       console.error('Failed to delete invoice', error);
+      alert('Delete failed: ' + (error.message || 'Unknown error'));
     }
-    setDeleteTarget(null);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
+    prevStatus.current = 'pending';
     setFormData({ customer: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0 });
   };
 

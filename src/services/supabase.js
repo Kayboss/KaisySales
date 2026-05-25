@@ -304,7 +304,7 @@ export const dbService = {
       const { error } = await supabase
         .from(collection)
         .delete()
-        .eq('id', recordId)
+        .eq('id', parseInt(recordId) || recordId)
         .eq('user_id', uid);
       if (error) throw error;
       return true;

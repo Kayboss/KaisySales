@@ -220,13 +220,16 @@ const DailySales = () => {
     const discountPct = parseFloat(formData.discount) || 0;
     const totalAmount = subtotal * (1 - discountPct / 100);
     
+    const invMatch = inventoryItems.find(i => i.name === formData.item);
+    
     const salePayload = {
       item: formData.item,
+      category: invMatch?.category || '',
       quantity: formData.quantity,
       unitPrice: formData.unitPrice,
       paymentMethod: formData.paymentMethod,
       date: new Date().toISOString().split('T')[0],
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
       amount: `GH₵${totalAmount.toFixed(2)}`
     };
     
