@@ -68,9 +68,10 @@ const ExpenseList = styled.div`
 const ListItem = styled.div`
   padding: 1.25rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.outlineVariant};
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1rem;
   align-items: center;
-  justify-content: space-between;
   transition: ${({ theme }) => theme.transitions.fast};
 
   &:hover {
@@ -450,7 +451,7 @@ const ExpenseTracking = () => {
           <ExpenseList style={{ minWidth: '600px' }}>
           {expenses.map(expense => (
             <ListItem key={expense.id}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', overflow: 'hidden' }}>
                 <div style={{ 
                   width: '40px', 
                   height: '40px', 
@@ -464,15 +465,15 @@ const ExpenseTracking = () => {
                 }}>
                   {expense.trend === 'up' ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
                 </div>
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ overflow: 'hidden' }}>
                   <div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expense.title}</div>
                   <div style={{ fontSize: '0.75rem', color: '#55423D' }}>{expense.date}</div>
                 </div>
               </div>
-              <div style={{ fontWeight: 700, color: '#6F240A', minWidth: '120px', textAlign: 'right' }} className="data-tabular">
+              <div style={{ fontWeight: 700, color: '#6F240A', textAlign: 'right' }} className="data-tabular">
                 {expense.amount}
               </div>
-              <div style={{ flexShrink: 0 }}>
+              <div style={{ whiteSpace: 'nowrap' }}>
                 <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(expense)} />
                 <Trash2 size={16} color="#BA1A1A" cursor="pointer" onClick={() => setDeleteTarget(expense)} />
               </div>
