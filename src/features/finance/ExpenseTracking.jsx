@@ -450,7 +450,7 @@ const ExpenseTracking = () => {
           <ExpenseList style={{ minWidth: '600px' }}>
           {expenses.map(expense => (
             <ListItem key={expense.id}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1', minWidth: 0 }}>
                 <div style={{ 
                   width: '40px', 
                   height: '40px', 
@@ -459,19 +459,20 @@ const ExpenseTracking = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: expense.trend === 'up' ? '#BA1A1A' : '#25432F'
+                  color: expense.trend === 'up' ? '#BA1A1A' : '#25432F',
+                  flexShrink: 0
                 }}>
                   {expense.trend === 'up' ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
                 </div>
-                <div>
-                  <div style={{ fontWeight: 700 }}>{expense.title}</div>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expense.title}</div>
                   <div style={{ fontSize: '0.75rem', color: '#55423D' }}>{expense.date}</div>
                 </div>
               </div>
-              <div style={{ fontWeight: 700, color: '#6F240A' }} className="data-tabular">
+              <div style={{ fontWeight: 700, color: '#6F240A', minWidth: '120px', textAlign: 'right' }} className="data-tabular">
                 {expense.amount}
               </div>
-              <div>
+              <div style={{ flexShrink: 0 }}>
                 <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(expense)} />
                 <Trash2 size={16} color="#BA1A1A" cursor="pointer" onClick={() => setDeleteTarget(expense)} />
               </div>
