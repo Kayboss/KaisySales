@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Plus, Filter, Download, ArrowUpRight, ArrowDownRight, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchCategories, createCategory, fetchInvoices } from '../../services/api';
+import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchCategories, createCategory, fetchInvoices, fetchLargestExpenseCategory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
 const Header = styled.div`
@@ -177,6 +177,7 @@ const ExpenseTracking = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [largestCategory, setLargestCategory] = useState('N/A');
 
   const [saving, setSaving] = useState(false);
 
@@ -186,8 +187,11 @@ const ExpenseTracking = () => {
 
   const loadData = async () => {
     try {
-      const data = await fetchExpenses();
+      const [data, largestCat] = await Promise.all([
+        fetchExpenses(), fetchLargestExpenseCategory()
+      ]);
       setExpenses(data.reverse());
+      setLargestCategory(largestCat);
       const cats = await fetchCategories('expense');
       setCategories(cats);
     } catch (error) {
@@ -294,12 +298,6 @@ const ExpenseTracking = () => {
   };
 
   const totalExpenses = expenses.reduce((acc, exp) => acc + parseAmount(exp.amount), 0);
-  
-  const categoryCounts = expenses.reduce((acc, exp) => {
-    acc[exp.category] = (acc[exp.category] || 0) + 1;
-    return acc;
-  }, {});
-  const largestCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
   
   // For pending invoices, we'll need to fetch them if we want this to be accurate, 
   // or we can show a placeholder if it's meant to be static for this module.
@@ -429,7 +427,7 @@ const ExpenseTracking = () => {
         <Card>
           <CardLabel>LARGEST CATEGORY</CardLabel>
           <CardValue $color="#875200">{largestCategory}</CardValue>
-          <div style={{ fontSize: '0.75rem', color: '#55423D', marginTop: '0.5rem' }}>Most frequent expense type</div>
+          <div style={{ fontSize: '0.75rem', color: '#25432F', marginTop: '0.5rem', fontWeight: 600 }}>Live from database</div>
         </Card>
         <Card>
           <CardLabel>PENDING INVOICES</CardLabel>

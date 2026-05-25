@@ -314,3 +314,5 @@ export const dbService = {
     return true;
   },
 };
+
+export { supabase };

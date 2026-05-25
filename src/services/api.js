@@ -1,4 +1,4 @@
-import { dbService, authService } from './supabase';
+import { dbService, authService, supabase } from './supabase';
 import { useAuthStore } from '../store/authStore';
 
 
@@ -100,6 +100,25 @@ export const updateExpense = async (id, expense) => {
 export const deleteExpense = async (id) => {
   const uid = getUid();
   await dbService.deleteUserRecord(uid, 'expenses', id);
+};
+
+export const fetchLargestExpenseCategory = async () => {
+  try {
+    const uid = getUid();
+    if (!supabase) return 'N/A';
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('category')
+      .eq('user_id', uid);
+    if (error) throw error;
+    const counts = {};
+    (data || []).forEach(r => { counts[r.category] = (counts[r.category] || 0) + 1; });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] || 'N/A';
+  } catch (error) {
+    console.error('Failed to fetch largest expense category', error);
+    return 'N/A';
+  }
 };
 
 // ====================================================
