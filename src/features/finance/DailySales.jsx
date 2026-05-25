@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Plus, Search, Tag, TrendingUp, Calendar, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchSales, createSale, updateSale, deleteSale, fetchCategories, createCategory } from '../../services/api';
+import { fetchSales, createSale, updateSale, deleteSale, fetchCategories, createCategory, fetchInventory, updateInventoryItem } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
 const Header = styled.div`
@@ -246,6 +246,24 @@ const DailySales = () => {
       } else {
         await createSale(salePayload);
       }
+
+      // Auto-deduct from inventory if item name matches
+      try {
+        const inventory = await fetchInventory();
+        const match = inventory.find(i => i.name.toLowerCase() === formData.item.toLowerCase());
+        if (match) {
+          const qty = parseInt(formData.quantity) || 1;
+          const newStock = Math.max(0, (parseInt(match.stock) || 0) - qty);
+          await updateInventoryItem(match.id, {
+            ...match,
+            stock: newStock,
+            status: newStock > 5 ? 'In Stock' : newStock > 0 ? 'Low Stock' : 'Out of Stock'
+          });
+        }
+      } catch (invErr) {
+        console.warn('Inventory auto-deduct skipped:', invErr);
+      }
+
       await loadData();
       closeModal();
     } catch (error) {

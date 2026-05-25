@@ -187,6 +187,17 @@ const EditInput = styled.input`
   outline: none;
 `;
 
+const TypeSelect = styled.select`
+  padding: 0.5rem;
+  border: 1px solid ${({ theme }) => theme.colors.primary};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-family: inherit;
+  font-size: 0.85rem;
+  outline: none;
+  background: white;
+  cursor: pointer;
+`;
+
 const EmptyState = styled.p`
   color: ${({ theme }) => theme.colors.text.muted};
   font-size: 0.9rem;
@@ -240,6 +251,7 @@ const SettingsPage = () => {
   const [categories, setCategories] = useState([]);
   const [editingCatId, setEditingCatId] = useState(null);
   const [editingCatName, setEditingCatName] = useState('');
+  const [editingCatType, setEditingCatType] = useState('sales');
   const [deleteCatTarget, setDeleteCatTarget] = useState(null);
 
   const loadCategories = async () => {
@@ -256,14 +268,16 @@ const SettingsPage = () => {
   const handleEditCategory = (cat) => {
     setEditingCatId(cat.id);
     setEditingCatName(cat.name);
+    setEditingCatType(cat.type || 'sales');
   };
 
   const handleSaveCategory = async (id) => {
     if (!editingCatName.trim()) return;
     try {
-      await updateCategory(id, { name: editingCatName.trim() });
+      await updateCategory(id, { name: editingCatName.trim(), type: editingCatType });
       setEditingCatId(null);
       setEditingCatName('');
+      setEditingCatType('sales');
       await loadCategories();
     } catch (error) {
       console.error('Failed to update category', error);
@@ -274,6 +288,7 @@ const SettingsPage = () => {
   const handleCancelEdit = () => {
     setEditingCatId(null);
     setEditingCatName('');
+    setEditingCatType('sales');
   };
 
   const handleDeleteCategory = async (id) => {
@@ -465,6 +480,11 @@ const SettingsPage = () => {
                             autoFocus
                             onKeyDown={e => { if (e.key === 'Enter') handleSaveCategory(cat.id); if (e.key === 'Escape') handleCancelEdit(); }}
                           />
+                          <TypeSelect value={editingCatType} onChange={e => setEditingCatType(e.target.value)}>
+                            <option value="sales">Sales</option>
+                            <option value="expense">Expense</option>
+                            <option value="inventory">Inventory</option>
+                          </TypeSelect>
                           <CatActions>
                             <IconBtn onClick={() => handleSaveCategory(cat.id)}><Check size={16} /></IconBtn>
                             <IconBtn onClick={handleCancelEdit}><X size={16} /></IconBtn>
