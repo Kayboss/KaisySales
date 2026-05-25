@@ -29,10 +29,12 @@ const Layout = styled.div`
   position: relative;
 `;
 
+const coffeeBg = '#4A2C1B';
+const milkText = '#F5E6D3';
+
 const Sidebar = styled.nav`
   width: 280px;
-  background: white;
-  border-right: 1px solid ${themeTokens.colors.outlineVariant};
+  background: ${coffeeBg};
   display: flex;
   flex-direction: column;
   padding: 2rem;
@@ -72,9 +74,9 @@ const MobileHeader = styled.div`
     left: 0;
     right: 0;
     height: 4rem;
-    background: white;
+    background: ${coffeeBg};
     padding: 0 1.5rem;
-    border-bottom: 1px solid ${themeTokens.colors.outlineVariant};
+    border-bottom: 1px solid rgba(255,255,255,0.1);
     z-index: 90;
   }
 `;
@@ -99,7 +101,7 @@ const Logo = styled.div`
   gap: 0.75rem;
   font-weight: 900;
   font-family: ${themeTokens.fonts.display};
-  color: ${themeTokens.colors.primary};
+  color: ${milkText};
   margin-bottom: 3rem;
   letter-spacing: 2px;
 `;
@@ -108,7 +110,7 @@ const CloseButton = styled.button`
   background: none;
   border: none;
   cursor: pointer;
-  color: ${themeTokens.colors.primary};
+  color: ${milkText};
   display: none;
   
   @media (max-width: 768px) {
@@ -122,16 +124,16 @@ const NavLink = styled(Link)`
   gap: 1rem;
   padding: 1rem;
   text-decoration: none;
-  color: ${props => props.$active ? themeTokens.colors.primary : themeTokens.colors.text.muted};
-  background: ${props => props.$active ? 'rgba(111, 36, 10, 0.05)' : 'transparent'};
+  color: ${props => props.$active ? '#FFFFFF' : milkText};
+  background: ${props => props.$active ? 'rgba(255,255,255,0.12)' : 'transparent'};
   border-radius: ${themeTokens.borderRadius.md};
   font-weight: 600;
   margin-bottom: 0.5rem;
   transition: ${themeTokens.transitions.fast};
 
   &:hover {
-    background: rgba(111, 36, 10, 0.03);
-    color: ${themeTokens.colors.primary};
+    background: rgba(255,255,255,0.08);
+    color: #FFFFFF;
   }
 `;
 
@@ -159,7 +161,7 @@ const App = () => {
                     <Leaf size={24} />
                     <span style={{ fontWeight: 900, textTransform: 'uppercase' }}>{businessName || 'KaisySales'}</span>
                   </Logo>
-                  <button onClick={toggleMobileMenu} style={{ background: 'none', border: 'none', cursor: 'pointer', color: themeTokens.colors.primary }}>
+                  <button onClick={toggleMobileMenu} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F5E6D3' }}>
                     <Menu size={24} />
                   </button>
                 </MobileHeader>
@@ -220,10 +222,14 @@ const App = () => {
                         padding: '1rem', 
                         background: 'none', 
                         border: 'none', 
-                        color: themeTokens.colors.text.muted,
+                        color: '#F5E6D3',
                         cursor: 'pointer',
-                        fontWeight: 600
+                        fontWeight: 600,
+                        borderRadius: '8px',
+                        width: '100%'
                       }}
+                      onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                      onMouseOut={e => e.currentTarget.style.background = 'none'}
                     >
                       <LogOut size={20} />
                       Sign Out
