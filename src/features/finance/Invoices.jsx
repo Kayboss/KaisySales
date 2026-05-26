@@ -4,7 +4,7 @@ import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircl
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
-import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory, updateInventoryItem, createSale } from '../../services/api';
+import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory, updateInventoryItem, createSale, deleteSale } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
@@ -239,10 +239,12 @@ const Invoices = () => {
     };
     
     try {
+      let invoiceId = isEditing ? editId : null;
       if (isEditing) {
         await updateInvoice(editId, invoicePayload);
       } else {
-        await createInvoice(invoicePayload);
+        const created = await createInvoice(invoicePayload);
+        invoiceId = created?.id;
       }
 
       // Deduct inventory
@@ -268,16 +270,28 @@ const Invoices = () => {
       const shouldCreateSale = isPaid && (!isEditing || prevStatus.current !== 'paid');
       if (shouldCreateSale) {
         try {
-          await createSale({
-            item: items[0]?.name || '',
-            category: '',
+          const inv = await fetchInventory();
+          const firstItem = items[0];
+          const invMatch = firstItem ? inv.find(i => i.name.toLowerCase() === firstItem.name.toLowerCase()) : null;
+          const saleResult = await createSale({
+            item: firstItem?.name || '',
+            category: invMatch?.category || '',
             quantity: totalQty,
-            unitPrice: items[0]?.unitPrice || '',
+            unitPrice: firstItem?.unitPrice || '',
             paymentMethod: 'Invoice',
             date: formData.date || new Date().toISOString().split('T')[0],
             time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
             amount: `GH₵${totalAmount.toFixed(2)}`
           });
+          // Store sale reference back in invoice
+          if (invoiceId && saleResult?.id) {
+            const currentInvoice = await fetchInvoices().then(all => all.find(i => String(i.id) === String(invoiceId)));
+            if (currentInvoice) {
+              const rawItems = Array.isArray(currentInvoice.items) ? currentInvoice.items : [];
+              const updatedItems = [...rawItems.filter(i => i.type !== '_saleId'), { type: '_saleId', saleId: saleResult.id }];
+              await updateInvoice(invoiceId, { items: updatedItems });
+            }
+          }
         } catch (saleErr) {
           console.warn('Sale creation from invoice skipped:', saleErr);
         }
@@ -316,6 +330,21 @@ const Invoices = () => {
 
   const handleDelete = async (id) => {
     try {
+      // Find and delete associated sale
+      try {
+        const allInvoices = await fetchInvoices();
+        const target = allInvoices.find(i => String(i.id) === String(id));
+        if (target) {
+          const rawItems = Array.isArray(target.items) ? target.items : [];
+          const saleRef = rawItems.find(i => i.type === '_saleId');
+          if (saleRef?.saleId) {
+            await deleteSale(saleRef.saleId);
+          }
+        }
+      } catch (saleErr) {
+        console.warn('Associated sale delete skipped:', saleErr);
+      }
+
       await deleteInvoice(id);
       await loadData();
       setDeleteTarget(null);
