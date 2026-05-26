@@ -206,11 +206,19 @@ const RetailStores = () => {
   const [historyInvoices, setHistoryInvoices] = useState([]);
   const [selectedStore, setSelectedStore] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [storeInvoiceCounts, setStoreInvoiceCounts] = useState({});
 
   const loadData = async () => {
     try {
-      const data = await fetchStores();
+      const [data, allInvoices] = await Promise.all([fetchStores(), fetchInvoices()]);
       setStores(data.reverse());
+      const counts = {};
+      allInvoices.forEach(inv => {
+        if (inv.customer) {
+          counts[inv.customer] = (counts[inv.customer] || 0) + 1;
+        }
+      });
+      setStoreInvoiceCounts(counts);
     } catch (error) {
       console.error('Failed to load stores', error);
     }
@@ -284,6 +292,12 @@ const RetailStores = () => {
     } catch (error) {
       console.error('Failed to fetch invoice history', error);
     }
+  };
+
+  const parseAmt = (v) => {
+    if (typeof v === 'number') return v;
+    if (typeof v !== 'string') return 0;
+    return parseFloat(v.replace(/[^\d.]/g, '')) || 0;
   };
 
   const closeHistoryModal = () => {
@@ -422,13 +436,18 @@ const RetailStores = () => {
               <Phone size={16} />
               {store.phone}
             </InfoRow>
-            <div style={{ marginTop: '1rem' }}>
+            <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span 
                 style={{ color: '#6F240A', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}
                 onClick={() => handleViewHistory(store)}
               >
                 View Invoice History →
               </span>
+              {storeInvoiceCounts[store.name] > 0 && (
+                <span style={{ background: '#6F240A', color: 'white', borderRadius: '999px', padding: '0.15rem 0.5rem', fontSize: '0.75rem', fontWeight: 700 }}>
+                  {storeInvoiceCounts[store.name]} invoice{storeInvoiceCounts[store.name] !== 1 ? 's' : ''}
+                </span>
+              )}
             </div>
           </StoreCard>
         ))}
@@ -454,15 +473,15 @@ const RetailStores = () => {
                 <tr key={inv.id}>
                   <Td>{inv.id}</Td>
                   <Td>{inv.date}</Td>
-                  <Td className="data-tabular">GH₵ {parseFloat(inv.total || 0).toFixed(2)}</Td>
+                  <Td className="data-tabular">GH₵ {parseAmt(inv.amount).toFixed(2)}</Td>
                   <Td>
                     <span style={{
                       padding: '0.25rem 0.5rem',
                       borderRadius: '4px',
                       fontSize: '0.75rem',
                       fontWeight: 700,
-                      background: inv.status === 'Paid' ? 'rgba(37, 67, 47, 0.1)' : 'rgba(186, 26, 26, 0.1)',
-                      color: inv.status === 'Paid' ? '#25432F' : '#BA1A1A'
+                      background: (inv.status || '').toLowerCase() === 'paid' ? 'rgba(37, 67, 47, 0.1)' : 'rgba(186, 26, 26, 0.1)',
+                      color: (inv.status || '').toLowerCase() === 'paid' ? '#25432F' : '#BA1A1A'
                     }}>
                       {inv.status || 'Pending'}
                     </span>
