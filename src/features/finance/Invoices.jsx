@@ -5,6 +5,7 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
 import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory, updateInventoryItem, createSale } from '../../services/api';
+import { useSettingsStore } from '../../store/settingsStore';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
 const Header = styled.div`
@@ -150,6 +151,7 @@ const ModalActions = styled.div`
 `;
 
 const Invoices = () => {
+  const { businessName } = useSettingsStore();
   const [invoices, setInvoices] = useState([]);
   const [stores, setStores] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -535,7 +537,7 @@ const Invoices = () => {
       </InvoicesGrid>
 
       {previewInvoice && (
-        <InvoicePreview invoice={previewInvoice} onClose={() => setPreviewInvoice(null)} />
+        <InvoicePreview invoice={previewInvoice} onClose={() => setPreviewInvoice(null)} businessName={businessName} />
       )}
 
       {deleteTarget && (

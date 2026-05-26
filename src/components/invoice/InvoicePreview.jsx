@@ -260,7 +260,7 @@ const CloseButton = styled.button`
 
 const PRINT_STYLE_ID = 'invoice-print-styles';
 
-const InvoicePreview = ({ invoice, onClose }) => {
+const InvoicePreview = ({ invoice, onClose, businessName }) => {
   const contentRef = useRef(null);
 
   useEffect(() => {
@@ -350,10 +350,10 @@ const InvoicePreview = ({ invoice, onClose }) => {
 
         <InvoiceBody>
           <Header>
-            <Brand>
-              <Leaf size={24} />
-              KaisySales
-            </Brand>
+              <Brand>
+                <Leaf size={24} />
+                {businessName || 'KaisySales'}
+              </Brand>
             <InvoiceMeta>
               <InvoiceTitle>INVOICE</InvoiceTitle>
               <InvoiceNumber>{invoice.id}</InvoiceNumber>
@@ -406,7 +406,7 @@ const InvoicePreview = ({ invoice, onClose }) => {
           </TotalRow>
 
           <Footer>
-            KaisySales — Know your Business. Stay in control.
+            {businessName || 'KaisySales'} — Know your Business. Stay in control.
           </Footer>
         </InvoiceBody>
       </Container>
