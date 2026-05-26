@@ -302,12 +302,19 @@ const InvoicePreview = ({ invoice, onClose, businessName }) => {
   const quantity = parseInt(invoice.quantity) || 1;
   const unitPrice = parseFloat(invoice.unitPrice) || (quantity > 0 ? totalAmount / quantity : 0);
 
-  const lineItems = (() => {
+  const { lineItems, discountPct } = (() => {
     try {
       const items = typeof invoice.items === 'string' ? JSON.parse(invoice.items) : invoice.items;
-      if (Array.isArray(items) && items.length > 0) return items;
+      if (Array.isArray(items) && items.length > 0) {
+        const meta = items.find(i => i.type === '_meta');
+        const actual = items.filter(i => i.type !== '_meta');
+        return {
+          lineItems: actual.length > 0 ? actual : [{ name: `${invoice.customer} - Order`, quantity, unitPrice, amount: totalAmount }],
+          discountPct: meta?.discount || 0
+        };
+      }
     } catch {}
-    return [{ name: `${invoice.customer} - Order`, quantity, unitPrice, amount: totalAmount }];
+    return { lineItems: [{ name: `${invoice.customer} - Order`, quantity, unitPrice, amount: totalAmount }], discountPct: 0 };
   })();
 
   const handlePrint = () => {
@@ -399,6 +406,18 @@ const InvoicePreview = ({ invoice, onClose, businessName }) => {
               ))}
             </tbody>
           </Table>
+
+          {discountPct > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#89726C' }}>
+              <span style={{ marginRight: '2rem' }}>Discount ({discountPct}%)</span>
+              <span style={{ fontWeight: 700, color: '#BA1A1A', minWidth: '120px', textAlign: 'right' }}>
+                -{(() => {
+                  const sub = lineItems.reduce((s, i) => s + ((parseInt(i.quantity) || 1) * (parseFloat(i.unitPrice) || 0)), 0);
+                  return `GH₵${(sub * discountPct / 100).toFixed(2)}`;
+                })()}
+              </span>
+            </div>
+          )}
 
           <TotalRow>
             <TotalLabel>Total Amount</TotalLabel>

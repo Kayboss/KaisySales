@@ -232,7 +232,10 @@ const Invoices = () => {
       unitPrice: items[0]?.unitPrice || '',
       status: formData.status,
       amount: `GH₵${totalAmount.toFixed(2)}`,
-      items: items.map(i => ({ name: i.name, quantity: parseInt(i.quantity), unitPrice: parseFloat(i.unitPrice) }))
+      items: [
+        ...items.map(i => ({ name: i.name, quantity: parseInt(i.quantity), unitPrice: parseFloat(i.unitPrice) })),
+        ...(discountPct > 0 ? [{ type: '_meta', discount: discountPct }] : [])
+      ]
     };
     
     try {
@@ -291,16 +294,20 @@ const Invoices = () => {
   };
 
   const handleEdit = (invoice) => {
-    const savedItems = Array.isArray(invoice.items) && invoice.items.length > 0
-      ? invoice.items.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice }))
+    const rawItems = Array.isArray(invoice.items) && invoice.items.length > 0 ? invoice.items : [];
+    const metaItem = rawItems.find(i => i.type === '_meta');
+    const discount = metaItem?.discount || 0;
+    const savedItems = rawItems.filter(i => i.type !== '_meta');
+    const finalItems = savedItems.length > 0
+      ? savedItems.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice }))
       : [{ name: '', quantity: invoice.quantity || 1, unitPrice: invoice.unitPrice || parseFloat(invoice.amount.replace('GH₵', '').replace(',', '')) }];
     prevStatus.current = invoice.status;
     setFormData({
       customer: invoice.customer,
       date: invoice.date,
-      items: savedItems,
+      items: finalItems,
       status: invoice.status,
-      discount: 0
+      discount
     });
     setEditId(invoice.id);
     setIsEditing(true);
