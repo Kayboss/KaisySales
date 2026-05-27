@@ -70,6 +70,10 @@ const SalesTable = styled.table`
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   overflow: hidden;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
 `;
 
 const Th = styled.th`
@@ -88,6 +92,46 @@ const Td = styled.td`
   padding: 1.25rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   font-size: 0.875rem;
+`;
+
+const MobileCard = styled.div`
+  display: none;
+
+  @media (max-width: 768px) {
+    display: block;
+  }
+`;
+
+const SaleCard = styled.div`
+  background: white;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  box-shadow: ${({ theme }) => theme.shadows.soft};
+`;
+
+const CardRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+  font-size: 0.8rem;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid #F0EEE8;
+  }
+`;
+
+const CardLabel = styled.span`
+  color: #89726C;
+  font-weight: 600;
+`;
+
+const CardValue = styled.span`
+  color: #1C1C18;
+  font-weight: 700;
+  text-align: right;
 `;
 
 const ActionButton = styled.button`
@@ -531,6 +575,47 @@ const DailySales = () => {
         </tbody>
       </SalesTable>
       </div>
+
+      <MobileCard>
+        {filteredSales.map(sale => (
+          <SaleCard key={sale.id}>
+            <CardRow>
+              <CardLabel>Receipt</CardLabel>
+              <CardValue style={{ color: '#6F240A' }}>{sale.id}</CardValue>
+            </CardRow>
+            <CardRow>
+              <CardLabel>Time</CardLabel>
+              <CardValue style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#89726C', fontWeight: 600 }}>
+                <Calendar size={12} /> {sale.time}
+              </CardValue>
+            </CardRow>
+            <CardRow>
+              <CardLabel>Item</CardLabel>
+              <CardValue>{sale.item}</CardValue>
+            </CardRow>
+            <CardRow>
+              <CardLabel>Category</CardLabel>
+              <CardValue><Badge>{sale.category}</Badge></CardValue>
+            </CardRow>
+            <CardRow>
+              <CardLabel>Amount</CardLabel>
+              <CardValue style={{ color: '#6F240A', fontSize: '0.95rem' }}>{sale.amount}</CardValue>
+            </CardRow>
+            <CardRow>
+              <CardLabel>Payment</CardLabel>
+              <CardValue style={{ fontWeight: 600 }}>{sale.paymentMethod}</CardValue>
+            </CardRow>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #F0EEE8' }}>
+              <button onClick={() => handleEdit(sale)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#6F240A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
+                <Edit2 size={14} /> Edit
+              </button>
+              <button onClick={() => setDeleteTarget(sale)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#BA1A1A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
+                <Trash2 size={14} /> Delete
+              </button>
+            </div>
+          </SaleCard>
+        ))}
+      </MobileCard>
 
       {deleteTarget && (
         <ConfirmDialog
