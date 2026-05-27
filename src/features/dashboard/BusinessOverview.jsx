@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriangle, ArrowRight } from 'lucide-react';
+import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriangle, ArrowRight, BookOpen } from 'lucide-react';
 import { fetchSales, fetchExpenses, fetchInvoices, fetchInventory } from '../../services/api';
+import TutorialModal, { STORAGE_KEY } from '../../components/tutorial/TutorialModal';
 
 const Grid = styled.div`
   display: grid;
@@ -259,6 +260,7 @@ const RestockLink = styled.button`
 `;
 
 const BusinessOverview = () => {
+  const [showTutorial, setShowTutorial] = useState(false);
   const [stats, setStats] = useState({
     revenue: 0,
     salesToday: 0,
@@ -323,10 +325,12 @@ const BusinessOverview = () => {
   useEffect(() => {
     loadStats();
 
-    // Poll every 30 seconds for real-time updates
+    if (!localStorage.getItem(STORAGE_KEY)) {
+      setShowTutorial(true);
+    }
+
     const interval = setInterval(loadStats, 30000);
 
-    // Also refresh when the user navigates back to this tab
     const handleFocus = () => loadStats();
     window.addEventListener('focus', handleFocus);
 
@@ -347,10 +351,15 @@ const BusinessOverview = () => {
           <h1 style={{ fontSize: '2rem' }}>Business Dashboard</h1>
           <p style={{ color: '#55423D' }}>Your revenue, sales, and growth at a glance.</p>
         </div>
-        <div style={{ background: 'white', padding: '0.5rem 1rem', borderRadius: '20px', border: '1px solid #89726C', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#25432F', animation: 'pulse 2s ease-in-out infinite', boxShadow: '0 0 0 0 rgba(37, 67, 47, 0.4)' }}></span>
-          Live Market Data
-          <style>{`@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(37,67,47,0.4); } 50% { box-shadow: 0 0 0 6px rgba(37,67,47,0); } }`}</style>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <button onClick={() => setShowTutorial(true)} style={{ background: 'white', border: '1px solid #E0D6D0', borderRadius: '20px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#6F240A' }}>
+            <BookOpen size={14} /> Tutorial
+          </button>
+          <div style={{ background: 'white', padding: '0.5rem 1rem', borderRadius: '20px', border: '1px solid #89726C', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#25432F', animation: 'pulse 2s ease-in-out infinite', boxShadow: '0 0 0 0 rgba(37, 67, 47, 0.4)' }}></span>
+            Live Market Data
+            <style>{`@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(37,67,47,0.4); } 50% { box-shadow: 0 0 0 6px rgba(37,67,47,0); } }`}</style>
+          </div>
         </div>
       </header>
 
@@ -422,6 +431,12 @@ const BusinessOverview = () => {
           <GrowthChart data={stats.monthlyData} />
         </ChartContainer>
       </section>
+
+      <TutorialModal
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        autoShow
+      />
     </div>
   );
 };
