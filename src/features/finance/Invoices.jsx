@@ -168,6 +168,8 @@ const Invoices = () => {
     customer: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0
   });
 
+  const [statusFilter, setStatusFilter] = useState('all');
+
   const addItem = () => {
     setFormData(prev => ({ ...prev, items: [...prev.items, { name: '', quantity: 1, unitPrice: '' }] }));
   };
@@ -530,7 +532,7 @@ const Invoices = () => {
         </form>
       </Modal>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <div style={{ 
           flex: 1, 
           background: 'white', 
@@ -539,15 +541,39 @@ const Invoices = () => {
           border: '1px solid #89726C',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.75rem'
+          gap: '0.75rem',
+          minWidth: '200px'
         }}>
           <Search size={18} color="#89726C" />
           <input type="text" placeholder="Search invoices, customers..." style={{ border: 'none', outline: 'none', width: '100%' }} />
         </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {['all', 'pending', 'paid'].map(status => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              style={{
+                padding: '0.6rem 1.25rem',
+                borderRadius: '8px',
+                border: `1px solid ${statusFilter === status ? '#6F240A' : '#D0C8C4'}`,
+                background: statusFilter === status ? '#6F240A' : 'white',
+                color: statusFilter === status ? 'white' : '#1C1C18',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                textTransform: 'capitalize'
+              }}
+            >
+              {status === 'all' ? 'All' : status}
+            </button>
+          ))}
+        </div>
       </div>
 
       <InvoicesGrid>
-        {invoices.map(invoice => (
+        {invoices
+          .filter(inv => statusFilter === 'all' || inv.status === statusFilter)
+          .map(invoice => (
           <InvoiceCard key={invoice.id}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <StatusBadge $status={invoice.status}>
