@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Package, Search, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Package, Search, Plus, Edit2, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchInventory, createInventoryItem, updateInventoryItem, deleteInventoryItem, fetchCategories, createCategory } from '../../services/api';
+
+const PAGE_SIZE = 20;
 
 const Header = styled.div`
   display: flex;
@@ -35,6 +37,10 @@ const Table = styled.table`
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   overflow: hidden;
   box-shadow: ${({ theme }) => theme.shadows.soft};
+
+  @media (max-width: 768px) {
+    display: none;
+  }
 `;
 
 const Th = styled.th`
@@ -88,6 +94,78 @@ const inventoryData = [
   { id: '3', name: 'Hand-carved Mask', category: 'Decor', stock: 45, price: 'GH₵8,000.00', status: 'In Stock' },
   { id: '4', name: 'Indigo Dye Pack', category: 'Materials', stock: 2, price: 'GH₵3,500.00', status: 'Low Stock' },
 ];
+
+const MobileCard = styled.div`
+  display: none;
+
+  @media (max-width: 768px) {
+    display: block;
+  }
+`;
+
+const InvCard = styled.div`
+  background: white;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  box-shadow: ${({ theme }) => theme.shadows.soft};
+`;
+
+const InvCardRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+  font-size: 0.8rem;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid #F0EEE8;
+  }
+`;
+
+const CardLabel = styled.span`
+  color: #89726C;
+  font-weight: 600;
+`;
+
+const CardValue = styled.span`
+  color: #1C1C18;
+  font-weight: 700;
+  text-align: right;
+`;
+
+const PaginationRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  font-size: 0.875rem;
+  color: #55423D;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+`;
+
+const PageBtn = styled.button`
+  background: white;
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  padding: 0.5rem 1rem;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: ${props => props.$active ? 'white' : '#1C1C18'};
+  background: ${props => props.$active ? '#6F240A' : 'white'};
+
+  &:hover:not(:disabled) {
+    background: ${props => props.$active ? '#875200' : '#F5F0EB'};
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+`;
 
 const FormGroup = styled.div`
   margin-bottom: 1.5rem;
@@ -151,6 +229,7 @@ const ModalActions = styled.div`
 
 const InventoryManagement = () => {
   const [inventory, setInventory] = useState([]);
+  const [page, setPage] = useState(1);
   const [categories, setCategories] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -166,6 +245,7 @@ const InventoryManagement = () => {
     try {
       const data = await fetchInventory();
       setInventory(data.reverse());
+      setPage(1);
       const cats = await fetchCategories('inventory');
       setCategories(cats);
     } catch (error) {
@@ -247,6 +327,9 @@ const InventoryManagement = () => {
     setEditId(null);
     setFormData({ name: '', category: '', stock: '', price: '', newCategory: '' });
   };
+
+  const totalPages = Math.ceil(inventory.length / PAGE_SIZE);
+  const paginated = inventory.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
@@ -333,7 +416,7 @@ const InventoryManagement = () => {
           <input 
             type="text" 
             placeholder="Search by name, SKU or category..." 
-            style={{ border: 'none', outline: 'none', width: '100%', fontInherit: true }}
+            style={{ border: 'none', outline: 'none', width: '100%', fontFamily: 'inherit' }}
           />
         </SearchBar>
       </div>
@@ -351,7 +434,7 @@ const InventoryManagement = () => {
           </tr>
         </thead>
         <tbody>
-          {inventory.map(item => (
+          {paginated.map(item => (
             <tr key={item.id}>
               <Td style={{ fontWeight: 600 }}>{item.name}</Td>
               <Td>{item.category}</Td>
@@ -373,6 +456,56 @@ const InventoryManagement = () => {
         </tbody>
       </Table>
       </div>
+
+      <MobileCard>
+        {paginated.map(item => (
+          <InvCard key={item.id}>
+            <InvCardRow>
+              <CardLabel>Item</CardLabel>
+              <CardValue>{item.name}</CardValue>
+            </InvCardRow>
+            <InvCardRow>
+              <CardLabel>Category</CardLabel>
+              <CardValue style={{ fontWeight: 600 }}>{item.category}</CardValue>
+            </InvCardRow>
+            <InvCardRow>
+              <CardLabel>Stock</CardLabel>
+              <CardValue className="data-tabular">{item.stock}</CardValue>
+            </InvCardRow>
+            <InvCardRow>
+              <CardLabel>Price</CardLabel>
+              <CardValue className="data-tabular">{item.price}</CardValue>
+            </InvCardRow>
+            <InvCardRow>
+              <CardLabel>Status</CardLabel>
+              <CardValue>
+                <StockBadge $low={item.status === 'Low Stock'}>{item.status}</StockBadge>
+              </CardValue>
+            </InvCardRow>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #F0EEE8' }}>
+              <button onClick={() => handleEdit(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#6F240A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
+                <Edit2 size={14} /> Edit
+              </button>
+              <button onClick={() => setDeleteTarget(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#BA1A1A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
+                <Trash2 size={14} /> Delete
+              </button>
+            </div>
+          </InvCard>
+        ))}
+      </MobileCard>
+
+      {totalPages > 1 && (
+        <PaginationRow>
+          <span>{inventory.length} total items</span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <PageBtn disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Previous</PageBtn>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <PageBtn key={p} $active={p === page} onClick={() => setPage(p)}>{p}</PageBtn>
+            ))}
+            <PageBtn disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next</PageBtn>
+          </div>
+        </PaginationRow>
+      )}
 
       {deleteTarget && (
         <ConfirmDialog

@@ -58,11 +58,17 @@ const CardValue = styled.div`
   }
 `;
 
+const PAGE_SIZE = 20;
+
 const ExpenseList = styled.div`
   background: white;
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   overflow: hidden;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
 `;
 
 const ListItem = styled.div`
@@ -80,6 +86,78 @@ const ListItem = styled.div`
 
   &:last-child {
     border-bottom: none;
+  }
+`;
+
+const MobileCard = styled.div`
+  display: none;
+
+  @media (max-width: 768px) {
+    display: block;
+  }
+`;
+
+const ExpCard = styled.div`
+  background: white;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  box-shadow: ${({ theme }) => theme.shadows.soft};
+`;
+
+const ExpCardRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+  font-size: 0.8rem;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid #F0EEE8;
+  }
+`;
+
+const ExpCardLabel = styled.span`
+  color: #89726C;
+  font-weight: 600;
+`;
+
+const ExpCardValue = styled.span`
+  color: #1C1C18;
+  font-weight: 700;
+  text-align: right;
+`;
+
+const PaginationRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  font-size: 0.875rem;
+  color: #55423D;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+`;
+
+const PageBtn = styled.button`
+  background: white;
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  padding: 0.5rem 1rem;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: ${props => props.$active ? 'white' : '#1C1C18'};
+  background: ${props => props.$active ? '#6F240A' : 'white'};
+
+  &:hover:not(:disabled) {
+    background: ${props => props.$active ? '#875200' : '#F5F0EB'};
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 `;
 
@@ -172,6 +250,7 @@ const ModalActions = styled.div`
 
 const ExpenseTracking = () => {
   const [expenses, setExpenses] = useState([]);
+  const [page, setPage] = useState(1);
   const [categories, setCategories] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -191,6 +270,7 @@ const ExpenseTracking = () => {
         fetchExpenses(), fetchLargestExpenseCategory()
       ]);
       setExpenses(data.reverse());
+      setPage(1);
       setLargestCategory(largestCat);
       const cats = await fetchCategories('expense');
       setCategories(cats);
@@ -298,6 +378,9 @@ const ExpenseTracking = () => {
   };
 
   const totalExpenses = expenses.reduce((acc, exp) => acc + parseAmount(exp.amount), 0);
+  
+  const totalPages = Math.ceil(expenses.length / PAGE_SIZE);
+  const paginatedExpenses = expenses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   
   // For pending invoices, we'll need to fetch them if we want this to be accurate, 
   // or we can show a placeholder if it's meant to be static for this module.
@@ -447,7 +530,7 @@ const ExpenseTracking = () => {
 
         <div style={{ overflowX: 'auto' }}>
           <ExpenseList style={{ minWidth: '600px' }}>
-          {expenses.map(expense => (
+          {paginatedExpenses.map(expense => (
             <ListItem key={expense.id}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', overflow: 'hidden' }}>
                 <div style={{ 
@@ -479,6 +562,50 @@ const ExpenseTracking = () => {
           ))}
         </ExpenseList>
       </div>
+
+        <MobileCard>
+          {paginatedExpenses.map(expense => (
+            <ExpCard key={expense.id}>
+              <ExpCardRow>
+                <ExpCardLabel>Title</ExpCardLabel>
+                <ExpCardValue>{expense.title}</ExpCardValue>
+              </ExpCardRow>
+              <ExpCardRow>
+                <ExpCardLabel>Date</ExpCardLabel>
+                <ExpCardValue>{expense.date}</ExpCardValue>
+              </ExpCardRow>
+              <ExpCardRow>
+                <ExpCardLabel>Category</ExpCardLabel>
+                <ExpCardValue style={{ fontWeight: 600 }}>{expense.category}</ExpCardValue>
+              </ExpCardRow>
+              <ExpCardRow>
+                <ExpCardLabel>Amount</ExpCardLabel>
+                <ExpCardValue style={{ color: '#6F240A', fontSize: '0.95rem' }}>{expense.amount}</ExpCardValue>
+              </ExpCardRow>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #F0EEE8' }}>
+                <button onClick={() => handleEdit(expense)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#6F240A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
+                  <Edit2 size={14} /> Edit
+                </button>
+                <button onClick={() => setDeleteTarget(expense)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#BA1A1A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
+                  <Trash2 size={14} /> Delete
+                </button>
+              </div>
+            </ExpCard>
+          ))}
+        </MobileCard>
+
+        {totalPages > 1 && (
+          <PaginationRow>
+            <span>{expenses.length} total expenses</span>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <PageBtn disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Previous</PageBtn>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <PageBtn key={p} $active={p === page} onClick={() => setPage(p)}>{p}</PageBtn>
+              ))}
+              <PageBtn disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next</PageBtn>
+            </div>
+          </PaginationRow>
+        )}
       </section>
 
       {deleteTarget && (

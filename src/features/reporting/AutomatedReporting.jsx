@@ -17,6 +17,14 @@ const ReportGrid = styled.div`
   grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
   margin-bottom: 3rem;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const ReportCard = styled.div`
@@ -94,6 +102,10 @@ const SummaryGrid = styled.div`
   grid-template-columns: repeat(2, 1fr);
   gap: 1.5rem;
   margin-bottom: 3rem;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const SummaryItem = styled.div`
@@ -104,6 +116,14 @@ const SummaryItem = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  @media (max-width: 600px) {
+    padding: 1rem;
+
+    div:first-child div:last-child {
+      font-size: 1.15rem !important;
+    }
+  }
 `;
 
 const ChartSection = styled.section`

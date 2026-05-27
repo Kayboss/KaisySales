@@ -121,19 +121,26 @@ const CloseButton = styled.button`
 const NavLink = styled(Link)`
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 0.75rem;
+  padding: 0.85rem;
   text-decoration: none;
   color: ${props => props.$active ? '#FFFFFF' : milkText};
   background: ${props => props.$active ? 'rgba(255,255,255,0.12)' : 'transparent'};
   border-radius: ${themeTokens.borderRadius.md};
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
   transition: ${themeTokens.transitions.fast};
 
   &:hover {
     background: rgba(255,255,255,0.08);
     color: #FFFFFF;
+  }
+
+  @media (max-width: 768px) {
+    padding: 0.65rem;
+    font-size: 0.85rem;
+    gap: 0.6rem;
   }
 `;
 
@@ -218,13 +225,14 @@ const App = () => {
                       style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
-                        gap: '1rem', 
-                        padding: '1rem', 
+                        gap: '0.75rem', 
+                        padding: '0.85rem', 
                         background: 'none', 
                         border: 'none', 
                         color: '#F5E6D3',
                         cursor: 'pointer',
                         fontWeight: 600,
+                        fontSize: '0.95rem',
                         borderRadius: '8px',
                         width: '100%'
                       }}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Plus, Search, Tag, TrendingUp, Calendar, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Search, Tag, TrendingUp, Calendar, Edit2, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchSales, createSale, updateSale, deleteSale, fetchInventory, updateInventoryItem } from '../../services/api';
@@ -134,6 +134,40 @@ const CardValue = styled.span`
   text-align: right;
 `;
 
+const PAGE_SIZE = 20;
+
+const PaginationRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  font-size: 0.875rem;
+  color: #55423D;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+`;
+
+const PageBtn = styled.button`
+  background: white;
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  padding: 0.5rem 1rem;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: ${props => props.$active ? 'white' : '#1C1C18'};
+  background: ${props => props.$active ? '#6F240A' : 'white'};
+
+  &:hover:not(:disabled) {
+    background: ${props => props.$active ? '#875200' : '#F5F0EB'};
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+`;
+
 const ActionButton = styled.button`
   background: ${({ theme }) => theme.colors.primary};
   color: white;
@@ -227,6 +261,7 @@ const ModalActions = styled.div`
 const DailySales = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sales, setSales] = useState([]);
+  const [page, setPage] = useState(1);
   const [inventoryItems, setInventoryItems] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -246,6 +281,7 @@ const DailySales = () => {
         fetchSales(), fetchInventory()
       ]);
       setSales(data.reverse());
+      setPage(1);
       setInventoryItems(inv);
     } catch (error) {
       console.error('Failed to load data', error);
@@ -346,6 +382,9 @@ const DailySales = () => {
     sale.item.toLowerCase().includes(searchTerm.toLowerCase()) || 
     sale.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filteredSales.length / PAGE_SIZE);
+  const paginatedSales = filteredSales.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const parseAmount = (amt) => {
     if (typeof amt === 'number') return amt;
@@ -549,7 +588,7 @@ const DailySales = () => {
           </tr>
         </thead>
         <tbody>
-          {filteredSales.map(sale => (
+          {paginatedSales.map(sale => (
             <tr key={sale.id}>
               <Td style={{ color: '#55423D', fontWeight: 600 }}>{sale.id}</Td>
               <Td>
@@ -577,7 +616,7 @@ const DailySales = () => {
       </div>
 
       <MobileCard>
-        {filteredSales.map(sale => (
+        {paginatedSales.map(sale => (
           <SaleCard key={sale.id}>
             <CardRow>
               <CardLabel>Receipt</CardLabel>
@@ -616,6 +655,19 @@ const DailySales = () => {
           </SaleCard>
         ))}
       </MobileCard>
+
+      {totalPages > 1 && (
+        <PaginationRow>
+          <span>{filteredSales.length} total sales</span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <PageBtn disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Previous</PageBtn>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <PageBtn key={p} $active={p === page} onClick={() => setPage(p)}>{p}</PageBtn>
+            ))}
+            <PageBtn disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next</PageBtn>
+          </div>
+        </PaginationRow>
+      )}
 
       {deleteTarget && (
         <ConfirmDialog
