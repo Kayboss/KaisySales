@@ -229,6 +229,7 @@ const ModalActions = styled.div`
 
 const InventoryManagement = () => {
   const [inventory, setInventory] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [categories, setCategories] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -299,11 +300,12 @@ const InventoryManagement = () => {
   };
 
   const handleEdit = (item) => {
+    const parsedPrice = item.price ? parseFloat(String(item.price).replace('GH₵', '').replace(',', '')) : 0;
     setFormData({
       name: item.name,
       category: item.category,
       stock: item.stock,
-      price: parseFloat(item.price.replace('GH₵', '').replace(',', '')),
+      price: parsedPrice,
       newCategory: ''
     });
     setEditId(item.id);
@@ -329,7 +331,10 @@ const InventoryManagement = () => {
   };
 
   const totalPages = Math.ceil(inventory.length / PAGE_SIZE);
-  const paginated = inventory.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const filteredInventory = searchTerm
+    ? inventory.filter(i => i.name?.toLowerCase().includes(searchTerm.toLowerCase()) || i.category?.toLowerCase().includes(searchTerm.toLowerCase()))
+    : inventory;
+  const paginated = filteredInventory.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
@@ -416,6 +421,7 @@ const InventoryManagement = () => {
           <input 
             type="text" 
             placeholder="Search by name, SKU or category..." 
+            value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
             style={{ border: 'none', outline: 'none', width: '100%', fontFamily: 'inherit' }}
           />
         </SearchBar>
@@ -496,7 +502,7 @@ const InventoryManagement = () => {
 
       {totalPages > 1 && (
         <PaginationRow>
-          <span>{inventory.length} total items</span>
+          <span>{filteredInventory.length} total items</span>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <PageBtn disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Previous</PageBtn>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (

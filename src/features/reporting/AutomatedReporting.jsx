@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
-import { FileText, Download, Calendar, TrendingUp, TrendingDown, DollarSign, BarChart3, PieChart, TrendingUp as ChartTrend } from 'lucide-react';
+import { FileText, Download, Calendar, TrendingUp, TrendingDown, DollarSign, BarChart3, PieChart } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Legend } from 'recharts';
 import { fetchSales, fetchExpenses, fetchInvoices } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
@@ -415,7 +415,7 @@ const AutomatedReporting = () => {
           <FullWidthChartCard>
             <ChartHeader>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ChartTrend size={18} color="#25432F" />
+                <TrendingUp size={18} color="#25432F" />
                 <ChartTitle>Revenue vs Expenses</ChartTitle>
               </div>
               <ChartBadge>Comparison</ChartBadge>

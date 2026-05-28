@@ -9,8 +9,8 @@ export const GlobalStyles = createGlobalStyle`
 
   body {
     font-family: ${({ theme }) => theme.fonts.main};
-    background-color: ${({ theme }) => theme.background};
-    color: ${({ theme }) => theme.text};
+    background-color: ${({ theme }) => theme.colors.background.main};
+    color: ${({ theme }) => theme.colors.text.main};
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     transition: ${({ theme }) => theme.transitions.default};

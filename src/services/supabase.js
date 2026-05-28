@@ -169,9 +169,9 @@ export const authService = {
     return () => { authListeners = authListeners.filter(fn => fn !== callback); };
   },
 
-  getCurrentUser() {
+  async getCurrentUser() {
     if (supabase) {
-      const { data } = supabase.auth.getUser();
+      const { data } = await supabase.auth.getUser();
       return data?.user ? mapUser(data.user) : null;
     }
     return null;

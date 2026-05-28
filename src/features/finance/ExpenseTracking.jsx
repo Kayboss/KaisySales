@@ -328,11 +328,12 @@ const ExpenseTracking = () => {
   };
 
   const handleEdit = (expense) => {
+    const parsedAmt = expense.amount ? parseFloat(String(expense.amount).replace('GH₵', '').replace(',', '')) : 0;
     setFormData({
       title: expense.title,
       category: expense.category,
       quantity: expense.quantity || 1,
-      unitPrice: expense.unitPrice || parseFloat(expense.amount.replace('GH₵', '').replace(',', '')),
+      unitPrice: expense.unitPrice || parsedAmt,
       date: expense.date,
       newCategory: ''
     });
@@ -480,7 +481,7 @@ const ExpenseTracking = () => {
               <input 
                 type="text" 
                 readOnly 
-                value={(formData.quantity && formData.unitPrice) ? (formData.quantity * formData.unitPrice).toFixed(2) : '0.00'}
+                value={(formData.quantity && formData.unitPrice) ? (parseFloat(formData.quantity) * parseFloat(formData.unitPrice)).toFixed(2) : '0.00'}
                 style={{ background: '#f5f5f5', cursor: 'not-allowed' }}
               />
             </FormGroup>

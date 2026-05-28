@@ -348,10 +348,11 @@ const DailySales = () => {
   };
 
   const handleEdit = (sale) => {
+    const parsedAmt = sale.amount ? parseFloat(String(sale.amount).replace('GH₵', '').replace(',', '')) : 0;
     setFormData({
       item: sale.item,
       quantity: sale.quantity || 1,
-      unitPrice: sale.unitPrice || parseFloat(sale.amount.replace('GH₵', '').replace(',', '')),
+      unitPrice: sale.unitPrice || parsedAmt,
       paymentMethod: sale.paymentMethod,
       discount: 0
     });
@@ -379,8 +380,8 @@ const DailySales = () => {
   };
 
   const filteredSales = sales.filter(sale => 
-    sale.item.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    sale.id.toLowerCase().includes(searchTerm.toLowerCase())
+    (sale.item || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (sale.id || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredSales.length / PAGE_SIZE);

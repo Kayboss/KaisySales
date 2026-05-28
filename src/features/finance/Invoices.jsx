@@ -169,6 +169,7 @@ const Invoices = () => {
   });
 
   const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const addItem = () => {
     setFormData(prev => ({ ...prev, items: [...prev.items, { name: '', quantity: 1, unitPrice: '' }] }));
@@ -545,7 +546,7 @@ const Invoices = () => {
           minWidth: '200px'
         }}>
           <Search size={18} color="#89726C" />
-          <input type="text" placeholder="Search invoices, customers..." style={{ border: 'none', outline: 'none', width: '100%' }} />
+          <input type="text" placeholder="Search invoices, customers..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%' }} />
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {['all', 'pending', 'paid'].map(status => (
@@ -573,6 +574,7 @@ const Invoices = () => {
       <InvoicesGrid>
         {invoices
           .filter(inv => statusFilter === 'all' || inv.status === statusFilter)
+          .filter(inv => !searchTerm || inv.id?.toLowerCase().includes(searchTerm.toLowerCase()) || inv.customer?.toLowerCase().includes(searchTerm.toLowerCase()))
           .map(invoice => (
           <InvoiceCard key={invoice.id}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>

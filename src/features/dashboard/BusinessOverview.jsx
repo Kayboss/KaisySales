@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriangle, ArrowRight, BookOpen } from 'lucide-react';
 import { fetchSales, fetchExpenses, fetchInvoices, fetchInventory } from '../../services/api';
@@ -66,7 +67,7 @@ const Value = styled.div`
 `;
 
 const Label = styled.div`
-  color: ${({ theme }) => theme.textMuted};
+  color: ${({ theme }) => theme.colors.text.muted};
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -260,6 +261,7 @@ const RestockLink = styled.button`
 `;
 
 const BusinessOverview = () => {
+  const navigate = useNavigate();
   const [showTutorial, setShowTutorial] = useState(false);
   const [stats, setStats] = useState({
     revenue: 0,
@@ -362,7 +364,7 @@ const BusinessOverview = () => {
             <AlertTriangle size={20} color="#BA1A1A" />
             <span>You have {stats.lowStock} items running low on stock.</span>
           </AlertContent>
-          <RestockLink onClick={() => window.location.hash = '#/inventory'}>
+          <RestockLink onClick={() => navigate('/inventory')}>
             Restock Now
             <ArrowRight size={16} />
           </RestockLink>
