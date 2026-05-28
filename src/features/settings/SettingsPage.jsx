@@ -4,7 +4,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { fetchCategories, updateCategory, deleteCategory } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check } from 'lucide-react';
+import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette } from 'lucide-react';
 
 const Header = styled.div`
   display: flex;
@@ -222,6 +222,33 @@ const TypeBadge = styled.span`
     '#6F240A'};
 `;
 
+const ColorGrid = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+`;
+
+const ColorOption = styled.button`
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: ${props => props.$color};
+  border: 3px solid ${props => props.$selected ? '#FFFFFF' : 'transparent'};
+  outline: ${props => props.$selected ? `2px solid ${props.theme.colors.primary}` : 'none'};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+`;
+
+const avatarColors = ['#6F240A', '#875200', '#25432F', '#D4AF37', '#8E3A1F'];
+
 const GroupLabel = styled.div`
   font-size: 0.8rem;
   font-weight: 700;
@@ -243,7 +270,8 @@ const SettingsPage = () => {
     email: settings.email,
     phone: settings.phone,
     location: settings.location,
-    category: settings.category
+    category: settings.category,
+    avatarColor: settings.avatarColor || '#6F240A'
   });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -439,6 +467,28 @@ const SettingsPage = () => {
                 <option value="Cape Coast, Central Region">Cape Coast, Central Region</option>
                 <option value="Koforidua, Eastern Region">Koforidua, Eastern Region</option>
               </Select>
+            </InputWrapper>
+          </FormGroup>
+
+          <FormGroup>
+            <Label>Theme Color</Label>
+            <InputWrapper>
+              <Palette size={18} />
+              <div style={{ marginLeft: '2.75rem' }}>
+                <ColorGrid>
+                  {avatarColors.map(color => (
+                    <ColorOption
+                      key={color}
+                      type="button"
+                      $color={color}
+                      $selected={formData.avatarColor === color}
+                      onClick={() => setFormData(prev => ({ ...prev, avatarColor: color }))}
+                    >
+                      {formData.avatarColor === color && <Check size={18} />}
+                    </ColorOption>
+                  ))}
+                </ColorGrid>
+              </div>
             </InputWrapper>
           </FormGroup>
 

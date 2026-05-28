@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { themeTokens } from './styles/themeTokens';
+import { getThemeForColor } from './styles/colorThemes';
 import { GlobalStyles } from './styles/GlobalStyles';
 import { useAuthStore } from './store/authStore';
 import { useSettingsStore } from './store/settingsStore';
@@ -25,7 +26,7 @@ import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, Leaf, FileT
 const Layout = styled.div`
   display: flex;
   min-height: 100vh;
-  background-color: ${themeTokens.colors.background.main};
+  background-color: ${({ theme }) => theme.colors.background.main};
   position: relative;
 `;
 
@@ -146,15 +147,17 @@ const NavLink = styled(Link)`
 
 const App = () => {
   const { user, logout } = useAuthStore();
-  const { businessName } = useSettingsStore();
+  const { businessName, avatarColor } = useSettingsStore();
   const location = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  const theme = avatarColor ? getThemeForColor(avatarColor) : themeTokens;
 
   const toggleMobileMenu = () => setIsMobileOpen(!isMobileOpen);
   const closeMobileMenu = () => setIsMobileOpen(false);
 
   return (
-    <ThemeProvider theme={themeTokens}>
+    <ThemeProvider theme={theme}>
       <ErrorBoundary>
         <GlobalStyles />
         <Routes>
