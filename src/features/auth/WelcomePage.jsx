@@ -265,7 +265,7 @@ const WelcomePage = () => {
       console.error('🔥 Authentication error:', err);
       let userFriendlyMessage = err.message;
       
-      // Translate complex Firebase auth codes into premium humanized alerts
+      // Translate complex auth codes into humanized alerts
       if (err.message.includes('auth/email-already-in-use')) {
         userFriendlyMessage = 'This email is already registered. Please log in instead.';
       } else if (err.message.includes('auth/wrong-password') || err.message.includes('auth/invalid-credential') || err.message.includes('auth/user-not-found')) {

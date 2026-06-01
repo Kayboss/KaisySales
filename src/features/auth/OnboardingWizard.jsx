@@ -12,9 +12,7 @@ import {
   Phone, 
   MapPin, 
   Check, 
-  Briefcase, 
-  Compass, 
-  Database 
+  Briefcase 
 } from 'lucide-react';
 
 const Container = styled.div`

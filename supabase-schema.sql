@@ -20,14 +20,17 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own profile" ON profiles;
 CREATE POLICY "Users can read own profile"
   ON profiles FOR SELECT
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
 CREATE POLICY "Users can insert own profile"
   ON profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 CREATE POLICY "Users can update own profile"
   ON profiles FOR UPDATE
   USING (auth.uid() = id);
@@ -65,6 +68,7 @@ CREATE TABLE IF NOT EXISTS sales (
 
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can CRUD their sales" ON sales;
 CREATE POLICY "Users can CRUD their sales"
   ON sales FOR ALL
   USING (auth.uid() = user_id)
@@ -85,6 +89,7 @@ CREATE TABLE IF NOT EXISTS invoices (
 
 ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can CRUD their invoices" ON invoices;
 CREATE POLICY "Users can CRUD their invoices"
   ON invoices FOR ALL
   USING (auth.uid() = user_id)
@@ -105,6 +110,7 @@ CREATE TABLE IF NOT EXISTS expenses (
 
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can CRUD their expenses" ON expenses;
 CREATE POLICY "Users can CRUD their expenses"
   ON expenses FOR ALL
   USING (auth.uid() = user_id)
@@ -125,6 +131,7 @@ CREATE TABLE IF NOT EXISTS inventory (
 
 ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can CRUD their inventory" ON inventory;
 CREATE POLICY "Users can CRUD their inventory"
   ON inventory FOR ALL
   USING (auth.uid() = user_id)
@@ -146,6 +153,7 @@ CREATE TABLE IF NOT EXISTS stores (
 
 ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can CRUD their stores" ON stores;
 CREATE POLICY "Users can CRUD their stores"
   ON stores FOR ALL
   USING (auth.uid() = user_id)
@@ -161,7 +169,46 @@ CREATE TABLE IF NOT EXISTS categories (
 
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can CRUD their categories" ON categories;
 CREATE POLICY "Users can CRUD their categories"
   ON categories FOR ALL
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
+
+-- 8. KEEP ALIVE (for free-tier inactivity prevention)
+CREATE TABLE IF NOT EXISTS keep_alive (
+  id BIGSERIAL PRIMARY KEY,
+  ping_id UUID DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE keep_alive ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow anon to read keep_alive" ON keep_alive;
+CREATE POLICY "Allow anon to read keep_alive"
+  ON keep_alive FOR SELECT
+  TO anon
+  USING (true);
+
+DROP POLICY IF EXISTS "Allow anon to insert keep_alive" ON keep_alive;
+CREATE POLICY "Allow anon to insert keep_alive"
+  ON keep_alive FOR INSERT
+  TO anon
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow anon to delete old keep_alive records" ON keep_alive;
+CREATE POLICY "Allow anon to delete old keep_alive records"
+  ON keep_alive FOR DELETE
+  TO anon
+  USING (true);
+
+-- Grant Data API access (tables must be accessible to roles for REST API to expose them)
+-- RLS policies still control row-level access per role
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+GRANT SELECT, INSERT, DELETE ON keep_alive TO anon;
+GRANT USAGE ON SEQUENCE keep_alive_id_seq TO anon;
+
+-- Reload PostgREST schema cache so tables are immediately available via REST API
+NOTIFY pgrst, 'reload schema';

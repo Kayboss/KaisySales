@@ -1,0 +1,34 @@
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    - cron: '0 6 */2 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SELECT - Recent activity check
+        run: |
+          curl -s -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/keep_alive?select=id,created_at&order=created_at.desc&limit=3" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Accept: application/json"
+
+      - name: INSERT - New keep-alive ping
+        run: |
+          curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/keep_alive" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{}'
+
+      - name: DELETE - Cleanup records older than 30 days
+        run: |
+          THIRTY_DAYS_AGO=$(date -d '30 days ago' --iso-8601=seconds)
+          curl -s -X DELETE "${{ secrets.SUPABASE_URL }}/rest/v1/keep_alive?created_at=lt.$THIRTY_DAYS_AGO" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Accept: application/json"

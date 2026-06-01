@@ -3,7 +3,7 @@ import { authService } from '../services/supabase';
 
 /**
  * Auth Store
- * Manages Firebase authentication state and reactive listeners.
+ * Manages Supabase authentication state and reactive listeners.
  */
 export const useAuthStore = create((set) => {
   
@@ -30,7 +30,7 @@ export const useAuthStore = create((set) => {
     isInitialized: false,
 
     /**
-     * Firebase signup wrapper
+     * Supabase signup wrapper
      */
     signup: async (email, password) => {
       try {
@@ -42,7 +42,7 @@ export const useAuthStore = create((set) => {
     },
 
     /**
-     * Firebase signin wrapper
+     * Supabase signin wrapper
      */
     login: async (email, password) => {
       try {
@@ -54,7 +54,7 @@ export const useAuthStore = create((set) => {
     },
 
     /**
-     * Firebase signout wrapper
+     * Supabase signout wrapper
      */
     logout: async () => {
       try {
@@ -87,8 +87,6 @@ export const useAuthStore = create((set) => {
       }
     },
 
-    setInitialized: (val) => set({ isInitialized: val }),
-    
     // Exposed for teardowns in testing if needed
     cleanup: () => unsubscribe()
   };

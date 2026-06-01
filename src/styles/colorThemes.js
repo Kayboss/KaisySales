@@ -84,4 +84,4 @@ export const getThemeForColor = (avatarColor) => {
   };
 };
 
-export default colorThemes;
+

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Package, Search, Plus, Edit2, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Package, Search, Plus, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchInventory, createInventoryItem, updateInventoryItem, deleteInventoryItem, fetchCategories, createCategory } from '../../services/api';
@@ -87,13 +87,6 @@ const ActionButton = styled.button`
     filter: brightness(1.2);
   }
 `;
-
-const inventoryData = [
-  { id: '1', name: 'Hand-woven Silk Scarf', category: 'Textiles', stock: 12, price: 'GH₵15,000.00', status: 'In Stock' },
-  { id: '2', name: 'Terracotta Vase (Large)', category: 'Ceramics', stock: 3, price: 'GH₵22,500.00', status: 'Low Stock' },
-  { id: '3', name: 'Hand-carved Mask', category: 'Decor', stock: 45, price: 'GH₵8,000.00', status: 'In Stock' },
-  { id: '4', name: 'Indigo Dye Pack', category: 'Materials', stock: 2, price: 'GH₵3,500.00', status: 'Low Stock' },
-];
 
 const MobileCard = styled.div`
   display: none;

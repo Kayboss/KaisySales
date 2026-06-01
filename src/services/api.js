@@ -4,15 +4,11 @@ import { useAuthStore } from '../store/authStore';
 
 /**
  * Scoped User ID Helper
- * Ensures all database calls are isolated under the active user's Firebase UID.
+ * Ensures all database calls are isolated under the active user's UID.
  */
 const getUid = () => {
   const { user } = useAuthStore.getState();
   if (!user) {
-    console.error('KaisySales: No authenticated user found in store. Auth state:', {
-      store: useAuthStore.getState(),
-      firebaseUser: authService.getCurrentUser?.()
-    });
     throw new Error('KaisySales Error: Attempted database request without an active authenticated session.');
   }
   return user.uid;

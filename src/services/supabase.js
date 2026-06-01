@@ -111,7 +111,7 @@ async function migrateLocalData(newUid) {
   }
 
   if (migrated) {
-    console.log('Local data migrated to Supabase successfully');
+    if (import.meta.env.DEV) console.log('Local data migrated to Supabase successfully');
   }
 }
 
