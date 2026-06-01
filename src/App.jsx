@@ -8,6 +8,7 @@ import { useAuthStore } from './store/authStore';
 import { useSettingsStore } from './store/settingsStore';
 import CheckAuth from './middleware/CheckAuth';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import IdleTimer from './components/common/IdleTimer';
 
 // Features
 import WelcomePage from './features/auth/WelcomePage';
@@ -248,6 +249,7 @@ const App = () => {
                   </div>
                 </Sidebar>
                 <Main>
+                  <IdleTimer />
                   <Routes>
                     <Route index element={<BusinessOverview />} />
                     <Route path="inventory" element={<InventoryManagement />} />
