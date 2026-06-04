@@ -260,7 +260,7 @@ const CloseButton = styled.button`
 
 const PRINT_STYLE_ID = 'invoice-print-styles';
 
-const InvoicePreview = ({ invoice, onClose, businessName }) => {
+const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, businessLocation }) => {
   const contentRef = useRef(null);
 
   useEffect(() => {
@@ -367,17 +367,29 @@ const InvoicePreview = ({ invoice, onClose, businessName }) => {
             </InvoiceMeta>
           </Header>
 
+          <Section>
+            <InfoBlock>
+              <InfoLabel>From</InfoLabel>
+              <p><strong>{businessName || 'KaisySales'}</strong></p>
+              {businessPhone && <p>{businessPhone}</p>}
+              {businessLocation && <p>{businessLocation}</p>}
+            </InfoBlock>
+            <InfoBlock style={{ textAlign: 'right' }}>
+              <InfoLabel>Bill To</InfoLabel>
+              <p><strong>{invoice.customer}</strong></p>
+              {invoice.customerLocation && <p>{invoice.customerLocation}</p>}
+            </InfoBlock>
+          </Section>
+
           <Divider />
 
           <Section>
             <InfoBlock>
-              <InfoLabel>Bill To</InfoLabel>
-              <p><strong>{invoice.customer}</strong></p>
-            </InfoBlock>
-            <InfoBlock style={{ textAlign: 'right' }}>
               <InfoLabel>Invoice Date</InfoLabel>
               <p><strong>{invoice.date}</strong></p>
-              <InfoLabel style={{ marginTop: '0.75rem' }}>Status</InfoLabel>
+            </InfoBlock>
+            <InfoBlock style={{ textAlign: 'right' }}>
+              <InfoLabel>Status</InfoLabel>
               <StatusBlock $status={invoice.status}>
                 {invoice.status === 'paid' ? 'Paid' : 'Pending'}
               </StatusBlock>

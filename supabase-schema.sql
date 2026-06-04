@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   customer TEXT NOT NULL,
+  customer_location TEXT DEFAULT '',
   date DATE DEFAULT NULL,
   total REAL DEFAULT 0,
   status TEXT DEFAULT 'Pending',

@@ -151,7 +151,7 @@ const ModalActions = styled.div`
 `;
 
 const Invoices = () => {
-  const { businessName } = useSettingsStore();
+  const { businessName, phone: businessPhone, location: businessLocation } = useSettingsStore();
   const [invoices, setInvoices] = useState([]);
   const [stores, setStores] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -165,7 +165,7 @@ const Invoices = () => {
   const prevStatus = useRef('pending');
 
   const [formData, setFormData] = useState({
-    customer: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0
+    customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0
   });
 
   const [statusFilter, setStatusFilter] = useState('all');
@@ -230,6 +230,7 @@ const Invoices = () => {
     
     const invoicePayload = {
       customer: formData.customer,
+      customerLocation: formData.customerLocation,
       date: formData.date,
       quantity: totalQty,
       unitPrice: items[0]?.unitPrice || '',
@@ -321,6 +322,7 @@ const Invoices = () => {
     prevStatus.current = invoice.status;
     setFormData({
       customer: invoice.customer,
+      customerLocation: invoice.customerLocation || '',
       date: invoice.date,
       items: finalItems,
       status: invoice.status,
@@ -362,7 +364,7 @@ const Invoices = () => {
     setIsEditing(false);
     setEditId(null);
     prevStatus.current = 'pending';
-    setFormData({ customer: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0 });
+    setFormData({ customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0 });
   };
 
   const handleExport = () => {
@@ -418,6 +420,15 @@ const Invoices = () => {
                 ))}
               </select>
             )}
+          </FormGroup>
+          <FormGroup>
+            <label>Customer Location</label>
+            <input 
+              type="text" 
+              value={formData.customerLocation}
+              onChange={e => setFormData({...formData, customerLocation: e.target.value})}
+              placeholder="Location"
+            />
           </FormGroup>
           <FormGroup>
             <label>Due Date</label>
@@ -601,7 +612,7 @@ const Invoices = () => {
       </InvoicesGrid>
 
       {previewInvoice && (
-        <InvoicePreview invoice={previewInvoice} onClose={() => setPreviewInvoice(null)} businessName={businessName} />
+        <InvoicePreview invoice={previewInvoice} onClose={() => setPreviewInvoice(null)} businessName={businessName} businessPhone={businessPhone} businessLocation={businessLocation} />
       )}
 
       {deleteTarget && (
