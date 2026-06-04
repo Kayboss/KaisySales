@@ -437,7 +437,7 @@ const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, busines
           </TotalRow>
 
           <Footer>
-            {businessName || 'KaisySales'} — Know your Business. Stay in control.
+            KaisySales - Know your Business, Stay in Control
           </Footer>
         </InvoiceBody>
       </Container>
