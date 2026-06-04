@@ -289,12 +289,8 @@ const BusinessOverview = () => {
 
       const today = new Date().toISOString().split('T')[0];
       
-      // Revenue: All sales + Paid invoices
-      const salesRevenue = sales.reduce((acc, s) => acc + parseAmount(s.totalAmount || s.amount), 0);
-      const invoiceRevenue = invoices
-        .filter(inv => inv.status?.toLowerCase() === 'paid')
-        .reduce((acc, inv) => acc + parseAmount(inv.amount || inv.totalAmount), 0);
-      const totalRevenue = salesRevenue + invoiceRevenue;
+      // Revenue: All sales (paid invoices already create sale records)
+      const totalRevenue = sales.reduce((acc, s) => acc + parseAmount(s.totalAmount || s.amount), 0);
 
       // Sales Today: Count of sales + invoices today
       const salesTodayCount = sales.filter(s => s.date === today).length + 

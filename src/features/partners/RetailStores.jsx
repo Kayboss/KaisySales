@@ -344,7 +344,7 @@ const RetailStores = () => {
                 <option value="">Select Type</option>
                 <option value="Boutique">Boutique</option>
                 <option value="Concept Store">Concept Store</option>
-                <option value="Gallery">Gallery</option>
+                <option value="Retail Store">Retail Store</option>
                 <option value="Wholesaler">Wholesaler</option>
               </select>
             </FormGroup>
