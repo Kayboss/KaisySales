@@ -125,6 +125,8 @@ CREATE TABLE IF NOT EXISTS inventory (
   category TEXT DEFAULT '',
   quantity INTEGER DEFAULT 0,
   unit TEXT DEFAULT 'pcs',
+  min_stock INTEGER DEFAULT 5,
+  price TEXT DEFAULT '',
   status TEXT DEFAULT 'In Stock',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

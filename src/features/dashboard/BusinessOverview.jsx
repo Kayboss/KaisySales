@@ -300,8 +300,8 @@ const BusinessOverview = () => {
       const totalExpenses = expenses.reduce((acc, e) => acc + parseAmount(e.amount || e.totalAmount), 0);
       const netProfit = totalRevenue - totalExpenses;
 
-      // Low Stock: Inventory items with status "Low Stock"
-      const lowStockCount = inventory.filter(item => item.status === 'Low Stock').length;
+      // Low Stock: Inventory items needing attention
+      const lowStockCount = inventory.filter(item => item.status === 'Low Stock' || item.status === 'Out of Stock').length;
 
       // Compute monthly dynamic performance trends
       const monthlyData = getMonthlyData(sales, invoices);

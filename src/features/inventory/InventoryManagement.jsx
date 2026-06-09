@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Package, Search, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Package, Search, Plus, Minus, Edit2, Trash2, Download } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchInventory, createInventoryItem, updateInventoryItem, deleteInventoryItem, fetchCategories, createCategory } from '../../services/api';
+import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
 const PAGE_SIZE = 20;
 
@@ -232,7 +233,7 @@ const InventoryManagement = () => {
   const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: '', category: '', stock: '', price: '', newCategory: ''
+    name: '', category: '', stock: '', price: '', minStock: 5, newCategory: ''
   });
 
   const loadData = async () => {
@@ -268,12 +269,14 @@ const InventoryManagement = () => {
     }
 
     const stockNum = parseInt(formData.stock, 10);
+    const minStock = parseInt(formData.minStock) || 5;
     const itemPayload = {
       name: formData.name,
       category: selectedCategory,
       stock: stockNum,
+      minStock: minStock,
       price: `GH₵${parseFloat(formData.price).toFixed(2)}`,
-      status: stockNum > 5 ? 'In Stock' : 'Low Stock'
+      status: stockNum > minStock ? 'In Stock' : stockNum > 0 ? 'Low Stock' : 'Out of Stock'
     };
     
     try {
@@ -299,6 +302,7 @@ const InventoryManagement = () => {
       category: item.category,
       stock: item.stock,
       price: parsedPrice,
+      minStock: item.minStock || 5,
       newCategory: ''
     });
     setEditId(item.id);
@@ -320,7 +324,40 @@ const InventoryManagement = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
-    setFormData({ name: '', category: '', stock: '', price: '', newCategory: '' });
+    setFormData({ name: '', category: '', stock: '', price: '', minStock: 5, newCategory: '' });
+  };
+
+  const adjustStock = async (item, delta) => {
+    try {
+      const newStock = Math.max(0, (parseInt(item.stock) || 0) + delta);
+      const minStock = parseInt(item.minStock) || 5;
+      await updateInventoryItem(item.id, {
+        stock: newStock,
+        status: newStock > minStock ? 'In Stock' : newStock > 0 ? 'Low Stock' : 'Out of Stock'
+      });
+      await loadData();
+    } catch (error) {
+      console.error('Failed to adjust stock', error);
+    }
+  };
+
+  const exportToCSV = () => {
+    const headers = {
+      name: 'Item Name',
+      category: 'Category',
+      stock: 'Stock',
+      price: 'Price',
+      status: 'Status',
+      minStock: 'Reorder At'
+    };
+    const csv = convertToCSV(inventory, headers);
+    downloadCSV(csv, `Inventory_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const parsePrice = (price) => {
+    if (typeof price === 'number') return price;
+    if (typeof price !== 'string') return 0;
+    return parseFloat(price.replace(/[^\d.]/g, '')) || 0;
   };
 
   const totalPages = Math.ceil(inventory.length / PAGE_SIZE);
@@ -329,6 +366,8 @@ const InventoryManagement = () => {
     : inventory;
   const paginated = filteredInventory.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const totalValue = paginated.reduce((sum, i) => sum + (parseInt(i.stock) || 0) * parsePrice(i.price), 0);
+
   return (
     <div>
       <Header>
@@ -336,7 +375,14 @@ const InventoryManagement = () => {
           <h1 style={{ fontSize: '2rem' }}>Inventory</h1>
           <p style={{ color: '#55423D' }}>Manage your inventory stock.</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <div style={{ fontSize: '0.9rem', color: '#55423D' }}>
+            Value: <strong style={{ color: '#6F240A' }}>GH₵{totalValue.toFixed(2)}</strong>
+          </div>
+          <ActionButton onClick={exportToCSV} style={{ background: 'white', color: '#6F240A', border: '1px solid #D0C8C4' }}>
+            <Download size={18} />
+            Export
+          </ActionButton>
           <ActionButton onClick={() => { setIsEditing(false); setIsModalOpen(true); }}>
             <Plus size={18} />
             New Item
@@ -390,6 +436,18 @@ const InventoryManagement = () => {
               />
             </FormGroup>
             <FormGroup>
+              <label>Min Stock (reorder alert)</label>
+              <input 
+                type="number" 
+                min="0"
+                value={formData.minStock}
+                onChange={e => setFormData({...formData, minStock: e.target.value})}
+                placeholder="5" 
+              />
+            </FormGroup>
+          </FormRow>
+          <FormRow>
+            <FormGroup>
               <label>Price (GH₵)</label>
               <input 
                 type="number" 
@@ -437,7 +495,13 @@ const InventoryManagement = () => {
             <tr key={item.id}>
               <Td style={{ fontWeight: 600 }}>{item.name}</Td>
               <Td>{item.category}</Td>
-              <Td className="data-tabular">{item.stock}</Td>
+              <Td className="data-tabular">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <button type="button" onClick={() => adjustStock(item, -1)} style={{ background: 'none', border: '1px solid #D0C8C4', borderRadius: '4px', cursor: 'pointer', display: 'flex', padding: '2px', color: '#BA1A1A' }} title="Decrease"><Minus size={14} /></button>
+                  <span style={{ minWidth: '24px', textAlign: 'center' }}>{item.stock}</span>
+                  <button type="button" onClick={() => adjustStock(item, 1)} style={{ background: 'none', border: '1px solid #D0C8C4', borderRadius: '4px', cursor: 'pointer', display: 'flex', padding: '2px', color: '#25432F' }} title="Increase"><Plus size={14} /></button>
+                </div>
+              </Td>
               <Td className="data-tabular" style={{ fontWeight: 600 }}>{item.price}</Td>
               <Td>
                 <StockBadge $low={item.status === 'Low Stock'}>
@@ -469,7 +533,13 @@ const InventoryManagement = () => {
             </InvCardRow>
             <InvCardRow>
               <CardLabel>Stock</CardLabel>
-              <CardValue className="data-tabular">{item.stock}</CardValue>
+              <CardValue className="data-tabular">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <button type="button" onClick={() => adjustStock(item, -1)} style={{ background: 'none', border: '1px solid #D0C8C4', borderRadius: '4px', cursor: 'pointer', display: 'flex', padding: '2px', color: '#BA1A1A' }}><Minus size={14} /></button>
+                  <span style={{ minWidth: '24px', textAlign: 'center' }}>{item.stock}</span>
+                  <button type="button" onClick={() => adjustStock(item, 1)} style={{ background: 'none', border: '1px solid #D0C8C4', borderRadius: '4px', cursor: 'pointer', display: 'flex', padding: '2px', color: '#25432F' }}><Plus size={14} /></button>
+                </div>
+              </CardValue>
             </InvCardRow>
             <InvCardRow>
               <CardLabel>Price</CardLabel>
