@@ -201,3 +201,51 @@ export const deleteCategory = async (id) => {
   const uid = getUid();
   await dbService.deleteUserRecord(uid, 'categories', id);
 };
+
+// ====================================================
+// 7. ADMIN
+// ====================================================
+export const fetchAllProfiles = async () => {
+  try {
+    return await dbService.fetchAllProfiles();
+  } catch (error) {
+    console.error('Failed to fetch all profiles', error);
+    return [];
+  }
+};
+
+export const fetchUsersWithStats = async () => {
+  try {
+    return await dbService.fetchUsersWithStats();
+  } catch (error) {
+    console.error('Failed to fetch users with stats', error);
+    return [];
+  }
+};
+
+export const fetchRecentActivity = async (limit = 20) => {
+  try {
+    return await dbService.fetchRecentActivity(limit);
+  } catch (error) {
+    console.error('Failed to fetch recent activity', error);
+    return [];
+  }
+};
+
+export const createSupportNote = async (note) => {
+  try {
+    return await dbService.createSupportNote(note);
+  } catch (error) {
+    console.error('Failed to create support note', error);
+    throw error;
+  }
+};
+
+export const fetchSupportNotes = async (userId) => {
+  try {
+    return await dbService.fetchSupportNotes(userId);
+  } catch (error) {
+    console.error('Failed to fetch support notes', error);
+    return [];
+  }
+};

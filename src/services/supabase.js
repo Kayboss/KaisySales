@@ -249,6 +249,113 @@ export const dbService = {
     return merged;
   },
 
+  // ---------------------------------------------------
+  // ADMIN METHODS (RLS-enforced: only admin role can read)
+  // ---------------------------------------------------
+
+  async fetchAllProfiles() {
+    if (supabase) {
+      const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(r => toCamelCase(r));
+    }
+    return JSON.parse(localStorage.getItem('kaisysales_mock_all_profiles') || '[]');
+  },
+
+  async fetchAllRecords(collection) {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from(collection)
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data || []).map(r => ({ ...toCamelCase(r), id: String(r.id) }));
+    }
+    return [];
+  },
+
+  async fetchUsersWithStats() {
+    if (!supabase) return [];
+    const profiles = await this.fetchAllProfiles();
+    const results = [];
+    for (const profile of profiles) {
+      const [sales, invoices, expenses, inventory] = await Promise.all([
+        supabase.from('sales').select('id,amount', { count: 'exact', head: false }).eq('user_id', profile.id),
+        supabase.from('invoices').select('id,total', { count: 'exact', head: false }).eq('user_id', profile.id),
+        supabase.from('expenses').select('id,amount', { count: 'exact', head: false }).eq('user_id', profile.id),
+        supabase.from('inventory').select('id', { count: 'exact', head: false }).eq('user_id', profile.id),
+      ]);
+      const parseAmt = (v) => {
+        if (typeof v === 'number') return v;
+        if (typeof v !== 'string') return 0;
+        return parseFloat(v.replace(/[^\d.]/g, '')) || 0;
+      };
+      results.push({
+        ...profile,
+        salesCount: sales.data?.length || 0,
+        salesRevenue: (sales.data || []).reduce((s, r) => s + parseAmt(r.amount), 0),
+        invoiceCount: invoices.data?.length || 0,
+        invoiceTotal: (invoices.data || []).reduce((s, r) => s + parseAmt(r.total), 0),
+        expenseCount: expenses.data?.length || 0,
+        expenseTotal: (expenses.data || []).reduce((s, r) => s + parseAmt(r.amount), 0),
+        inventoryCount: inventory.data?.length || 0,
+      });
+    }
+    return results;
+  },
+
+  async fetchRecentActivity(limit = 20) {
+    if (!supabase) return [];
+    const collections = ['sales', 'invoices', 'expenses'];
+    const results = [];
+    for (const col of collections) {
+      const { data, error } = await supabase
+        .from(col)
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) continue;
+      for (const r of data || []) {
+        results.push({
+          type: col,
+          id: String(r.id),
+          userId: r.user_id,
+          label: col === 'sales' ? r.item : col === 'invoices' ? `Invoice #${r.id}` : r.title,
+          amount: r.amount || r.total,
+          date: r.created_at || r.date,
+          userEmail: null,
+        });
+      }
+    }
+    results.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    return results.slice(0, limit);
+  },
+
+  async createSupportNote(note) {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('support_notes')
+        .insert(toSnakeCase(note))
+        .select()
+        .single();
+      if (error) throw error;
+      return toCamelCase(data);
+    }
+    return { ...note, id: 'note-' + Math.random().toString(36).substr(2, 9) };
+  },
+
+  async fetchSupportNotes(userId) {
+    if (supabase) {
+      let query = supabase.from('support_notes').select('*').order('created_at', { ascending: false });
+      if (userId) query = query.eq('user_id', userId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []).map(r => toCamelCase(r));
+    }
+    return [];
+  },
+
   async fetchUserRecords(uid, collection) {
     if (supabase) {
       const { data, error } = await supabase

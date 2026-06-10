@@ -13,6 +13,7 @@ export const useSettingsStore = create((set) => ({
   location: '',
   category: '',
   avatarColor: '#6F240A',
+  role: 'user',
   isOnboarded: null,
   isLoading: false,
 
@@ -32,6 +33,7 @@ export const useSettingsStore = create((set) => ({
           location: profile.location || '',
           category: profile.category || '',
           avatarColor: profile.avatarColor || '#6F240A',
+          role: profile.role || 'user',
           isOnboarded: profile.isOnboarded === true,
           isLoading: false
         });
@@ -83,6 +85,7 @@ export const useSettingsStore = create((set) => ({
     phone: '',
     location: '',
     category: '',
+    role: 'user',
     isOnboarded: null,
     isLoading: false
   })
