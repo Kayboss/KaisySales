@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Search, Mail, Calendar, Package, ShoppingCart, CreditCard, DollarSign } from 'lucide-react';
+import { Search, Mail, Calendar, Package, ShoppingCart, CreditCard, DollarSign, Clock, AlertCircle } from 'lucide-react';
 import { fetchUsersWithStats } from '../../services/api';
 
 const SearchBar = styled.div`
@@ -72,14 +72,30 @@ const UserEmail = styled.span`
   color: #89726C;
 `;
 
-const Badge = styled.span`
+const RoleBadge = styled.span`
   display: inline-block;
   padding: 0.2rem 0.5rem;
   border-radius: 20px;
   font-size: 0.7rem;
   font-weight: 700;
-  color: ${props => props.$active ? '#25432F' : '#89726C'};
-  background: ${props => props.$active ? '#E8F0EC' : '#F0EEE8'};
+  color: ${props => props.$admin ? '#25432F' : '#89726C'};
+  background: ${props => props.$admin ? '#E8F0EC' : '#F0EEE8'};
+`;
+
+const StatusBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: ${props =>
+    props.$status === 'active' ? '#25432F' :
+    props.$status === 'dormant' ? '#875200' : '#BA1A1A'};
+  background: ${props =>
+    props.$status === 'active' ? '#E8F0EC' :
+    props.$status === 'dormant' ? '#FFF0E0' : '#FFE8E8'};
 `;
 
 const StatCell = styled.span`
@@ -96,6 +112,14 @@ const Empty = styled.div`
   padding: 3rem;
   color: #89726C;
 `;
+
+const getUserStatus = (lastSignInAt) => {
+  if (!lastSignInAt) return { label: 'Never', status: 'churned' };
+  const daysAgo = (Date.now() - new Date(lastSignInAt).getTime()) / (1000 * 60 * 60 * 24);
+  if (daysAgo <= 7) return { label: 'Active', status: 'active' };
+  if (daysAgo <= 30) return { label: 'Dormant', status: 'dormant' };
+  return { label: 'Churned', status: 'churned' };
+};
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
@@ -131,6 +155,17 @@ const AdminUsers = () => {
         <SearchInput placeholder="Search by name, business, or email..." value={search} onChange={e => setSearch(e.target.value)} />
       </SearchBar>
 
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        {['Active', 'Dormant', 'Churned', 'Never'].map(s => {
+          const count = filtered.filter(u => getUserStatus(u.lastSignInAt).label === s).length;
+          return (
+            <span key={s} style={{ fontSize: '0.8rem', color: '#55423D', background: '#F0EEE8', padding: '0.25rem 0.6rem', borderRadius: '20px', fontWeight: 600 }}>
+              {s}: {count}
+            </span>
+          );
+        })}
+      </div>
+
       {filtered.length === 0 ? (
         <Empty>
           {search ? 'No users match your search.' : 'No users found.'}
@@ -142,8 +177,8 @@ const AdminUsers = () => {
               <tr>
                 <Th>User</Th>
                 <Th>Business</Th>
-                <Th>Role</Th>
-                <Th>Joined</Th>
+                <Th>Status</Th>
+                <Th>Last Active</Th>
                 <Th>Sales</Th>
                 <Th>Revenue</Th>
                 <Th>Expenses</Th>
@@ -151,52 +186,58 @@ const AdminUsers = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(u => (
-                <tr key={u.id}>
-                  <Td>
-                    <UserCell>
-                      <UserName>{u.ownerName || '—'}</UserName>
-                      <UserEmail><Mail size={11} /> {u.email || '—'}</UserEmail>
-                    </UserCell>
-                  </Td>
-                  <Td>
-                    <span style={{ fontWeight: 600 }}>{u.businessName || '—'}</span>
-                  </Td>
-                  <Td>
-                    <Badge $active={u.role === 'admin'}>{u.role || 'user'}</Badge>
-                  </Td>
-                  <Td>
-                    <StatCell>
-                      <Calendar size={13} />
-                      {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
-                    </StatCell>
-                  </Td>
-                  <Td>
-                    <StatCell>
-                      <ShoppingCart size={13} color="#6F240A" />
-                      {u.salesCount || 0}
-                    </StatCell>
-                  </Td>
-                  <Td>
-                    <StatCell>
-                      <DollarSign size={13} color="#25432F" />
-                      GH₵{(u.salesRevenue || 0).toLocaleString()}
-                    </StatCell>
-                  </Td>
-                  <Td>
-                    <StatCell>
-                      <CreditCard size={13} color="#BA1A1A" />
-                      GH₵{(u.expenseTotal || 0).toLocaleString()}
-                    </StatCell>
-                  </Td>
-                  <Td>
-                    <StatCell>
-                      <Package size={13} color="#875200" />
-                      {u.inventoryCount || 0}
-                    </StatCell>
-                  </Td>
-                </tr>
-              ))}
+              {filtered.map(u => {
+                const { label: statusLabel, status: statusType } = getUserStatus(u.lastSignInAt);
+                return (
+                  <tr key={u.id}>
+                    <Td>
+                      <UserCell>
+                        <UserName>{u.ownerName || '—'}</UserName>
+                        <UserEmail><Mail size={11} /> {u.email || '—'}</UserEmail>
+                      </UserCell>
+                    </Td>
+                    <Td>
+                      <span style={{ fontWeight: 600 }}>{u.businessName || '—'}</span>
+                    </Td>
+                    <Td>
+                      <StatusBadge $status={statusType}>
+                        {statusType === 'churned' ? <AlertCircle size={11} /> : <Clock size={11} />}
+                        {statusLabel}
+                      </StatusBadge>
+                    </Td>
+                    <Td>
+                      <StatCell>
+                        <Calendar size={13} />
+                        {u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleDateString() : '—'}
+                      </StatCell>
+                    </Td>
+                    <Td>
+                      <StatCell>
+                        <ShoppingCart size={13} color="#6F240A" />
+                        {u.salesCount || 0}
+                      </StatCell>
+                    </Td>
+                    <Td>
+                      <StatCell>
+                        <DollarSign size={13} color="#25432F" />
+                        GH₵{(u.salesRevenue || 0).toLocaleString()}
+                      </StatCell>
+                    </Td>
+                    <Td>
+                      <StatCell>
+                        <CreditCard size={13} color="#BA1A1A" />
+                        GH₵{(u.expenseTotal || 0).toLocaleString()}
+                      </StatCell>
+                    </Td>
+                    <Td>
+                      <StatCell>
+                        <Package size={13} color="#875200" />
+                        {u.inventoryCount || 0}
+                      </StatCell>
+                    </Td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
         </TableWrapper>

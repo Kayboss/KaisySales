@@ -249,3 +249,12 @@ export const fetchSupportNotes = async (userId) => {
     return [];
   }
 };
+
+export const fetchErrorLogs = async (limit = 20) => {
+  try {
+    return await dbService.fetchErrorLogs(limit);
+  } catch (error) {
+    console.error('Failed to fetch error logs', error);
+    return [];
+  }
+};

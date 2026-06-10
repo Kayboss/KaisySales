@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Users, TrendingUp, ShoppingCart, DollarSign } from 'lucide-react';
+import { Users, TrendingUp, ShoppingCart, DollarSign, Clock, AlertCircle, Bug } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { fetchAllProfiles, fetchRecentActivity } from '../../services/api';
+import { fetchAllProfiles, fetchRecentActivity, fetchErrorLogs } from '../../services/api';
 
 const Grid = styled.div`
   display: grid;
@@ -75,20 +75,100 @@ const ChartTitle = styled.h3`
   margin-bottom: 1rem;
 `;
 
+const SectionTitle = styled.h3`
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1C1C18;
+  margin: 1.5rem 0 0.75rem;
+`;
+
+const StatusRow = styled.div`
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+`;
+
+const StatusPill = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  background: ${props =>
+    props.$status === 'active' ? '#E8F0EC' :
+    props.$status === 'dormant' ? '#FFF0E0' : '#FFE8E8'};
+  color: ${props =>
+    props.$status === 'active' ? '#25432F' :
+    props.$status === 'dormant' ? '#875200' : '#BA1A1A'};
+  font-weight: 700;
+  font-size: 0.85rem;
+`;
+
+const ErrorFeed = styled.div`
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #F0EEE8;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+`;
+
+const ErrorItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #F0EEE8;
+  font-size: 0.8rem;
+
+  &:last-child { border-bottom: none; }
+`;
+
+const ErrorText = styled.span`
+  flex: 1;
+  color: #BA1A1A;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const ErrorPage = styled.span`
+  color: #89726C;
+  font-size: 0.7rem;
+  font-weight: 600;
+`;
+
+const ErrorTime = styled.span`
+  color: #89726C;
+  font-size: 0.7rem;
+  white-space: nowrap;
+`;
+
+const getUserStatus = (lastSignInAt) => {
+  if (!lastSignInAt) return 'churned';
+  const daysAgo = (Date.now() - new Date(lastSignInAt).getTime()) / (1000 * 60 * 60 * 24);
+  if (daysAgo <= 7) return 'active';
+  if (daysAgo <= 30) return 'dormant';
+  return 'churned';
+};
+
 const AdminOverview = () => {
   const [profiles, setProfiles] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
+  const [errorLogs, setErrorLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [p, a] = await Promise.all([
+        const [p, a, e] = await Promise.all([
           fetchAllProfiles(),
           fetchRecentActivity(20),
+          fetchErrorLogs(10),
         ]);
         setProfiles(p);
         setRecentActivity(a);
+        setErrorLogs(e);
       } catch (err) {
         console.error('Failed to load overview data', err);
       } finally {
@@ -103,6 +183,10 @@ const AdminOverview = () => {
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const totalUsers = profiles.length;
+  const activeUsers = profiles.filter(p => getUserStatus(p.lastSignInAt) === 'active').length;
+  const dormantUsers = profiles.filter(p => getUserStatus(p.lastSignInAt) === 'dormant').length;
+  const churnedUsers = profiles.filter(p => getUserStatus(p.lastSignInAt) === 'churned').length;
+
   const newThisMonth = profiles.filter(p => {
     const d = new Date(p.createdAt || 0);
     return d >= thirtyDaysAgo;
@@ -171,15 +255,19 @@ const AdminOverview = () => {
 
         <StatCard>
           <StatHeader>
-            <StatLabel>Avg Revenue/User</StatLabel>
-            <StatIcon $bg="#E8F0EC" $color="#25432F"><DollarSign size={20} /></StatIcon>
+            <StatLabel>Recent Errors</StatLabel>
+            <StatIcon $bg="#FFE8E8" $color="#BA1A1A"><Bug size={20} /></StatIcon>
           </StatHeader>
-          <StatValue>{totalUsers > 0 ? 'GH₵' + (recentActivity.filter(a => a.amount).reduce((s, a) => {
-            const v = typeof a.amount === 'string' ? parseFloat(a.amount.replace(/[^\d.]/g, '')) : (a.amount || 0);
-            return s + v;
-          }, 0) / Math.max(totalUsers, 1)).toFixed(0) : 'GH₵0'}</StatValue>
+          <StatValue>{errorLogs.length}</StatValue>
+          <StatTrend>in last 50 actions</StatTrend>
         </StatCard>
       </Grid>
+
+      <StatusRow>
+        <StatusPill $status="active"><Clock size={15} /> {activeUsers} Active (7d)</StatusPill>
+        <StatusPill $status="dormant"><Clock size={15} /> {dormantUsers} Dormant (7-30d)</StatusPill>
+        <StatusPill $status="churned"><AlertCircle size={15} /> {churnedUsers} Churned (30d+)</StatusPill>
+      </StatusRow>
 
       <ChartCard>
         <ChartTitle>New Signups (Last 7 Days)</ChartTitle>
@@ -196,6 +284,22 @@ const AdminOverview = () => {
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
+
+      {errorLogs.length > 0 && (
+        <>
+          <SectionTitle>Recent Client Errors</SectionTitle>
+          <ErrorFeed>
+            {errorLogs.map(e => (
+              <ErrorItem key={e.id}>
+                <Bug size={14} color="#BA1A1A" />
+                <ErrorText>{e.error}</ErrorText>
+                <ErrorPage>{e.page || '—'}</ErrorPage>
+                <ErrorTime>{e.createdAt ? new Date(e.createdAt).toLocaleDateString() : '—'}</ErrorTime>
+              </ErrorItem>
+            ))}
+          </ErrorFeed>
+        </>
+      )}
     </div>
   );
 };

@@ -138,7 +138,10 @@ export const authService = {
     if (supabase) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      if (data.user) migrateLocalData(data.user.id);
+      if (data.user) {
+        migrateLocalData(data.user.id);
+        supabase.from('profiles').update({ last_sign_in_at: new Date().toISOString() }).eq('id', data.user.id).then().catch(() => {});
+      }
       return mapUser(data.user);
     }
     // Mock
@@ -434,6 +437,34 @@ export const dbService = {
     mockSet(collection, records.filter(r => String(r.id) !== String(recordId)));
     return true;
   },
+
+  async fetchErrorLogs(limit = 20) {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('error_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data || []).map(r => toCamelCase(r));
+    }
+    return [];
+  },
+};
+
+// Standalone error logger — call from anywhere
+export const logClientError = async (error, page) => {
+  if (!supabase) return;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('error_logs').insert({
+      user_id: user?.id || null,
+      error: typeof error === 'string' ? error : (error?.message || String(error)),
+      page: page || window.location.pathname,
+    });
+  } catch {
+    // Silently fail — don't log errors about logging errors
+  }
 };
 
 export { supabase };
