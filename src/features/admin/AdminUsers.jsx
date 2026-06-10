@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Search, Mail, Calendar, Package, ShoppingCart, CreditCard, DollarSign, Clock, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Search, Mail, Calendar, Package, ShoppingCart, CreditCard, Clock, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 import { fetchUsersWithStats, updateUserStatus } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
@@ -262,8 +262,7 @@ const AdminUsers = () => {
                     </Td>
                     <Td>
                       <StatCell>
-                        <DollarSign size={13} color="#25432F" />
-                        {(u.salesRevenue || 0).toLocaleString()}
+                        GH₵{(u.salesRevenue || 0).toLocaleString()}
                       </StatCell>
                     </Td>
                     <Td>
