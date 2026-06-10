@@ -127,7 +127,7 @@ const AdminActivity = () => {
               <ActivityLabel>{a.label}</ActivityLabel>
               <ActivityMeta>
                 <User size={11} />
-                {a.userEmail || `User ${(a.userId || '').slice(0, 8)}`}
+                {a.businessName || a.userEmail || `User ${(a.userId || '').slice(0, 8)}`}
                 <Clock size={11} />
                 {a.date ? new Date(a.date).toLocaleString() : '—'}
               </ActivityMeta>

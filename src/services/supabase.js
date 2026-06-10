@@ -347,6 +347,26 @@ export const dbService = {
           amount: r.amount || r.total,
           date: r.created_at || r.date,
           userEmail: null,
+          businessName: null,
+        });
+      }
+    }
+    const userIds = [...new Set(results.map(r => r.userId).filter(Boolean))];
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, business_name, email')
+        .in('id', userIds);
+      if (profiles) {
+        const profileMap = {};
+        profiles.forEach(p => {
+          profileMap[p.id] = { businessName: p.business_name, email: p.email };
+        });
+        results.forEach(r => {
+          if (profileMap[r.userId]) {
+            r.businessName = profileMap[r.userId].businessName;
+            r.userEmail = profileMap[r.userId].email;
+          }
         });
       }
     }
