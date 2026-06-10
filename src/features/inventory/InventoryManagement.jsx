@@ -99,34 +99,164 @@ const MobileCard = styled.div`
 
 const InvCard = styled.div`
   background: white;
-  border-radius: ${({ theme }) => theme.borderRadius.md};
+  border-radius: 14px;
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-  box-shadow: ${({ theme }) => theme.shadows.soft};
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  overflow: hidden;
+  position: relative;
 `;
 
-const InvCardRow = styled.div`
+const InvCardAccent = styled.div`
+  height: 4px;
+  width: 100%;
+  background: ${props => 
+    props.$status === 'Out of Stock' ? '#BA1A1A' : 
+    props.$status === 'Low Stock' ? '#875200' : '#25432F'};
+`;
+
+const InvCardHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.85rem 1rem 0.4rem;
+`;
+
+const InvName = styled.div`
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1C1C18;
+  line-height: 1.3;
+  flex: 1;
+`;
+
+const InvCategoryPill = styled.span`
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #55423D;
+  background: #F0EEE8;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  white-space: nowrap;
+  margin-left: 0.5rem;
+`;
+
+const InvCardBody = styled.div`
+  padding: 0.15rem 1rem 0.75rem;
+`;
+
+const InvStockRow = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.35rem 0;
-  font-size: 0.8rem;
+  margin-bottom: 0.4rem;
+`;
 
-  &:not(:last-child) {
-    border-bottom: 1px solid #F0EEE8;
+const InvStockLabel = styled.span`
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #89726C;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+`;
+
+const InvStockControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const InvStockBtn = styled.button`
+  background: white;
+  border: 1px solid #D0C8C4;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  width: 28px;
+  height: 28px;
+  transition: all 0.15s ease;
+  color: ${props => props.$color || '#55423D'};
+
+  &:hover {
+    background: #F5EFEB;
   }
 `;
 
-const CardLabel = styled.span`
-  color: #89726C;
-  font-weight: 600;
+const InvStockValue = styled.span`
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1C1C18;
+  min-width: 28px;
+  text-align: center;
 `;
 
-const CardValue = styled.span`
-  color: #1C1C18;
+const InvPriceRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const InvPriceLabel = styled.span`
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #89726C;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+`;
+
+const InvPriceValue = styled.span`
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #25432F;
+  letter-spacing: -0.3px;
+`;
+
+const InvCardDivider = styled.div`
+  height: 1px;
+  background: #F0EEE8;
+  margin: 0 1rem;
+`;
+
+const InvCardFooter = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1rem;
+`;
+
+const StatusTag = styled.span`
+  font-size: 0.7rem;
   font-weight: 700;
-  text-align: right;
+  color: ${props => 
+    props.$status === 'Out of Stock' ? '#BA1A1A' : 
+    props.$status === 'Low Stock' ? '#875200' : '#25432F'};
+  background: ${props =>
+    props.$status === 'Out of Stock' ? '#FFE8E8' : 
+    props.$status === 'Low Stock' ? '#FFF0E0' : '#E8F0EC'};
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+`;
+
+const InvActionBtn = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  color: ${props => props.$color || '#6F240A'};
+
+  &:hover {
+    background: #F5EFEB;
+  }
 `;
 
 const PaginationRow = styled.div`
@@ -523,42 +653,37 @@ const InventoryManagement = () => {
       <MobileCard>
         {paginated.map(item => (
           <InvCard key={item.id}>
-            <InvCardRow>
-              <CardLabel>Item</CardLabel>
-              <CardValue>{item.name}</CardValue>
-            </InvCardRow>
-            <InvCardRow>
-              <CardLabel>Category</CardLabel>
-              <CardValue style={{ fontWeight: 600 }}>{item.category}</CardValue>
-            </InvCardRow>
-            <InvCardRow>
-              <CardLabel>Stock</CardLabel>
-              <CardValue className="data-tabular">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <button type="button" onClick={() => adjustStock(item, -1)} style={{ background: 'none', border: '1px solid #D0C8C4', borderRadius: '4px', cursor: 'pointer', display: 'flex', padding: '2px', color: '#BA1A1A' }}><Minus size={14} /></button>
-                  <span style={{ minWidth: '24px', textAlign: 'center' }}>{item.stock}</span>
-                  <button type="button" onClick={() => adjustStock(item, 1)} style={{ background: 'none', border: '1px solid #D0C8C4', borderRadius: '4px', cursor: 'pointer', display: 'flex', padding: '2px', color: '#25432F' }}><Plus size={14} /></button>
-                </div>
-              </CardValue>
-            </InvCardRow>
-            <InvCardRow>
-              <CardLabel>Price</CardLabel>
-              <CardValue className="data-tabular">{item.price}</CardValue>
-            </InvCardRow>
-            <InvCardRow>
-              <CardLabel>Status</CardLabel>
-              <CardValue>
-                <StockBadge $low={item.status === 'Low Stock'}>{item.status}</StockBadge>
-              </CardValue>
-            </InvCardRow>
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #F0EEE8' }}>
-              <button onClick={() => handleEdit(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#6F240A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
-                <Edit2 size={14} /> Edit
-              </button>
-              <button onClick={() => setDeleteTarget(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#BA1A1A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
-                <Trash2 size={14} /> Delete
-              </button>
-            </div>
+            <InvCardAccent $status={item.status} />
+            <InvCardHeader>
+              <InvName>{item.name}</InvName>
+              <InvCategoryPill>{item.category}</InvCategoryPill>
+            </InvCardHeader>
+            <InvCardBody>
+              <InvStockRow>
+                <InvStockLabel>Stock</InvStockLabel>
+                <InvStockControls>
+                  <InvStockBtn onClick={() => adjustStock(item, -1)} $color="#BA1A1A"><Minus size={14} /></InvStockBtn>
+                  <InvStockValue className="data-tabular">{item.stock}</InvStockValue>
+                  <InvStockBtn onClick={() => adjustStock(item, 1)} $color="#25432F"><Plus size={14} /></InvStockBtn>
+                </InvStockControls>
+              </InvStockRow>
+              <InvPriceRow>
+                <InvPriceLabel>Unit Price</InvPriceLabel>
+                <InvPriceValue className="data-tabular">{item.price}</InvPriceValue>
+              </InvPriceRow>
+            </InvCardBody>
+            <InvCardDivider />
+            <InvCardFooter>
+              <StatusTag $status={item.status}>{item.status}</StatusTag>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <InvActionBtn onClick={() => handleEdit(item)} $color="#6F240A">
+                  <Edit2 size={13} /> Edit
+                </InvActionBtn>
+                <InvActionBtn onClick={() => setDeleteTarget(item)} $color="#BA1A1A">
+                  <Trash2 size={13} /> Delete
+                </InvActionBtn>
+              </div>
+            </InvCardFooter>
           </InvCard>
         ))}
       </MobileCard>

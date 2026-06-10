@@ -99,34 +99,113 @@ const MobileCard = styled.div`
 
 const ExpCard = styled.div`
   background: white;
-  border-radius: ${({ theme }) => theme.borderRadius.md};
+  border-radius: 14px;
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-  box-shadow: ${({ theme }) => theme.shadows.soft};
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  overflow: hidden;
+  position: relative;
 `;
 
-const ExpCardRow = styled.div`
+const ExpCardAccent = styled.div`
+  height: 4px;
+  background: #875200;
+  width: 100%;
+`;
+
+const ExpCardHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.35rem 0;
-  font-size: 0.8rem;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid #F0EEE8;
-  }
+  padding: 0.85rem 1rem 0.5rem;
 `;
 
-const ExpCardLabel = styled.span`
-  color: #89726C;
-  font-weight: 600;
-`;
-
-const ExpCardValue = styled.span`
+const ExpTitle = styled.div`
+  font-size: 1rem;
+  font-weight: 800;
   color: #1C1C18;
+  line-height: 1.3;
+  flex: 1;
+`;
+
+const ExpDatePill = styled.span`
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #875200;
+  background: #FFF0E0;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  white-space: nowrap;
+  margin-left: 0.5rem;
+`;
+
+const ExpCardBody = styled.div`
+  padding: 0.25rem 1rem 0.75rem;
+`;
+
+const ExpCategoryTag = styled.span`
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #55423D;
+  background: #F0EEE8;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.65rem;
+`;
+
+const ExpAmountRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const ExpAmountLabel = styled.span`
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #89726C;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+`;
+
+const ExpAmountValue = styled.span`
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #875200;
+  letter-spacing: -0.3px;
+`;
+
+const ExpCardDivider = styled.div`
+  height: 1px;
+  background: #F0EEE8;
+  margin: 0 1rem;
+`;
+
+const ExpCardFooter = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0.65rem 1rem;
+  gap: 0.5rem;
+`;
+
+const ExpActionBtn = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  text-align: right;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  color: ${props => props.$color || '#6F240A'};
+
+  &:hover {
+    background: #F5EFEB;
+  }
 `;
 
 const PaginationRow = styled.div`
@@ -567,30 +646,27 @@ const ExpenseTracking = () => {
         <MobileCard>
           {paginatedExpenses.map(expense => (
             <ExpCard key={expense.id}>
-              <ExpCardRow>
-                <ExpCardLabel>Title</ExpCardLabel>
-                <ExpCardValue>{expense.title}</ExpCardValue>
-              </ExpCardRow>
-              <ExpCardRow>
-                <ExpCardLabel>Date</ExpCardLabel>
-                <ExpCardValue>{expense.date}</ExpCardValue>
-              </ExpCardRow>
-              <ExpCardRow>
-                <ExpCardLabel>Category</ExpCardLabel>
-                <ExpCardValue style={{ fontWeight: 600 }}>{expense.category}</ExpCardValue>
-              </ExpCardRow>
-              <ExpCardRow>
-                <ExpCardLabel>Amount</ExpCardLabel>
-                <ExpCardValue style={{ color: '#6F240A', fontSize: '0.95rem' }}>{expense.amount}</ExpCardValue>
-              </ExpCardRow>
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #F0EEE8' }}>
-                <button onClick={() => handleEdit(expense)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#6F240A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
-                  <Edit2 size={14} /> Edit
-                </button>
-                <button onClick={() => setDeleteTarget(expense)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#BA1A1A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
-                  <Trash2 size={14} /> Delete
-                </button>
-              </div>
+              <ExpCardAccent />
+              <ExpCardHeader>
+                <ExpTitle>{expense.title}</ExpTitle>
+                <ExpDatePill>{expense.date}</ExpDatePill>
+              </ExpCardHeader>
+              <ExpCardBody>
+                <ExpCategoryTag>{expense.category}</ExpCategoryTag>
+                <ExpAmountRow>
+                  <ExpAmountLabel>Total</ExpAmountLabel>
+                  <ExpAmountValue className="data-tabular">{expense.amount}</ExpAmountValue>
+                </ExpAmountRow>
+              </ExpCardBody>
+              <ExpCardDivider />
+              <ExpCardFooter>
+                <ExpActionBtn onClick={() => handleEdit(expense)} $color="#6F240A">
+                  <Edit2 size={13} /> Edit
+                </ExpActionBtn>
+                <ExpActionBtn onClick={() => setDeleteTarget(expense)} $color="#BA1A1A">
+                  <Trash2 size={13} /> Delete
+                </ExpActionBtn>
+              </ExpCardFooter>
             </ExpCard>
           ))}
         </MobileCard>
