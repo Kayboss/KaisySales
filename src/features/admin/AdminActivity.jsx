@@ -86,9 +86,40 @@ const Empty = styled.div`
   color: #89726C;
 `;
 
+const PAGE_SIZE = 30;
+
+const PageBtn = styled.button`
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #D0C8C4;
+  background: ${props => props.$active ? '#6F240A' : 'white'};
+  color: ${props => props.$active ? 'white' : '#55423D'};
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: ${props => props.$active ? '#6F240A' : '#F5EFEB'};
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+`;
+
+const Pagination = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+`;
+
 const AdminActivity = () => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const load = async () => {
@@ -103,6 +134,11 @@ const AdminActivity = () => {
     };
     load();
   }, []);
+
+  const totalPages = Math.max(1, Math.ceil(activities.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const paged = activities.slice(start, start + PAGE_SIZE);
 
   const typeIcon = (type) => {
     switch (type) {
@@ -120,7 +156,7 @@ const AdminActivity = () => {
       {activities.length === 0 ? (
         <Empty>No recent activity found.</Empty>
       ) : (
-        activities.map((a, i) => (
+        paged.map((a, i) => (
           <FeedItem key={`${a.type}-${a.id}-${i}`}>
             <IconBox $type={a.type}>{typeIcon(a.type)}</IconBox>
             <ActivityInfo>
@@ -138,6 +174,17 @@ const AdminActivity = () => {
             </div>
           </FeedItem>
         ))
+      )}
+      {totalPages > 1 && (
+        <Pagination>
+          <PageBtn disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Prev</PageBtn>
+          {Array.from({ length: totalPages }, (_, i) => (
+            <PageBtn key={i + 1} $active={i + 1 === currentPage} onClick={() => setPage(i + 1)}>
+              {i + 1}
+            </PageBtn>
+          ))}
+          <PageBtn disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Next</PageBtn>
+        </Pagination>
       )}
     </Feed>
   );
