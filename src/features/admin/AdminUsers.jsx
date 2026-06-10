@@ -263,7 +263,7 @@ const AdminUsers = () => {
                     <Td>
                       <StatCell>
                         <DollarSign size={13} color="#25432F" />
-                        GH₵{(u.salesRevenue || 0).toLocaleString()}
+                        {(u.salesRevenue || 0).toLocaleString()}
                       </StatCell>
                     </Td>
                     <Td>
