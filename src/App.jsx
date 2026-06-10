@@ -24,7 +24,7 @@ import SettingsPage from './features/settings/SettingsPage';
 import AdminDashboard from './features/admin/AdminDashboard';
 
 // Icons
-import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, Leaf, FileText, Store, Settings, Receipt, Menu, X, Shield } from 'lucide-react';
+import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, Leaf, FileText, Store, Settings, Receipt, Menu, X } from 'lucide-react';
 
 const Layout = styled.div`
   display: flex;
@@ -150,7 +150,7 @@ const NavLink = styled(Link)`
 
 const App = () => {
   const { user, logout } = useAuthStore();
-  const { businessName, avatarColor, role } = useSettingsStore();
+  const { businessName, avatarColor } = useSettingsStore();
   const location = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -224,13 +224,6 @@ const App = () => {
                     <Settings size={20} />
                     Settings
                   </NavLink>
-                  {role === 'admin' && (
-                    <NavLink to="/admin" $active={location.pathname === '/admin'} onClick={closeMobileMenu}>
-                      <Shield size={20} />
-                      Admin
-                    </NavLink>
-                  )}
-
                   <div style={{ marginTop: 'auto' }}>
                     <button 
                       onClick={logout}
