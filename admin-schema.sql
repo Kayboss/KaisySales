@@ -6,7 +6,14 @@
 -- 1. Add role column to profiles (default 'user')
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
 
--- 2. Create support_notes table
+-- 2. Create is_admin() security definer function
+--    (bypasses RLS to avoid infinite recursion in policies)
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin');
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- 3. Create support_notes table
 CREATE TABLE IF NOT EXISTS support_notes (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -16,54 +23,50 @@ CREATE TABLE IF NOT EXISTS support_notes (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. Enable RLS on support_notes
+-- 4. Enable RLS on support_notes
 ALTER TABLE support_notes ENABLE ROW LEVEL SECURITY;
 
--- 4. RLS policies for support_notes: admins can CRUD, users can read their own
+-- 5. RLS policies for support_notes
 DROP POLICY IF EXISTS "Admins can read all support notes" ON support_notes;
 CREATE POLICY "Admins can read all support notes" ON support_notes
-  FOR SELECT USING (
-    auth.uid() IN (SELECT id FROM profiles WHERE role = 'admin')
-  );
+  FOR SELECT USING (is_admin());
 
 DROP POLICY IF EXISTS "Admins can insert support notes" ON support_notes;
 CREATE POLICY "Admins can insert support notes" ON support_notes
-  FOR INSERT WITH CHECK (
-    auth.uid() IN (SELECT id FROM profiles WHERE role = 'admin')
-  );
+  FOR INSERT WITH CHECK (is_admin());
 
 DROP POLICY IF EXISTS "Admins can delete support notes" ON support_notes;
 CREATE POLICY "Admins can delete support notes" ON support_notes
-  FOR DELETE USING (
-    auth.uid() IN (SELECT id FROM profiles WHERE role = 'admin')
-  );
+  FOR DELETE USING (is_admin());
 
--- 5. Admin SELECT policies on all user data tables
+-- 6. Admin SELECT policies on all user data tables
+DROP POLICY IF EXISTS "Admins can read all profiles" ON profiles;
+CREATE POLICY "Admins can read all profiles" ON profiles
+  FOR SELECT USING (is_admin());
+
 DO $$
 DECLARE
   tbl TEXT;
 BEGIN
   FOR tbl IN SELECT unnest(ARRAY['sales', 'invoices', 'expenses', 'inventory', 'stores', 'categories'])
   LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "Admins can read all %I" ON %I;', tbl, tbl);
     EXECUTE format(
-      'DROP POLICY IF EXISTS "Admins can read all %I" ON %I;', tbl, tbl
-    );
-    EXECUTE format(
-      'CREATE POLICY "Admins can read all %I" ON %I FOR SELECT USING (
-        auth.uid() IN (SELECT id FROM profiles WHERE role = ''admin'')
-      );', tbl, tbl
+      'CREATE POLICY "Admins can read all %I" ON %I FOR SELECT USING (is_admin());',
+      tbl, tbl
     );
   END LOOP;
 END $$;
 
--- 6. Grant authenticated users access to support_notes
+-- 7. Grant permissions
 GRANT ALL ON support_notes TO authenticated;
 GRANT USAGE ON SEQUENCE support_notes_id_seq TO authenticated;
 
--- 7. Set yourself as admin (replace with your actual user UUID from auth.users)
--- Uncomment and run after finding your UUID:
--- UPDATE profiles SET role = 'admin' WHERE email = 'tripelkay@gmail.com';
--- SELECT * FROM profiles WHERE role = 'admin';
+-- 8. Set yourself as admin
+UPDATE profiles SET role = 'admin' WHERE email = 'tripelkay@gmail.com';
 
--- 8. Reload schema cache
+-- 9. Verify
+SELECT email, business_name, role FROM profiles WHERE role = 'admin';
+
+-- 10. Reload schema cache
 NOTIFY pgrst, 'reload schema';

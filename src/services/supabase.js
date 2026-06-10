@@ -278,31 +278,45 @@ export const dbService = {
   async fetchUsersWithStats() {
     if (!supabase) return [];
     const profiles = await this.fetchAllProfiles();
-    const results = [];
-    for (const profile of profiles) {
-      const [sales, invoices, expenses, inventory] = await Promise.all([
-        supabase.from('sales').select('id,amount', { count: 'exact', head: false }).eq('user_id', profile.id),
-        supabase.from('invoices').select('id,total', { count: 'exact', head: false }).eq('user_id', profile.id),
-        supabase.from('expenses').select('id,amount', { count: 'exact', head: false }).eq('user_id', profile.id),
-        supabase.from('inventory').select('id', { count: 'exact', head: false }).eq('user_id', profile.id),
-      ]);
-      const parseAmt = (v) => {
-        if (typeof v === 'number') return v;
-        if (typeof v !== 'string') return 0;
-        return parseFloat(v.replace(/[^\d.]/g, '')) || 0;
-      };
-      results.push({
-        ...profile,
-        salesCount: sales.data?.length || 0,
-        salesRevenue: (sales.data || []).reduce((s, r) => s + parseAmt(r.amount), 0),
-        invoiceCount: invoices.data?.length || 0,
-        invoiceTotal: (invoices.data || []).reduce((s, r) => s + parseAmt(r.total), 0),
-        expenseCount: expenses.data?.length || 0,
-        expenseTotal: (expenses.data || []).reduce((s, r) => s + parseAmt(r.amount), 0),
-        inventoryCount: inventory.data?.length || 0,
+
+    const parseAmt = (v) => {
+      if (typeof v === 'number') return v;
+      if (typeof v !== 'string') return 0;
+      return parseFloat(v.replace(/[^\d.]/g, '')) || 0;
+    };
+
+    const [allSales, allInvoices, allExpenses, allInventory] = await Promise.all([
+      supabase.from('sales').select('user_id, amount'),
+      supabase.from('invoices').select('user_id, total'),
+      supabase.from('expenses').select('user_id, amount'),
+      supabase.from('inventory').select('user_id'),
+    ]);
+
+    const groupByUser = (records, valueKey) => {
+      const map = {};
+      (records || []).forEach(r => {
+        if (!map[r.user_id]) map[r.user_id] = { count: 0, total: 0 };
+        map[r.user_id].count++;
+        if (valueKey) map[r.user_id].total += parseAmt(r[valueKey]);
       });
-    }
-    return results;
+      return map;
+    };
+
+    const salesMap = groupByUser(allSales.data, 'amount');
+    const invoicesMap = groupByUser(allInvoices.data, 'total');
+    const expensesMap = groupByUser(allExpenses.data, 'amount');
+    const inventoryMap = groupByUser(allInventory.data, null);
+
+    return profiles.map(p => ({
+      ...p,
+      salesCount: salesMap[p.id]?.count || 0,
+      salesRevenue: salesMap[p.id]?.total || 0,
+      invoiceCount: invoicesMap[p.id]?.count || 0,
+      invoiceTotal: invoicesMap[p.id]?.total || 0,
+      expenseCount: expensesMap[p.id]?.count || 0,
+      expenseTotal: expensesMap[p.id]?.total || 0,
+      inventoryCount: inventoryMap[p.id]?.count || 0,
+    }));
   },
 
   async fetchRecentActivity(limit = 20) {
