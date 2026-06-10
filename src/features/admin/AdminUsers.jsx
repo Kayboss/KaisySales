@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Search, Mail, Calendar, Package, ShoppingCart, CreditCard, Clock, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Search, Mail, Calendar, Package, ShoppingCart, CreditCard, ToggleLeft, ToggleRight } from 'lucide-react';
 import { fetchUsersWithStats, updateUserStatus } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
@@ -73,15 +73,6 @@ const UserEmail = styled.span`
   color: #89726C;
 `;
 
-const StatusDot = styled.span`
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: ${props => props.$active ? '#25432F' : '#BA1A1A'};
-  margin-right: 0.35rem;
-`;
-
 const ToggleBtn = styled.button`
   display: flex;
   align-items: center;
@@ -99,32 +90,6 @@ const ToggleBtn = styled.button`
   &:hover {
     opacity: 0.8;
   }
-`;
-
-const RoleBadge = styled.span`
-  display: inline-block;
-  padding: 0.2rem 0.5rem;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: ${props => props.$admin ? '#25432F' : '#89726C'};
-  background: ${props => props.$admin ? '#E8F0EC' : '#F0EEE8'};
-`;
-
-const StatusBadge = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: ${props =>
-    props.$status === 'active' ? '#25432F' :
-    props.$status === 'dormant' ? '#875200' : '#BA1A1A'};
-  background: ${props =>
-    props.$status === 'active' ? '#E8F0EC' :
-    props.$status === 'dormant' ? '#FFF0E0' : '#FFE8E8'};
 `;
 
 const StatCell = styled.span`
@@ -218,7 +183,6 @@ const AdminUsers = () => {
               <tr>
                 <Th>User</Th>
                 <Th>Business</Th>
-                <Th>Activity</Th>
                 <Th>Last Active</Th>
                 <Th>Sales</Th>
                 <Th>Revenue</Th>
@@ -229,7 +193,6 @@ const AdminUsers = () => {
             </thead>
             <tbody>
               {filtered.map(u => {
-                const { label: statusLabel, status: statusType } = getUserStatus(u.lastSignInAt);
                 const isSuspended = u.status === 'suspended';
                 return (
                   <tr key={u.id} style={{ opacity: isSuspended ? 0.6 : 1 }}>
@@ -241,12 +204,6 @@ const AdminUsers = () => {
                     </Td>
                     <Td>
                       <span style={{ fontWeight: 600 }}>{u.businessName || '—'}</span>
-                    </Td>
-                    <Td>
-                      <StatusBadge $status={statusType}>
-                        {statusType === 'churned' ? <AlertCircle size={11} /> : <Clock size={11} />}
-                        {statusLabel}
-                      </StatusBadge>
                     </Td>
                     <Td>
                       <StatCell>
