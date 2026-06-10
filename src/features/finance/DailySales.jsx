@@ -104,34 +104,138 @@ const MobileCard = styled.div`
 
 const SaleCard = styled.div`
   background: white;
-  border-radius: ${({ theme }) => theme.borderRadius.md};
+  border-radius: 14px;
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-  box-shadow: ${({ theme }) => theme.shadows.soft};
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  overflow: hidden;
+  position: relative;
 `;
 
-const CardRow = styled.div`
+const CardAccent = styled.div`
+  height: 4px;
+  background: #6F240A;
+  width: 100%;
+`;
+
+const CardHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.35rem 0;
-  font-size: 0.8rem;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid #F0EEE8;
-  }
+  padding: 0.85rem 1rem 0.5rem;
 `;
 
-const CardLabel = styled.span`
-  color: #89726C;
-  font-weight: 600;
-`;
-
-const CardValue = styled.span`
-  color: #1C1C18;
+const ReceiptBadge = styled.span`
+  font-size: 0.7rem;
   font-weight: 700;
-  text-align: right;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #6F240A;
+  background: #F5EFEB;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+`;
+
+const TimePill = styled.span`
+  font-size: 0.75rem;
+  color: #89726C;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+`;
+
+const CardBody = styled.div`
+  padding: 0.25rem 1rem 0.75rem;
+`;
+
+const ItemName = styled.div`
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1C1C18;
+  margin-bottom: 0.2rem;
+  line-height: 1.3;
+`;
+
+const CategoryTag = styled.span`
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6F240A;
+  background: #F5EFEB;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.65rem;
+`;
+
+const AmountRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const AmountLabel = styled.span`
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #89726C;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+`;
+
+const AmountValue = styled.span`
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #6F240A;
+  letter-spacing: -0.3px;
+`;
+
+const CardDivider = styled.div`
+  height: 1px;
+  background: #F0EEE8;
+  margin: 0 1rem;
+`;
+
+const CardFooterContent = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1rem;
+`;
+
+const PaymentTag = styled.span`
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: ${props => 
+    props.$method === 'Mobile Money' ? '#25432F' : 
+    props.$method === 'Card' ? '#875200' : '#55423D'};
+  background: ${props =>
+    props.$method === 'Mobile Money' ? '#E8F0EC' : 
+    props.$method === 'Card' ? '#FFF0E0' : '#F0EEE8'};
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+`;
+
+const CardActions = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const ActionBtn = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #F5EFEB;
+  }
 `;
 
 const PAGE_SIZE = 20;
@@ -619,40 +723,31 @@ const DailySales = () => {
       <MobileCard>
         {paginatedSales.map(sale => (
           <SaleCard key={sale.id}>
-            <CardRow>
-              <CardLabel>Receipt</CardLabel>
-              <CardValue style={{ color: '#6F240A' }}>{sale.id}</CardValue>
-            </CardRow>
-            <CardRow>
-              <CardLabel>Time</CardLabel>
-              <CardValue style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#89726C', fontWeight: 600 }}>
-                <Calendar size={12} /> {sale.time}
-              </CardValue>
-            </CardRow>
-            <CardRow>
-              <CardLabel>Item</CardLabel>
-              <CardValue>{sale.item}</CardValue>
-            </CardRow>
-            <CardRow>
-              <CardLabel>Category</CardLabel>
-              <CardValue><Badge>{sale.category}</Badge></CardValue>
-            </CardRow>
-            <CardRow>
-              <CardLabel>Amount</CardLabel>
-              <CardValue style={{ color: '#6F240A', fontSize: '0.95rem' }}>{sale.amount}</CardValue>
-            </CardRow>
-            <CardRow>
-              <CardLabel>Payment</CardLabel>
-              <CardValue style={{ fontWeight: 600 }}>{sale.paymentMethod}</CardValue>
-            </CardRow>
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #F0EEE8' }}>
-              <button onClick={() => handleEdit(sale)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#6F240A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
-                <Edit2 size={14} /> Edit
-              </button>
-              <button onClick={() => setDeleteTarget(sale)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#BA1A1A', fontWeight: 600, fontSize: '0.8rem', padding: 0 }}>
-                <Trash2 size={14} /> Delete
-              </button>
-            </div>
+            <CardAccent />
+            <CardHeader>
+              <ReceiptBadge>#{sale.id}</ReceiptBadge>
+              <TimePill><Calendar size={11} /> {sale.time}</TimePill>
+            </CardHeader>
+            <CardBody>
+              <ItemName>{sale.item}</ItemName>
+              <CategoryTag>{sale.category}</CategoryTag>
+              <AmountRow>
+                <AmountLabel>Total</AmountLabel>
+                <AmountValue className="data-tabular">{sale.amount}</AmountValue>
+              </AmountRow>
+            </CardBody>
+            <CardDivider />
+            <CardFooterContent>
+              <PaymentTag $method={sale.paymentMethod}>{sale.paymentMethod}</PaymentTag>
+              <CardActions>
+                <ActionBtn onClick={() => handleEdit(sale)} style={{ color: '#6F240A' }}>
+                  <Edit2 size={13} /> Edit
+                </ActionBtn>
+                <ActionBtn onClick={() => setDeleteTarget(sale)} style={{ color: '#BA1A1A' }}>
+                  <Trash2 size={13} /> Delete
+                </ActionBtn>
+              </CardActions>
+            </CardFooterContent>
           </SaleCard>
         ))}
       </MobileCard>
