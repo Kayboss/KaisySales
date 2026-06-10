@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+import { logClientError } from '../../services/supabase';
 
 const ErrorContainer = styled.div`
   height: 100vh;
@@ -44,8 +45,8 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // You could log the error to a service like Sentry here
-    console.error('Anti-Gravity Error Boundary caught:', error, errorInfo);
+    console.error('Error Boundary caught:', error, errorInfo);
+    logClientError(error, window.location.pathname);
   }
 
   render() {
