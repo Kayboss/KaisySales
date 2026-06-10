@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Search, Mail, Calendar, Package, ShoppingCart, CreditCard, DollarSign, Clock, AlertCircle } from 'lucide-react';
-import { fetchUsersWithStats } from '../../services/api';
+import { Search, Mail, Calendar, Package, ShoppingCart, CreditCard, DollarSign, Clock, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { fetchUsersWithStats, updateUserStatus } from '../../services/api';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const SearchBar = styled.div`
   display: flex;
@@ -72,6 +73,34 @@ const UserEmail = styled.span`
   color: #89726C;
 `;
 
+const StatusDot = styled.span`
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: ${props => props.$active ? '#25432F' : '#BA1A1A'};
+  margin-right: 0.35rem;
+`;
+
+const ToggleBtn = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: ${props => props.$suspended ? '#25432F' : '#BA1A1A'};
+  background: ${props => props.$suspended ? '#E8F0EC' : '#FFE8E8'};
+  transition: all 0.15s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+`;
+
 const RoleBadge = styled.span`
   display: inline-block;
   padding: 0.2rem 0.5rem;
@@ -125,20 +154,32 @@ const AdminUsers = () => {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [suspendTarget, setSuspendTarget] = useState(null);
+
+  const loadData = async () => {
+    try {
+      const data = await fetchUsersWithStats();
+      setUsers(data);
+    } catch (err) {
+      console.error('Failed to load users', err);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await fetchUsersWithStats();
-        setUsers(data);
-      } catch (err) {
-        console.error('Failed to load users', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadData();
+    setLoading(false);
   }, []);
+
+  const handleToggleStatus = async (u) => {
+    const newStatus = u.status === 'suspended' ? 'active' : 'suspended';
+    try {
+      await updateUserStatus(u.id, newStatus);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to update user status', err);
+    }
+    setSuspendTarget(null);
+  };
 
   const filtered = users.filter(u =>
     !search || (u.businessName || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -177,19 +218,21 @@ const AdminUsers = () => {
               <tr>
                 <Th>User</Th>
                 <Th>Business</Th>
-                <Th>Status</Th>
+                <Th>Activity</Th>
                 <Th>Last Active</Th>
                 <Th>Sales</Th>
                 <Th>Revenue</Th>
                 <Th>Expenses</Th>
                 <Th>Inventory</Th>
+                <Th>Access</Th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(u => {
                 const { label: statusLabel, status: statusType } = getUserStatus(u.lastSignInAt);
+                const isSuspended = u.status === 'suspended';
                 return (
-                  <tr key={u.id}>
+                  <tr key={u.id} style={{ opacity: isSuspended ? 0.6 : 1 }}>
                     <Td>
                       <UserCell>
                         <UserName>{u.ownerName || '—'}</UserName>
@@ -235,12 +278,35 @@ const AdminUsers = () => {
                         {u.inventoryCount || 0}
                       </StatCell>
                     </Td>
+                    <Td>
+                      <ToggleBtn
+                        $suspended={isSuspended}
+                        onClick={() => setSuspendTarget(u)}
+                      >
+                        {isSuspended ? <ToggleLeft size={15} /> : <ToggleRight size={15} />}
+                        {isSuspended ? 'Activate' : 'Suspend'}
+                      </ToggleBtn>
+                    </Td>
                   </tr>
                 );
               })}
             </tbody>
           </Table>
         </TableWrapper>
+      )}
+
+      {suspendTarget && (
+        <ConfirmDialog
+          title={suspendTarget.status === 'suspended' ? 'Activate Account' : 'Suspend Account'}
+          message={
+            suspendTarget.status === 'suspended'
+              ? `Activate ${suspendTarget.ownerName || suspendTarget.businessName || 'this user'}'s account? They will be able to sign in again.`
+              : `Suspend ${suspendTarget.ownerName || suspendTarget.businessName || 'this user'}'s account? They will not be able to sign in until reactivated.`
+          }
+          confirmLabel={suspendTarget.status === 'suspended' ? 'Activate' : 'Suspend'}
+          onConfirm={() => handleToggleStatus(suspendTarget)}
+          onCancel={() => setSuspendTarget(null)}
+        />
       )}
     </div>
   );

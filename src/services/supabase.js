@@ -139,6 +139,11 @@ export const authService = {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       if (data.user) {
+        const { data: profile } = await supabase.from('profiles').select('status').eq('id', data.user.id).single();
+        if (profile?.status === 'suspended') {
+          await supabase.auth.signOut();
+          throw new Error('Your account has been suspended. Please contact support.');
+        }
         migrateLocalData(data.user.id);
         supabase.from('profiles').update({ last_sign_in_at: new Date().toISOString() }).eq('id', data.user.id).then().catch(() => {});
       }
@@ -449,6 +454,18 @@ export const dbService = {
       return (data || []).map(r => toCamelCase(r));
     }
     return [];
+  },
+
+  async updateUserStatus(userId, status) {
+    if (supabase) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      if (error) throw error;
+      return true;
+    }
+    return false;
   },
 };
 

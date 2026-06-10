@@ -258,3 +258,12 @@ export const fetchErrorLogs = async (limit = 20) => {
     return [];
   }
 };
+
+export const updateUserStatus = async (userId, status) => {
+  try {
+    return await dbService.updateUserStatus(userId, status);
+  } catch (error) {
+    console.error('Failed to update user status', error);
+    throw error;
+  }
+};

@@ -3,9 +3,10 @@
 -- Run this in your Supabase SQL Editor
 -- ============================================================
 
--- 1. Add role + last_sign_in_at to profiles
+-- 1. Add role + last_sign_in_at + status to profiles
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_sign_in_at TIMESTAMPTZ;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active' CHECK (status IN ('active', 'suspended'));
 
 -- 2. Create is_admin() security definer function
 CREATE OR REPLACE FUNCTION is_admin()
@@ -77,7 +78,12 @@ BEGIN
   END LOOP;
 END $$;
 
--- 9. Grant permissions
+-- 9. Admin UPDATE policy for profiles (so admin can update status/role)
+DROP POLICY IF EXISTS "Admins can update profiles" ON profiles;
+CREATE POLICY "Admins can update profiles" ON profiles
+  FOR UPDATE USING (is_admin()) WITH CHECK (is_admin());
+
+-- 10. Grant permissions
 GRANT ALL ON support_notes TO authenticated;
 GRANT USAGE ON SEQUENCE support_notes_id_seq TO authenticated;
 GRANT ALL ON error_logs TO authenticated;

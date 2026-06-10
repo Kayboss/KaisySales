@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import OnboardingWizard from '../features/auth/OnboardingWizard';
 import styled from 'styled-components';
-import { Leaf } from 'lucide-react';
+import { Leaf, Ban } from 'lucide-react';
 
 const LoaderContainer = styled.div`
   height: 100vh;
@@ -35,9 +35,23 @@ const Spinner = styled.div`
  * CheckAuth Middleware Component
  * Protects private routes, loads user profiles, and gates onboarding.
  */
+const SuspendedContainer = styled.div`
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #FCF9F3;
+  color: #BA1A1A;
+  gap: 1.5rem;
+  font-family: 'Manrope', sans-serif;
+  text-align: center;
+  padding: 2rem;
+`;
+
 const CheckAuth = () => {
   const { isAuthenticated, isInitialized, user } = useAuthStore();
-  const { isOnboarded, loadSettings, isLoading, clearSettings } = useSettingsStore();
+  const { isOnboarded, loadSettings, isLoading, clearSettings, status } = useSettingsStore();
   const location = useLocation();
 
   // Load user business settings and details from Firestore when authenticated
@@ -72,6 +86,22 @@ const CheckAuth = () => {
   // Gatekeeper: if the authenticated user is not onboarded, lock them inside the Wizard
   if (!isOnboarded) {
     return <OnboardingWizard />;
+  }
+
+  // Block suspended users
+  if (status === 'suspended') {
+    return (
+      <SuspendedContainer>
+        <Ban size={48} />
+        <h2 style={{ color: '#1C1B1F', margin: 0 }}>Account Suspended</h2>
+        <p style={{ color: '#55423D', maxWidth: 400 }}>
+          Your account has been suspended. Please contact support to reactivate your account.
+        </p>
+        <p style={{ fontSize: '0.85rem', color: '#55423D' }}>
+          <a href="mailto:support@kaisysales.com" style={{ color: '#6F240A' }}>support@kaisysales.com</a>
+        </p>
+      </SuspendedContainer>
+    );
   }
 
   return <Outlet />;
