@@ -226,6 +226,13 @@ const ReceiptRow = styled.div`
 `;
 
 const FEATURES = {
+  free: [
+    'Up to 10 sales',
+    'Up to 5 invoices',
+    'Up to 20 products',
+    'Basic reports',
+    '7-day free trial',
+  ],
   silver: [
     'Up to 50 sales per month',
     'Up to 20 invoices per month',
@@ -259,6 +266,11 @@ const SubscriptionSettings = () => {
   const currentPlan = subscriptionPlan || 'none';
   const currentStatus = subscriptionStatus || 'none';
   const isActive = currentStatus === 'active';
+  const isTrial = currentPlan === 'free';
+
+  const daysRemaining = subscriptionExpiresAt
+    ? Math.max(0, Math.ceil((new Date(subscriptionExpiresAt) - new Date()) / (1000 * 60 * 60 * 24)))
+    : 0;
 
   const handlePayment = async () => {
     if (!showPayment || !user?.uid) return;
@@ -288,11 +300,17 @@ const SubscriptionSettings = () => {
           <PlanInfo>
             <Crown size={32} color={isActive ? '#6F240A' : '#89726C'} />
             <PlanDetail>
-              <PlanLabel>{currentPlan === 'none' ? 'Free' : currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}</PlanLabel>
+              <PlanLabel>
+                {currentPlan === 'none' ? 'Free' :
+                 currentPlan === 'free' ? 'Free Trial' :
+                 currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}
+              </PlanLabel>
               <PlanMeta>
-                {isActive
-                  ? `Expires ${subscriptionExpiresAt ? new Date(subscriptionExpiresAt).toLocaleDateString() : '—'}`
-                  : currentPlan === 'none' ? 'No active subscription' : 'Subscription inactive'}
+                {isTrial
+                  ? `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining in trial`
+                  : isActive
+                    ? `Expires ${subscriptionExpiresAt ? new Date(subscriptionExpiresAt).toLocaleDateString() : '—'}`
+                    : currentPlan === 'none' ? 'No active subscription' : 'Subscription inactive'}
               </PlanMeta>
             </PlanDetail>
           </PlanInfo>
@@ -309,16 +327,23 @@ const SubscriptionSettings = () => {
         <SectionDesc>Upgrade to unlock more features.</SectionDesc>
         <CardGrid>
           {[
-            { key: 'silver', label: 'Silver', price: 50 },
-            { key: 'gold', label: 'Gold', price: 100 },
+            { key: 'free', label: 'Free Trial', price: 0, period: '7 days' },
+            { key: 'silver', label: 'Silver', price: 50, period: '/month' },
+            { key: 'gold', label: 'Gold', price: 100, period: '/month' },
           ].map(p => (
             <PlanCard key={p.key} $active={currentPlan === p.key && isActive}>
-              <Crown size={24} color={p.key === 'gold' ? '#875200' : '#89726C'} style={{ marginBottom: '0.5rem' }} />
+              <Crown size={24} color={p.key === 'gold' ? '#875200' : p.key === 'silver' ? '#6F240A' : '#89726C'} style={{ marginBottom: '0.5rem' }} />
               <PlanCardTitle>{p.label}</PlanCardTitle>
-              <PlanCardPrice>GH₵{p.price}</PlanCardPrice>
-              <div style={{ fontSize: '0.8rem', color: '#89726C', marginBottom: '0.5rem' }}>/month</div>
+              {p.price > 0 ? (
+                <>
+                  <PlanCardPrice>GH₵{p.price}</PlanCardPrice>
+                  <div style={{ fontSize: '0.8rem', color: '#89726C', marginBottom: '0.5rem' }}>{p.period}</div>
+                </>
+              ) : (
+                <div style={{ fontSize: '1.2rem', color: '#25432F', fontWeight: 700, margin: '0.5rem 0' }}>{p.period} free</div>
+              )}
               <FeatureList>
-                {FEATURES[p.key].map((f, i) => (
+                {(FEATURES[p.key] || []).map((f, i) => (
                   <FeatureItem key={i}>
                     <CheckCircle size={14} color="#25432F" />
                     {f}
@@ -327,10 +352,10 @@ const SubscriptionSettings = () => {
               </FeatureList>
               <SubscribeBtn
                 $current={currentPlan === p.key && isActive}
-                onClick={() => setShowPayment(p.key)}
-                disabled={currentPlan === p.key && isActive}
+                onClick={() => p.key === 'free' ? null : setShowPayment(p.key)}
+                disabled={currentPlan === p.key && isActive || p.key === 'free'}
               >
-                {currentPlan === p.key && isActive ? 'Current Plan' : 'Subscribe'}
+                {currentPlan === p.key && isActive ? 'Current Plan' : p.key === 'free' ? 'Starts on Sign-up' : 'Subscribe'}
               </SubscribeBtn>
             </PlanCard>
           ))}

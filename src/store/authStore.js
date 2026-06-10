@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authService } from '../services/supabase';
+import { authService, dbService } from '../services/supabase';
 
 /**
  * Auth Store
@@ -15,6 +15,7 @@ export const useAuthStore = create((set) => {
         isAuthenticated: true, 
         isInitialized: true 
       });
+      dbService.ensureFreeTrial(user.uid);
     } else {
       set({ 
         user: null, 

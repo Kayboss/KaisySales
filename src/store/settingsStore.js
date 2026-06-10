@@ -15,6 +15,9 @@ export const useSettingsStore = create((set) => ({
   avatarColor: '#6F240A',
   role: 'user',
   status: 'active',
+  subscriptionPlan: 'none',
+  subscriptionStatus: 'none',
+  subscriptionExpiresAt: null,
   isOnboarded: null,
   isLoading: false,
 
@@ -36,6 +39,9 @@ export const useSettingsStore = create((set) => ({
           avatarColor: profile.avatarColor || '#6F240A',
           role: profile.role || 'user',
           status: profile.status || 'active',
+          subscriptionPlan: profile.subscriptionPlan || 'none',
+          subscriptionStatus: profile.subscriptionStatus || 'none',
+          subscriptionExpiresAt: profile.subscriptionExpiresAt || null,
           isOnboarded: profile.isOnboarded === true,
           isLoading: false
         });

@@ -86,10 +86,12 @@ const PlanBadge = styled.span`
   font-weight: 700;
   color: ${props =>
     props.$plan === 'gold' ? '#875200' :
-    props.$plan === 'silver' ? '#55423D' : '#89726C'};
+    props.$plan === 'silver' ? '#55423D' :
+    props.$plan === 'free' ? '#25432F' : '#89726C'};
   background: ${props =>
     props.$plan === 'gold' ? '#FFF0E0' :
-    props.$plan === 'silver' ? '#F0EEE8' : '#F5F5F5'};
+    props.$plan === 'silver' ? '#F0EEE8' :
+    props.$plan === 'free' ? '#E8F0EC' : '#F5F5F5'};
 `;
 
 const StatusBadge = styled.span`
@@ -319,6 +321,13 @@ const AdminSubscriptions = () => {
   const getUserSubStatus = (u) => u.subscriptionStatus || 'none';
 
   const FEATURES = {
+    free: [
+      'Up to 10 sales',
+      'Up to 5 invoices',
+      'Up to 20 products',
+      'Basic reports',
+      '7-day free trial',
+    ],
     silver: [
       'Up to 50 sales per month',
       'Up to 20 invoices per month',
@@ -346,16 +355,23 @@ const AdminSubscriptions = () => {
       {subTab === 'plans' && (
         <CardGrid>
           {[
+            { key: 'free', label: 'Free Trial', price: '0', period: '7 days' },
             { key: 'silver', label: 'Silver', price: '50', period: '/month' },
             { key: 'gold', label: 'Gold', price: '100', period: '/month' },
           ].map(p => (
             <PlanCard key={p.key}>
-              <Crown size={24} color={p.key === 'gold' ? '#875200' : '#89726C'} style={{ marginBottom: '0.5rem' }} />
+              <Crown size={24} color={p.key === 'gold' ? '#875200' : p.key === 'silver' ? '#6F240A' : '#89726C'} style={{ marginBottom: '0.5rem' }} />
               <PlanName>{p.label}</PlanName>
-              <PlanPrice>GH₵{p.price}</PlanPrice>
-              <PlanPeriod>{p.period}</PlanPeriod>
+              {p.price > 0 ? (
+                <>
+                  <PlanPrice>GH₵{p.price}</PlanPrice>
+                  <PlanPeriod>{p.period}</PlanPeriod>
+                </>
+              ) : (
+                <div style={{ fontSize: '1.2rem', color: '#25432F', fontWeight: 700, margin: '0.5rem 0' }}>{p.period} free</div>
+              )}
               <div style={{ margin: '1rem 0', textAlign: 'left' }}>
-                {FEATURES[p.key].map((f, i) => (
+                {(FEATURES[p.key] || []).map((f, i) => (
                   <PlanFeature key={i}>{f}</PlanFeature>
                 ))}
               </div>
@@ -429,7 +445,7 @@ const AdminSubscriptions = () => {
                         <Td>
                           <PlanBadge $plan={plan}>
                             {plan === 'gold' || plan === 'silver' ? <Crown size={11} /> : null}
-                            {plan === 'none' ? 'Free' : plan.charAt(0).toUpperCase() + plan.slice(1)}
+                            {plan === 'none' ? 'None' : plan === 'free' ? 'Free Trial' : plan.charAt(0).toUpperCase() + plan.slice(1)}
                           </PlanBadge>
                         </Td>
                         <Td>
@@ -448,9 +464,9 @@ const AdminSubscriptions = () => {
                         <Td>
                           <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                             <ActionBtn onClick={() => { setAssignTarget(u); setSelectedPlan('silver'); }}>
-                              {plan === 'none' ? 'Assign' : 'Change'}
+                              {plan === 'none' || plan === 'free' ? 'Assign' : 'Change'}
                             </ActionBtn>
-                            {plan !== 'none' && (
+                            {plan !== 'none' && plan !== 'free' && (
                               <ActionBtn $color="#BA1A1A" onClick={() => handleCancel(u)}>Remove</ActionBtn>
                             )}
                           </div>

@@ -124,7 +124,10 @@ export const authService = {
     if (supabase) {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
-      if (data.user) migrateLocalData(data.user.id);
+      if (data.user) {
+        migrateLocalData(data.user.id);
+        this.ensureFreeTrial(data.user.id);
+      }
       return mapUser(data.user);
     }
     // Mock
@@ -491,6 +494,19 @@ export const dbService = {
   // ---------------------------------------------------
   // SUBSCRIPTION METHODS
   // ---------------------------------------------------
+  async ensureFreeTrial(userId) {
+    if (!supabase) return;
+    const { data: existing } = await supabase.from('profiles').select('subscription_plan').eq('id', userId).maybeSingle();
+    if (existing?.subscription_plan && existing.subscription_plan !== 'none') return;
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from('profiles').update({
+      subscription_plan: 'free',
+      subscription_status: 'active',
+      subscription_expires_at: expiresAt,
+      subscription_updated_at: new Date().toISOString(),
+    }).eq('id', userId).then().catch(() => {});
+  },
+
   async fetchSubscriptionPlans() {
     if (supabase) {
       const { data, error } = await supabase.from('subscription_plans').select('*').order('name');
