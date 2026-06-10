@@ -260,11 +260,15 @@ const App = () => {
                     <Route path="reporting" element={<AutomatedReporting />} />
                     <Route path="retail-stores" element={<RetailStores />} />
                     <Route path="settings" element={<SettingsPage />} />
-                    <Route path="admin" element={<AdminCheck><AdminDashboard /></AdminCheck>} />
                     <Route path="*" element={<BusinessOverview />} />
                   </Routes>
                 </Main>
               </Layout>
+            } />
+            <Route path="/admin" element={
+              <AdminCheck>
+                <AdminDashboard />
+              </AdminCheck>
             } />
           </Route>
         </Routes>
