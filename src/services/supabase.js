@@ -487,6 +487,129 @@ export const dbService = {
     }
     return false;
   },
+
+  // ---------------------------------------------------
+  // SUBSCRIPTION METHODS
+  // ---------------------------------------------------
+  async fetchSubscriptionPlans() {
+    if (supabase) {
+      const { data, error } = await supabase.from('subscription_plans').select('*').order('name');
+      if (error) throw error;
+      return (data || []).map(r => toCamelCase(r));
+    }
+    return [];
+  },
+
+  async assignSubscription(userId, plan, durationDays = 30) {
+    if (supabase) {
+      const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          subscription_plan: plan,
+          subscription_status: 'active',
+          subscription_expires_at: expiresAt,
+          subscription_updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId);
+      if (error) throw error;
+      return true;
+    }
+    return false;
+  },
+
+  async cancelSubscription(userId) {
+    if (supabase) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          subscription_plan: 'none',
+          subscription_status: 'none',
+          subscription_expires_at: null,
+          subscription_updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId);
+      if (error) throw error;
+      return true;
+    }
+    return false;
+  },
+
+  async recordPayment({ userId, plan, amount, reference, paymentMethod }) {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('subscription_payments')
+        .insert({
+          user_id: userId,
+          plan,
+          amount,
+          reference: reference || null,
+          payment_method: paymentMethod || 'manual',
+          status: 'pending',
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return toCamelCase(data);
+    }
+    return { id: 'pay-' + Math.random().toString(36).substr(2, 9), userId, plan, amount, status: 'pending' };
+  },
+
+  async confirmPayment(paymentId, adminId) {
+    if (supabase) {
+      const { data: payment } = await supabase
+        .from('subscription_payments')
+        .update({ status: 'confirmed', admin_id: adminId, confirmed_at: new Date().toISOString() })
+        .eq('id', paymentId)
+        .select()
+        .single();
+      if (!payment) throw new Error('Payment not found');
+      const planRow = await supabase
+        .from('subscription_plans')
+        .select('duration_days')
+        .eq('name', payment.plan)
+        .single();
+      const durationDays = planRow.data?.duration_days || 30;
+      const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+      await supabase
+        .from('profiles')
+        .update({
+          subscription_plan: payment.plan,
+          subscription_status: 'active',
+          subscription_expires_at: expiresAt,
+          subscription_updated_at: new Date().toISOString(),
+        })
+        .eq('id', payment.user_id);
+      return toCamelCase(payment);
+    }
+    return null;
+  },
+
+  async fetchAllPayments(limit = 50) {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('subscription_payments')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data || []).map(r => toCamelCase(r));
+    }
+    return [];
+  },
+
+  async fetchUserPayments(userId) {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('subscription_payments')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(r => toCamelCase(r));
+    }
+    return [];
+  },
 };
 
 // Standalone error logger — call from anywhere

@@ -267,3 +267,69 @@ export const updateUserStatus = async (userId, status) => {
     throw error;
   }
 };
+
+// ====================================================
+// 8. SUBSCRIPTIONS
+// ====================================================
+export const fetchSubscriptionPlans = async () => {
+  try {
+    return await dbService.fetchSubscriptionPlans();
+  } catch (error) {
+    console.error('Failed to fetch subscription plans', error);
+    return [];
+  }
+};
+
+export const assignSubscription = async (userId, plan, durationDays) => {
+  try {
+    return await dbService.assignSubscription(userId, plan, durationDays);
+  } catch (error) {
+    console.error('Failed to assign subscription', error);
+    throw error;
+  }
+};
+
+export const cancelSubscription = async (userId) => {
+  try {
+    return await dbService.cancelSubscription(userId);
+  } catch (error) {
+    console.error('Failed to cancel subscription', error);
+    throw error;
+  }
+};
+
+export const recordPayment = async (paymentData) => {
+  try {
+    return await dbService.recordPayment(paymentData);
+  } catch (error) {
+    console.error('Failed to record payment', error);
+    throw error;
+  }
+};
+
+export const confirmPayment = async (paymentId, adminId) => {
+  try {
+    return await dbService.confirmPayment(paymentId, adminId);
+  } catch (error) {
+    console.error('Failed to confirm payment', error);
+    throw error;
+  }
+};
+
+export const fetchAllPayments = async (limit = 50) => {
+  try {
+    return await dbService.fetchAllPayments(limit);
+  } catch (error) {
+    console.error('Failed to fetch payments', error);
+    return [];
+  }
+};
+
+export const fetchUserPayments = async (userId) => {
+  try {
+    return await dbService.fetchUserPayments(userId);
+  } catch (error) {
+    console.error('Failed to fetch user payments', error);
+    return [];
+  }
+};

@@ -4,7 +4,8 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { fetchCategories, updateCategory, deleteCategory } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette } from 'lucide-react';
+import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, Crown } from 'lucide-react';
+import SubscriptionSettings from './SubscriptionSettings';
 
 const Header = styled.div`
   display: flex;
@@ -247,6 +248,28 @@ const ColorOption = styled.button`
   }
 `;
 
+const TabsRow = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid #F0EEE8;
+  margin-bottom: 2rem;
+`;
+
+const TabBtn = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 3px solid ${props => props.$active ? '#6F240A' : 'transparent'};
+  color: ${props => props.$active ? '#6F240A' : '#89726C'};
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+`;
+
 const avatarColors = ['#6F240A', '#875200', '#25432F', '#D4AF37', '#8E3A1F'];
 
 const GroupLabel = styled.div`
@@ -260,7 +283,13 @@ const GroupLabel = styled.div`
   &:first-child { padding-top: 0; }
 `;
 
+const SETTINGS_TABS = [
+  { id: 'profile', label: 'Business Profile', icon: Building },
+  { id: 'subscription', label: 'Subscription', icon: Crown },
+];
+
 const SettingsPage = () => {
+  const [activeTab, setActiveTab] = useState('profile');
   const { user } = useAuthStore();
   const settings = useSettingsStore();
   
@@ -357,12 +386,23 @@ const SettingsPage = () => {
     <div>
       <Header>
         <div>
-          <h1 style={{ fontSize: '2rem' }}>Business Settings</h1>
+          <h1 style={{ fontSize: '2rem' }}>Settings</h1>
           <p style={{ color: '#55423D' }}>Manage your profile and application preferences.</p>
         </div>
       </Header>
 
-      <FormCard>
+      <TabsRow>
+        {SETTINGS_TABS.map(tab => (
+          <TabBtn key={tab.id} $active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
+            <tab.icon size={18} />
+            {tab.label}
+          </TabBtn>
+        ))}
+      </TabsRow>
+
+      {activeTab === 'subscription' && <SubscriptionSettings />}
+
+      {activeTab === 'profile' && <><FormCard>
         {saved && (
           <SuccessMessage>
             <CheckCircle size={18} />
@@ -571,6 +611,7 @@ const SettingsPage = () => {
           onCancel={() => setDeleteCatTarget(null)}
         />
       )}
+      </>}
     </div>
   );
 };

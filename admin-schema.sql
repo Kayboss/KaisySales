@@ -83,7 +83,79 @@ DROP POLICY IF EXISTS "Admins can update profiles" ON profiles;
 CREATE POLICY "Admins can update profiles" ON profiles
   FOR UPDATE USING (is_admin()) WITH CHECK (is_admin());
 
--- 10. Grant permissions
+-- 11. Subscription management
+-- 11a. Add subscription columns to profiles
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS subscription_plan TEXT DEFAULT 'none';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'none';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS subscription_updated_at TIMESTAMPTZ;
+
+-- 11b. Create subscription_plans table
+CREATE TABLE IF NOT EXISTS subscription_plans (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  price DECIMAL(10,2) NOT NULL,
+  duration_days INTEGER NOT NULL DEFAULT 30,
+  features JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Insert default plans
+INSERT INTO subscription_plans (name, price, duration_days, features) VALUES
+  ('silver', 50.00, 30, '{"max_sales_month": 50, "max_invoices_month": 20, "max_products": 100, "reports": "basic", "support": "email"}'),
+  ('gold', 100.00, 30, '{"max_sales_month": -1, "max_invoices_month": -1, "max_products": -1, "reports": "advanced", "support": "priority"}')
+ON CONFLICT (name) DO NOTHING;
+
+-- 11c. Create subscription_payments table
+CREATE TABLE IF NOT EXISTS subscription_payments (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  plan TEXT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  reference TEXT,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'refunded')),
+  payment_method TEXT DEFAULT 'manual' CHECK (payment_method IN ('manual', 'mobile_money')),
+  admin_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  confirmed_at TIMESTAMPTZ
+);
+
+ALTER TABLE subscription_payments ENABLE ROW LEVEL SECURITY;
+
+-- RLS: admins can read all payments, users can read their own
+DROP POLICY IF EXISTS "Admins can read all subscription payments" ON subscription_payments;
+CREATE POLICY "Admins can read all subscription payments" ON subscription_payments
+  FOR SELECT USING (is_admin());
+
+DROP POLICY IF EXISTS "Users can read own payments" ON subscription_payments;
+CREATE POLICY "Users can read own payments" ON subscription_payments
+  FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert own payments" ON subscription_payments;
+CREATE POLICY "Users can insert own payments" ON subscription_payments
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Admins can update subscription payments" ON subscription_payments;
+CREATE POLICY "Admins can update subscription payments" ON subscription_payments
+  FOR UPDATE USING (is_admin()) WITH CHECK (is_admin());
+
+-- RLS: users can read subscription_plans
+DROP POLICY IF EXISTS "Anyone can read subscription plans" ON subscription_plans;
+CREATE POLICY "Anyone can read subscription plans" ON subscription_plans
+  FOR SELECT USING (true);
+
+ALTER TABLE subscription_plans ENABLE ROW LEVEL SECURITY;
+
+-- Admin can read subscription_updated_at from profiles
+-- (already covered by "Admins can read all profiles" policy above)
+
+-- Grant permissions
+GRANT ALL ON subscription_payments TO authenticated;
+GRANT USAGE ON SEQUENCE subscription_payments_id_seq TO authenticated;
+GRANT ALL ON subscription_plans TO authenticated;
+GRANT USAGE ON SEQUENCE subscription_plans_id_seq TO authenticated;
+
+-- 12. Grant permissions
 GRANT ALL ON support_notes TO authenticated;
 GRANT USAGE ON SEQUENCE support_notes_id_seq TO authenticated;
 GRANT ALL ON error_logs TO authenticated;
