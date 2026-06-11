@@ -51,7 +51,7 @@ const SuspendedContainer = styled.div`
 
 const CheckAuth = () => {
   const { isAuthenticated, isInitialized, user } = useAuthStore();
-  const { isOnboarded, loadSettings, isLoading, clearSettings, status } = useSettingsStore();
+  const { isOnboarded, loadSettings, isLoading, clearSettings, status, role } = useSettingsStore();
   const location = useLocation();
 
   // Load user business settings and details from Firestore when authenticated
@@ -102,6 +102,11 @@ const CheckAuth = () => {
         </p>
       </SuspendedContainer>
     );
+  }
+
+  // Redirect admins to admin dashboard on initial login
+  if (role === 'admin' && location.pathname === '/') {
+    return <Navigate to="/admin" replace />;
   }
 
   return <Outlet />;
