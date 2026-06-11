@@ -144,6 +144,19 @@ const ErrorTime = styled.span`
   white-space: nowrap;
 `;
 
+const ErrorUser = styled.span`
+  color: #55423D;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #F0EEE8;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
 const getUserStatus = (lastSignInAt) => {
   if (!lastSignInAt) return 'churned';
   const daysAgo = (Date.now() - new Date(lastSignInAt).getTime()) / (1000 * 60 * 60 * 24);
@@ -292,9 +305,12 @@ const AdminOverview = () => {
             {errorLogs.map(e => (
               <ErrorItem key={e.id}>
                 <Bug size={14} color="#BA1A1A" />
-                <ErrorText>{e.error}</ErrorText>
+                <ErrorText title={e.error}>{e.error}</ErrorText>
                 <ErrorPage>{e.page || '—'}</ErrorPage>
-                <ErrorTime>{e.createdAt ? new Date(e.createdAt).toLocaleDateString() : '—'}</ErrorTime>
+                <ErrorUser title={e.userEmail || e.userBusinessName || e.userId}>
+                  {e.userBusinessName || e.userEmail || e.userId?.slice(0, 8) || '—'}
+                </ErrorUser>
+                <ErrorTime>{e.createdAt ? new Date(e.createdAt).toLocaleString() : '—'}</ErrorTime>
               </ErrorItem>
             ))}
           </ErrorFeed>

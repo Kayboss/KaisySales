@@ -474,7 +474,25 @@ export const dbService = {
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return (data || []).map(r => toCamelCase(r));
+      const logs = (data || []).map(r => toCamelCase(r));
+      const userIds = [...new Set(logs.map(l => l.userId).filter(Boolean))];
+      if (userIds.length > 0) {
+        const { data: profiles, error: pErr } = await supabase
+          .from('profiles')
+          .select('id, email, business_name')
+          .in('id', userIds);
+        if (!pErr && profiles) {
+          const profileMap = Object.fromEntries(
+            profiles.map(p => [p.id, { email: p.email, businessName: p.business_name }])
+          );
+          return logs.map(l => ({
+            ...l,
+            userEmail: profileMap[l.userId]?.email || null,
+            userBusinessName: profileMap[l.userId]?.businessName || null,
+          }));
+        }
+      }
+      return logs;
     }
     return [];
   },
