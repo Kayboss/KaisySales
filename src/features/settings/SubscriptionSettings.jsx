@@ -77,6 +77,55 @@ const CardGrid = styled.div`
   gap: 1rem;
 `;
 
+const ToggleRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+`;
+
+const ToggleLabel = styled.span`
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: ${props => props.$active ? '#6F240A' : '#89726C'};
+`;
+
+const ToggleSwitch = styled.button`
+  width: 52px;
+  height: 28px;
+  border-radius: 14px;
+  border: none;
+  background: ${props => props.$yearly ? '#6F240A' : '#D0C8C4'};
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: ${props => props.$yearly ? '27px' : '3px'};
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: white;
+    transition: left 0.2s ease;
+  }
+`;
+
+const SaveBadge = styled.span`
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: white;
+  background: #25432F;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+`;
+
 const PlanCard = styled.div`
   background: white;
   border-radius: 12px;
@@ -257,6 +306,11 @@ const SubscriptionSettings = () => {
   const [showPayment, setShowPayment] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('mobile_money');
   const [reference, setReference] = useState('');
+  const [yearly, setYearly] = useState(false);
+
+  const getPrice = (basePrice) => yearly ? basePrice * 10 : basePrice;
+  const getPeriod = () => yearly ? '/year' : '/month';
+  const getDurationDays = () => yearly ? 365 : 30;
 
   useEffect(() => {
     fetchSubscriptionPlans().then(setPlans);
@@ -275,10 +329,11 @@ const SubscriptionSettings = () => {
   const handlePayment = async () => {
     if (!showPayment || !user?.uid) return;
     try {
+      const amount = showPayment === 'silver' ? (yearly ? 350 : 35) : (yearly ? 750 : 75);
       await recordPayment({
         userId: user.uid,
         plan: showPayment,
-        amount: showPayment === 'silver' ? 35 : 75,
+        amount,
         reference: reference || null,
         paymentMethod,
       });
@@ -325,22 +380,32 @@ const SubscriptionSettings = () => {
       <Section>
         <SectionTitle>Available Plans</SectionTitle>
         <SectionDesc>Upgrade to unlock more features.</SectionDesc>
+
+        <ToggleRow>
+          <ToggleLabel $active={!yearly}>Monthly</ToggleLabel>
+          <ToggleSwitch $yearly={yearly} onClick={() => setYearly(!yearly)} />
+          <ToggleLabel $active={yearly}>Yearly <SaveBadge>Save 2mo</SaveBadge></ToggleLabel>
+        </ToggleRow>
+
         <CardGrid>
           {[
             { key: 'free', label: 'Free Trial', price: 0, period: '3 days' },
-            { key: 'silver', label: 'Silver', price: 35, period: '/month' },
-            { key: 'gold', label: 'Gold', price: 75, period: '/month' },
-          ].map(p => (
+            { key: 'silver', label: 'Silver', price: 35, yearlyPrice: 350 },
+            { key: 'gold', label: 'Gold', price: 75, yearlyPrice: 750 },
+          ].map(p => {
+            const displayPrice = p.key === 'free' ? 0 : (yearly ? p.yearlyPrice : p.price);
+            const period = p.key === 'free' ? '3 days' : (yearly ? '/year' : '/month');
+            return (
             <PlanCard key={p.key} $active={currentPlan === p.key && isActive}>
               <Crown size={24} color={p.key === 'gold' ? '#875200' : p.key === 'silver' ? '#6F240A' : '#89726C'} style={{ marginBottom: '0.5rem' }} />
               <PlanCardTitle>{p.label}</PlanCardTitle>
-              {p.price > 0 ? (
+              {p.key !== 'free' ? (
                 <>
-                  <PlanCardPrice>GH₵{p.price}</PlanCardPrice>
-                  <div style={{ fontSize: '0.8rem', color: '#89726C', marginBottom: '0.5rem' }}>{p.period}</div>
+                  <PlanCardPrice>GH₵{displayPrice}</PlanCardPrice>
+                  <div style={{ fontSize: '0.8rem', color: '#89726C', marginBottom: '0.5rem' }}>{period}</div>
                 </>
               ) : (
-                <div style={{ fontSize: '1.2rem', color: '#25432F', fontWeight: 700, margin: '0.5rem 0' }}>{p.period} free</div>
+                <div style={{ fontSize: '1.2rem', color: '#25432F', fontWeight: 700, margin: '0.5rem 0' }}>{period} free</div>
               )}
               <FeatureList>
                 {(FEATURES[p.key] || []).map((f, i) => (
@@ -358,7 +423,8 @@ const SubscriptionSettings = () => {
                 {currentPlan === p.key && isActive ? 'Current Plan' : p.key === 'free' ? 'Starts on Sign-up' : 'Subscribe'}
               </SubscribeBtn>
             </PlanCard>
-          ))}
+          );
+        })}
         </CardGrid>
       </Section>
 
@@ -392,7 +458,7 @@ const SubscriptionSettings = () => {
               <CreditCard size={24} color="#6F240A" />
               <div>
                 <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>Subscribe to {showPayment === 'silver' ? 'Silver' : 'Gold'}</div>
-                <div style={{ fontSize: '0.8rem', color: '#89726C' }}>GH₵{showPayment === 'silver' ? 35 : 75}/month</div>
+                <div style={{ fontSize: '0.8rem', color: '#89726C' }}>GH₵{showPayment === 'silver' ? (yearly ? 350 : 35) : (yearly ? 750 : 75)}{yearly ? '/year' : '/month'}</div>
               </div>
             </div>
 

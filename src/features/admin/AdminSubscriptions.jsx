@@ -259,6 +259,55 @@ const PaymentItem = styled.div`
   &:last-child { border-bottom: none; }
 `;
 
+const ToggleRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+`;
+
+const ToggleLabel = styled.span`
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: ${props => props.$active ? '#6F240A' : '#89726C'};
+`;
+
+const ToggleSwitch = styled.button`
+  width: 52px;
+  height: 28px;
+  border-radius: 14px;
+  border: none;
+  background: ${props => props.$yearly ? '#6F240A' : '#D0C8C4'};
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: ${props => props.$yearly ? '27px' : '3px'};
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: white;
+    transition: left 0.2s ease;
+  }
+`;
+
+const SaveBadge = styled.span`
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: white;
+  background: #25432F;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+`;
+
 const AdminSubscriptions = () => {
   const [users, setUsers] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -267,6 +316,7 @@ const AdminSubscriptions = () => {
   const [subTab, setSubTab] = useState('users');
   const [assignTarget, setAssignTarget] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState('silver');
+  const [yearly, setYearly] = useState(false);
   const { user } = useAuthStore();
 
   const loadData = async () => {
@@ -353,31 +403,42 @@ const AdminSubscriptions = () => {
       </TabRow>
 
       {subTab === 'plans' && (
-        <CardGrid>
-          {[
-            { key: 'free', label: 'Free Trial', price: '0', period: '3 days' },
-            { key: 'silver', label: 'Silver', price: '35', period: '/month' },
-            { key: 'gold', label: 'Gold', price: '75', period: '/month' },
-          ].map(p => (
-            <PlanCard key={p.key}>
-              <Crown size={24} color={p.key === 'gold' ? '#875200' : p.key === 'silver' ? '#6F240A' : '#89726C'} style={{ marginBottom: '0.5rem' }} />
-              <PlanName>{p.label}</PlanName>
-              {p.price > 0 ? (
-                <>
-                  <PlanPrice>GH₵{p.price}</PlanPrice>
-                  <PlanPeriod>{p.period}</PlanPeriod>
-                </>
-              ) : (
-                <div style={{ fontSize: '1.2rem', color: '#25432F', fontWeight: 700, margin: '0.5rem 0' }}>{p.period} free</div>
-              )}
-              <div style={{ margin: '1rem 0', textAlign: 'left' }}>
-                {(FEATURES[p.key] || []).map((f, i) => (
-                  <PlanFeature key={i}>{f}</PlanFeature>
-                ))}
-              </div>
-            </PlanCard>
-          ))}
-        </CardGrid>
+        <>
+          <ToggleRow>
+            <ToggleLabel $active={false}>Monthly</ToggleLabel>
+            <ToggleSwitch $yearly={yearly} onClick={() => setYearly(!yearly)} />
+            <ToggleLabel $active={true}>Yearly <SaveBadge>Save 2mo</SaveBadge></ToggleLabel>
+          </ToggleRow>
+          <CardGrid>
+            {[
+              { key: 'free', label: 'Free Trial', price: '0', period: '3 days', yearlyPrice: '0' },
+              { key: 'silver', label: 'Silver', price: '35', period: '/month', yearlyPrice: '350', yearlyPeriod: '/year' },
+              { key: 'gold', label: 'Gold', price: '75', period: '/month', yearlyPrice: '750', yearlyPeriod: '/year' },
+            ].map(p => {
+              const displayPrice = p.key === 'free' ? '0' : (yearly ? p.yearlyPrice : p.price);
+              const period = p.key === 'free' ? '3 days' : (yearly ? p.yearlyPeriod : p.period);
+              return (
+              <PlanCard key={p.key}>
+                <Crown size={24} color={p.key === 'gold' ? '#875200' : p.key === 'silver' ? '#6F240A' : '#89726C'} style={{ marginBottom: '0.5rem' }} />
+                <PlanName>{p.label}</PlanName>
+                {p.key !== 'free' ? (
+                  <>
+                    <PlanPrice>GH₵{displayPrice}</PlanPrice>
+                    <PlanPeriod>{period}</PlanPeriod>
+                  </>
+                ) : (
+                  <div style={{ fontSize: '1.2rem', color: '#25432F', fontWeight: 700, margin: '0.5rem 0' }}>{p.period} free</div>
+                )}
+                <div style={{ margin: '1rem 0', textAlign: 'left' }}>
+                  {(FEATURES[p.key] || []).map((f, i) => (
+                    <PlanFeature key={i}>{f}</PlanFeature>
+                  ))}
+                </div>
+              </PlanCard>
+              );
+            })}
+          </CardGrid>
+        </>
       )}
 
       {subTab === 'payments' && (
