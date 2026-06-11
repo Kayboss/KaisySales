@@ -180,6 +180,7 @@ const FullWidthChartCard = styled(ChartCard)`
 const COLORS = ['#6F240A', '#875200', '#25432F', '#BA1A1A', '#D4A373', '#55423D', '#89726C', '#A68B7B'];
 
 const CustomTooltip = ({ active, payload, label }) => {
+  const { currency } = useSettingsStore();
   if (active && payload && payload.length) {
     return (
       <div style={{
@@ -193,7 +194,7 @@ const CustomTooltip = ({ active, payload, label }) => {
         <div style={{ fontWeight: 700, color: '#1C1C18', marginBottom: '0.25rem' }}>{label}</div>
         {payload.map((p, i) => (
           <div key={i} style={{ color: p.color, fontWeight: 600 }}>
-            {p.name}: {p.name === 'Count' ? p.value : formatCurrency(p.value)}
+            {p.name}: {p.name === 'Count' ? p.value : formatCurrency(p.value, currency)}
           </div>
         ))}
       </div>
