@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { dbService } from '../services/supabase';
+import { detectCurrency } from '../utils/currency';
 
 /**
  * Settings Store
@@ -15,6 +16,7 @@ export const useSettingsStore = create((set) => ({
   avatarColor: '#6F240A',
   role: 'user',
   status: 'active',
+  currency: null,
   subscriptionPlan: 'none',
   subscriptionStatus: 'none',
   subscriptionExpiresAt: null,
@@ -39,6 +41,7 @@ export const useSettingsStore = create((set) => ({
           avatarColor: profile.avatarColor || '#6F240A',
           role: profile.role || 'user',
           status: profile.status || 'active',
+          currency: profile.currency || detectCurrency().code,
           subscriptionPlan: profile.subscriptionPlan || 'none',
           subscriptionStatus: profile.subscriptionStatus || 'none',
           subscriptionExpiresAt: profile.subscriptionExpiresAt || null,

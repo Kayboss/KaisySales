@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import { Crown, Search, CheckCircle, XCircle, Clock, DollarSign } from 'lucide-react';
 import { fetchUsersWithStats, fetchSubscriptionPlans, assignSubscription, cancelSubscription, fetchAllPayments, confirmPayment } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { useSettingsStore } from '../../store/settingsStore';
 
 const TabRow = styled.div`
   display: flex;
@@ -309,6 +311,7 @@ const SaveBadge = styled.span`
 `;
 
 const AdminSubscriptions = () => {
+  const { currency } = useSettingsStore();
   const [users, setUsers] = useState([]);
   const [payments, setPayments] = useState([]);
   const [plans, setPlans] = useState([]);
@@ -423,7 +426,7 @@ const AdminSubscriptions = () => {
                 <PlanName>{p.label}</PlanName>
                 {p.key !== 'free' ? (
                   <>
-                    <PlanPrice>GH₵{displayPrice}</PlanPrice>
+                    <PlanPrice>{formatCurrency(displayPrice, currency)}</PlanPrice>
                     <PlanPeriod>{period}</PlanPeriod>
                   </>
                 ) : (
@@ -452,7 +455,7 @@ const AdminSubscriptions = () => {
                   <DollarSign size={16} color="#6F240A" />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                      {p.userEmail || `User ${(p.userId || '').slice(0, 8)}`} — GH₵{p.amount} ({p.plan})
+                      {p.userEmail || `User ${(p.userId || '').slice(0, 8)}`} — {formatCurrency(p.amount, currency)} ({p.plan})
                     </div>
                     <div style={{ fontSize: '0.7rem', color: '#89726C', marginTop: '0.15rem' }}>
                       {p.paymentMethod} {p.reference ? `· Ref: ${p.reference}` : ''} · {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '—'}
@@ -549,7 +552,7 @@ const AdminSubscriptions = () => {
             <p style={{ marginBottom: '0.75rem', color: '#55423D', fontSize: '0.875rem' }}>Select a subscription plan:</p>
             <PlanSelect value={selectedPlan} onChange={e => setSelectedPlan(e.target.value)} style={{ width: '100%' }}>
               {plans.map(p => (
-                <option key={p.name} value={p.name}>{p.name.charAt(0).toUpperCase() + p.name.slice(1)} — GH₵{p.price}</option>
+                <option key={p.name} value={p.name}>{p.name.charAt(0).toUpperCase() + p.name.slice(1)} — {formatCurrency(p.price, currency)}</option>
               ))}
             </PlanSelect>
             <ModalActions>

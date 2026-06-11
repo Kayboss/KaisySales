@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   location TEXT DEFAULT '',
   category TEXT DEFAULT '',
   avatar_color TEXT DEFAULT '#6F240A',
+  currency TEXT DEFAULT 'GHS',
   is_onboarded BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

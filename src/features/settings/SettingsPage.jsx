@@ -4,8 +4,9 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { fetchCategories, updateCategory, deleteCategory } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, Crown } from 'lucide-react';
+import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, Crown, DollarSign } from 'lucide-react';
 import SubscriptionSettings from './SubscriptionSettings';
+import { CURRENCY_OPTIONS } from '../../utils/currency';
 
 const Header = styled.div`
   display: flex;
@@ -300,7 +301,8 @@ const SettingsPage = () => {
     phone: settings.phone,
     location: settings.location,
     category: settings.category,
-    avatarColor: settings.avatarColor || '#6F240A'
+    avatarColor: settings.avatarColor || '#6F240A',
+    currency: settings.currency || 'GHS'
   });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -506,6 +508,21 @@ const SettingsPage = () => {
                 <option value="Bolgatanga, Upper East">Bolgatanga, Upper East Region</option>
                 <option value="Cape Coast, Central Region">Cape Coast, Central Region</option>
                 <option value="Koforidua, Eastern Region">Koforidua, Eastern Region</option>
+              </Select>
+            </InputWrapper>
+          </FormGroup>
+
+          <FormGroup>
+            <Label>Currency</Label>
+            <InputWrapper>
+              <DollarSign size={18} />
+              <Select
+                value={formData.currency}
+                onChange={e => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+              >
+                {CURRENCY_OPTIONS.map(opt => (
+                  <option key={opt.code} value={opt.code}>{opt.symbol} - {opt.label}</option>
+                ))}
               </Select>
             </InputWrapper>
           </FormGroup>

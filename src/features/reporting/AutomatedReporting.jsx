@@ -4,6 +4,8 @@ import { FileText, Download, Calendar, TrendingUp, TrendingDown, DollarSign, Bar
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Legend } from 'recharts';
 import { fetchSales, fetchExpenses, fetchInvoices } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
+import { useSettingsStore } from '../../store/settingsStore';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
 
 const Header = styled.div`
   display: flex;
@@ -191,7 +193,7 @@ const CustomTooltip = ({ active, payload, label }) => {
         <div style={{ fontWeight: 700, color: '#1C1C18', marginBottom: '0.25rem' }}>{label}</div>
         {payload.map((p, i) => (
           <div key={i} style={{ color: p.color, fontWeight: 600 }}>
-            {p.name}: {p.name === 'Count' ? p.value : `GH₵${Number(p.value).toLocaleString()}`}
+            {p.name}: {p.name === 'Count' ? p.value : formatCurrency(p.value)}
           </div>
         ))}
       </div>
@@ -201,6 +203,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const AutomatedReporting = () => {
+  const { currency } = useSettingsStore();
   const [data, setData] = useState({
     sales: [],
     expenses: [],
@@ -232,7 +235,7 @@ const AutomatedReporting = () => {
     return parseFloat(amt.replace(/[^\d.]/g, '')) || 0;
   };
 
-  const formatCurrency = (value) => `GH₵${Number(value).toFixed(2)}`;
+  const formatCurrencyLocal = (value) => formatCurrency(value, currency);
 
   const revenue = data.sales.reduce((acc, s) => acc + parseAmount(s.totalAmount || s.amount), 0) +
                   data.invoices.filter(inv => inv.status?.toLowerCase() === 'paid').reduce((acc, inv) => acc + parseAmount(inv.amount || inv.totalAmount), 0);
@@ -290,7 +293,7 @@ const AutomatedReporting = () => {
           customer: s.customer || 'Random Buyer',
           'Item Sold': s.item,
           quantity: s.quantity || 1,
-          'Total Amount': s.amount || formatCurrency(parseAmount(s.totalAmount))
+          'Total Amount': s.amount || formatCurrencyLocal(parseAmount(s.totalAmount))
         }));
         headers = { date: 'Date', customer: 'Customer', 'Item Sold': 'Item Sold', quantity: 'Quantity', 'Total Amount': 'Total Amount' };
         fileName = 'Sales_Report';
@@ -328,14 +331,14 @@ const AutomatedReporting = () => {
           <SummaryItem>
             <div>
               <div style={{ color: '#89726C', fontSize: '0.875rem' }}>Total Revenue</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#25432F' }}>GH₵{revenue.toLocaleString()}</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#25432F' }}>{formatCurrencyShort(revenue, currency)}</div>
             </div>
             <TrendingUp color="#25432F" size={32} style={{ opacity: 0.2 }} />
           </SummaryItem>
           <SummaryItem>
             <div>
               <div style={{ color: '#89726C', fontSize: '0.875rem' }}>Total Expenses</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#BA1A1A' }}>GH₵{totalExpenses.toLocaleString()}</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#BA1A1A' }}>{formatCurrencyShort(totalExpenses, currency)}</div>
             </div>
             <TrendingDown color="#BA1A1A" size={32} style={{ opacity: 0.2 }} />
           </SummaryItem>
@@ -343,7 +346,7 @@ const AutomatedReporting = () => {
             <div>
               <div style={{ color: '#89726C', fontSize: '0.875rem' }}>Net Profit</div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: netProfit >= 0 ? '#25432F' : '#BA1A1A' }}>
-                GH₵{netProfit.toLocaleString()}
+                {formatCurrencyShort(netProfit, currency)}
               </div>
             </div>
             <DollarSign color={netProfit >= 0 ? '#25432F' : '#BA1A1A'} size={32} style={{ opacity: 0.2 }} />

@@ -5,6 +5,8 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchCategories, createCategory, fetchInvoices, fetchLargestExpenseCategory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
+import { useSettingsStore } from '../../store/settingsStore';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
 
 const Header = styled.div`
   display: flex;
@@ -328,6 +330,7 @@ const ModalActions = styled.div`
 `;
 
 const ExpenseTracking = () => {
+  const { currency } = useSettingsStore();
   const [expenses, setExpenses] = useState([]);
   const [page, setPage] = useState(1);
   const [categories, setCategories] = useState([]);
@@ -407,7 +410,7 @@ const ExpenseTracking = () => {
   };
 
   const handleEdit = (expense) => {
-    const parsedAmt = expense.amount ? parseFloat(String(expense.amount).replace('GH₵', '').replace(',', '')) : 0;
+    const parsedAmt = expense.amount ? parseFloat(String(expense.amount).replace(/[^\d.-]/g, '')) : 0;
     setFormData({
       title: expense.title,
       category: expense.category,
@@ -454,7 +457,7 @@ const ExpenseTracking = () => {
   const parseAmount = (amt) => {
     if (typeof amt === 'number') return amt;
     if (typeof amt !== 'string') return 0;
-    return parseFloat(amt.replace(/[^\d.]/g, '')) || 0;
+    return parseFloat(amt.replace(/[^\d.-]/g, '')) || 0;
   };
 
   const totalExpenses = expenses.reduce((acc, exp) => acc + parseAmount(exp.amount), 0);
@@ -543,7 +546,7 @@ const ExpenseTracking = () => {
               />
             </FormGroup>
             <FormGroup>
-              <label>Unit Price (GH₵)</label>
+              <label>Unit Price ({getCurrencySymbol(currency)})</label>
               <input 
                 type="number" 
                 step="0.01" 
@@ -556,7 +559,7 @@ const ExpenseTracking = () => {
           </FormRow>
           <FormRow>
             <FormGroup>
-              <label>Total Amount (GH₵)</label>
+              <label>Total Amount ({getCurrencySymbol(currency)})</label>
               <input 
                 type="text" 
                 readOnly 
@@ -584,7 +587,7 @@ const ExpenseTracking = () => {
       <SummaryGrid>
         <Card>
           <CardLabel>TOTAL EXPENSES</CardLabel>
-          <CardValue className="data-tabular" $color="#6F240A">GH₵{totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</CardValue>
+          <CardValue className="data-tabular" $color="#6F240A">{formatCurrencyShort(totalExpenses, currency)}</CardValue>
           <div style={{ fontSize: '0.75rem', color: '#25432F', marginTop: '0.5rem', fontWeight: 600 }}>Live from database</div>
         </Card>
         <Card>

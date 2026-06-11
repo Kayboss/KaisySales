@@ -4,6 +4,7 @@ import { Crown, CheckCircle, Clock, AlertCircle, CreditCard } from 'lucide-react
 import { fetchSubscriptionPlans, recordPayment, fetchUserPayments } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
 
 const Section = styled.div`
   margin-bottom: 2rem;
@@ -300,7 +301,7 @@ const FEATURES = {
 
 const SubscriptionSettings = () => {
   const { user } = useAuthStore();
-  const { subscriptionPlan, subscriptionStatus, subscriptionExpiresAt } = useSettingsStore();
+  const { subscriptionPlan, subscriptionStatus, subscriptionExpiresAt, currency } = useSettingsStore();
   const [plans, setPlans] = useState([]);
   const [payments, setPayments] = useState([]);
   const [showPayment, setShowPayment] = useState(null);
@@ -401,7 +402,7 @@ const SubscriptionSettings = () => {
               <PlanCardTitle>{p.label}</PlanCardTitle>
               {p.key !== 'free' ? (
                 <>
-                  <PlanCardPrice>GH₵{displayPrice}</PlanCardPrice>
+                  <PlanCardPrice>{formatCurrency(displayPrice, currency)}</PlanCardPrice>
                   <div style={{ fontSize: '0.8rem', color: '#89726C', marginBottom: '0.5rem' }}>{period}</div>
                 </>
               ) : (
@@ -436,7 +437,7 @@ const SubscriptionSettings = () => {
             {payments.map(p => (
               <ReceiptRow key={p.id}>
                 <div>
-                  <div style={{ fontWeight: 700 }}>{p.plan.charAt(0).toUpperCase() + p.plan.slice(1)} — GH₵{p.amount}</div>
+                  <div style={{ fontWeight: 700 }}>{p.plan.charAt(0).toUpperCase() + p.plan.slice(1)} — {formatCurrency(p.amount, currency)}</div>
                   <div style={{ fontSize: '0.75rem', color: '#89726C' }}>
                     {p.paymentMethod === 'mobile_money' ? 'Mobile Money' : 'Manual'} {p.reference ? `· ${p.reference}` : ''}
                   </div>
@@ -458,7 +459,7 @@ const SubscriptionSettings = () => {
               <CreditCard size={24} color="#6F240A" />
               <div>
                 <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>Subscribe to {showPayment === 'silver' ? 'Silver' : 'Gold'}</div>
-                <div style={{ fontSize: '0.8rem', color: '#89726C' }}>GH₵{showPayment === 'silver' ? (yearly ? 350 : 35) : (yearly ? 750 : 75)}{yearly ? '/year' : '/month'}</div>
+                <div style={{ fontSize: '0.8rem', color: '#89726C' }}>{formatCurrency(showPayment === 'silver' ? (yearly ? 350 : 35) : (yearly ? 750 : 75), currency)}{yearly ? '/year' : '/month'}</div>
               </div>
             </div>
 

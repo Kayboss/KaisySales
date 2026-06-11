@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import { Search, Mail, Calendar, Package, ShoppingCart, CreditCard, ToggleLeft, ToggleRight } from 'lucide-react';
 import { fetchUsersWithStats, updateUserStatus } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { useSettingsStore } from '../../store/settingsStore';
 
 const SearchBar = styled.div`
   display: flex;
@@ -116,6 +118,7 @@ const getUserStatus = (lastSignInAt) => {
 };
 
 const AdminUsers = () => {
+  const { currency } = useSettingsStore();
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -219,13 +222,13 @@ const AdminUsers = () => {
                     </Td>
                     <Td>
                       <StatCell>
-                        GH₵{(u.salesRevenue || 0).toLocaleString()}
+                        {formatCurrencyShort(u.salesRevenue || 0, currency)}
                       </StatCell>
                     </Td>
                     <Td>
                       <StatCell>
                         <CreditCard size={13} color="#BA1A1A" />
-                        GH₵{(u.expenseTotal || 0).toLocaleString()}
+                        {formatCurrencyShort(u.expenseTotal || 0, currency)}
                       </StatCell>
                     </Td>
                     <Td>

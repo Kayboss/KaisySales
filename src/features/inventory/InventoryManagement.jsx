@@ -5,6 +5,8 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchInventory, createInventoryItem, updateInventoryItem, deleteInventoryItem, fetchCategories, createCategory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
+import { useSettingsStore } from '../../store/settingsStore';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
 
 const PAGE_SIZE = 20;
 
@@ -352,6 +354,7 @@ const ModalActions = styled.div`
 `;
 
 const InventoryManagement = () => {
+  const { currency } = useSettingsStore();
   const [inventory, setInventory] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
@@ -426,7 +429,7 @@ const InventoryManagement = () => {
   };
 
   const handleEdit = (item) => {
-    const parsedPrice = item.price ? parseFloat(String(item.price).replace('GH₵', '').replace(',', '')) : 0;
+    const parsedPrice = item.price ? parseFloat(String(item.price).replace(/[^\d.-]/g, '')) : 0;
     setFormData({
       name: item.name,
       category: item.category,
@@ -507,7 +510,7 @@ const InventoryManagement = () => {
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <div style={{ fontSize: '0.9rem', color: '#55423D' }}>
-            Value: <strong style={{ color: '#6F240A' }}>GH₵{totalValue.toFixed(2)}</strong>
+            Value: <strong style={{ color: '#6F240A' }}>{formatCurrency(totalValue, currency)}</strong>
           </div>
           <ActionButton onClick={exportToCSV} style={{ background: 'white', color: '#6F240A', border: '1px solid #D0C8C4' }}>
             <Download size={18} />
@@ -578,7 +581,7 @@ const InventoryManagement = () => {
           </FormRow>
           <FormRow>
             <FormGroup>
-              <label>Price (GH₵)</label>
+              <label>Price ({getCurrencySymbol(currency)})</label>
               <input 
                 type="number" 
                 step="0.01" 

@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import { Leaf, Download, Share2, X } from 'lucide-react';
+import { formatCurrency, getCurrencySymbol } from '../../utils/currency';
+import { useSettingsStore } from '../../store/settingsStore';
 
 const Overlay = styled.div`
   position: fixed;
@@ -261,6 +263,7 @@ const CloseButton = styled.button`
 const PRINT_STYLE_ID = 'invoice-print-styles';
 
 const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, businessLocation }) => {
+  const { currency } = useSettingsStore();
   const contentRef = useRef(null);
 
   useEffect(() => {
@@ -410,9 +413,9 @@ const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, busines
                 <tr key={idx}>
                   <Td>{item.name}</Td>
                   <Td style={{ textAlign: 'right' }}>{parseInt(item.quantity) || 1}</Td>
-                  <Td style={{ textAlign: 'right' }}>GH₵{(parseFloat(item.unitPrice) || 0).toFixed(2)}</Td>
+                  <Td style={{ textAlign: 'right' }}>{formatCurrency(parseFloat(item.unitPrice) || 0, currency)}</Td>
                   <Td style={{ textAlign: 'right', fontWeight: 700 }}>
-                    GH₵{((parseInt(item.quantity) || 1) * (parseFloat(item.unitPrice) || 0)).toFixed(2)}
+                    {formatCurrency((parseInt(item.quantity) || 1) * (parseFloat(item.unitPrice) || 0), currency)}
                   </Td>
                 </tr>
               ))}
@@ -425,7 +428,7 @@ const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, busines
               <span style={{ fontWeight: 700, color: '#BA1A1A', minWidth: '120px', textAlign: 'right' }}>
                 -{(() => {
                   const sub = lineItems.reduce((s, i) => s + ((parseInt(i.quantity) || 1) * (parseFloat(i.unitPrice) || 0)), 0);
-                  return `GH₵${(sub * discountPct / 100).toFixed(2)}`;
+                  return formatCurrency(sub * discountPct / 100, currency);
                 })()}
               </span>
             </div>

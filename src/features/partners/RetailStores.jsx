@@ -4,6 +4,8 @@ import { Store, MapPin, Phone, Search, Plus, Edit2, Trash2 } from 'lucide-react'
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchStores, createStore, updateStore, deleteStore, fetchInvoices } from '../../services/api';
+import { useSettingsStore } from '../../store/settingsStore';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
 
 const Header = styled.div`
   display: flex;
@@ -190,6 +192,7 @@ const Td = styled.td`
 `;
 
 const RetailStores = () => {
+  const { currency } = useSettingsStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [stores, setStores] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -473,7 +476,7 @@ const RetailStores = () => {
                 <tr key={inv.id}>
                   <Td>{inv.id}</Td>
                   <Td>{inv.date}</Td>
-                  <Td className="data-tabular">GH₵ {parseAmt(inv.amount).toFixed(2)}</Td>
+                  <Td className="data-tabular">{formatCurrency(parseAmt(inv.amount), currency)}</Td>
                   <Td>
                     <span style={{
                       padding: '0.25rem 0.5rem',

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriangle, ArrowRight, BookOpen } from 'lucide-react';
 import { fetchSales, fetchExpenses, fetchInvoices, fetchInventory } from '../../services/api';
+import { useSettingsStore } from '../../store/settingsStore';
+import { formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
 import TutorialModal, { STORAGE_KEY } from '../../components/tutorial/TutorialModal';
 
 const Grid = styled.div`
@@ -198,7 +200,7 @@ const GrowthChart = ({ data }) => {
             fontWeight="bold" 
             fill="#6F240A"
           >
-            GH₵{p.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatCurrencyShort(p.amount, currency)}
           </text>
           {/* Month Label */}
           <text 
@@ -261,6 +263,7 @@ const RestockLink = styled.button`
 `;
 
 const BusinessOverview = () => {
+  const { currency } = useSettingsStore();
   const navigate = useNavigate();
   const [showTutorial, setShowTutorial] = useState(false);
   const [stats, setStats] = useState({
@@ -371,7 +374,7 @@ const BusinessOverview = () => {
         <StatCard>
           <IconWrapper><TrendingUp size={20} /></IconWrapper>
           <Label>Total Revenue</Label>
-          <Value className="data-tabular">GH₵{stats.revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Value>
+          <Value className="data-tabular">{formatCurrencyShort(stats.revenue, currency)}</Value>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#25432F', fontSize: '0.75rem', fontWeight: 700 }}>
             <ArrowUpRight size={14} /> Live Sync
           </div>
@@ -385,7 +388,7 @@ const BusinessOverview = () => {
         <StatCard $color="#25432F">
           <IconWrapper $bg="rgba(37, 67, 47, 0.05)" $color="#25432F"><CreditCard size={20} /></IconWrapper>
           <Label>Net Profit</Label>
-          <Value className="data-tabular">GH₵{stats.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Value>
+          <Value className="data-tabular">{formatCurrencyShort(stats.netProfit, currency)}</Value>
           <div style={{ color: stats.netProfit >= 0 ? '#25432F' : '#BA1A1A', fontSize: '0.75rem', fontWeight: 700 }}>
             {stats.netProfit >= 0 ? 'Healthy Margin' : 'Action Required'}
           </div>

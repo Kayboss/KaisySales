@@ -7,6 +7,7 @@ import InvoicePreview from '../../components/invoice/InvoicePreview';
 import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory, updateInventoryItem, createSale, deleteSale } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
 
 const Header = styled.div`
   display: flex;
@@ -151,6 +152,7 @@ const ModalActions = styled.div`
 `;
 
 const Invoices = () => {
+  const { currency } = useSettingsStore();
   const { businessName, phone: businessPhone, location: businessLocation } = useSettingsStore();
   const [invoices, setInvoices] = useState([]);
   const [stores, setStores] = useState([]);
@@ -318,7 +320,7 @@ const Invoices = () => {
     const savedItems = rawItems.filter(i => i.type !== '_meta');
     const finalItems = savedItems.length > 0
       ? savedItems.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice }))
-      : [{ name: '', quantity: invoice.quantity || 1, unitPrice: invoice.unitPrice || parseFloat(invoice.amount.replace('GH₵', '').replace(',', '')) }];
+      : [{ name: '', quantity: invoice.quantity || 1, unitPrice: invoice.unitPrice || parseFloat(invoice.amount.replace(/[^\d.-]/g, '')) }];
     prevStatus.current = invoice.status;
     setFormData({
       customer: invoice.customer,
@@ -493,7 +495,7 @@ const Invoices = () => {
                   placeholder="0.00"
                 />
                 <div style={{ padding: '0.6rem 0', textAlign: 'right', fontWeight: 700, color: '#6F240A', fontSize: '0.85rem' }}>
-                  GH₵{lineTotal(item).toFixed(2)}
+                  {formatCurrency(lineTotal(item), currency)}
                 </div>
                 <button 
                   type="button" 
@@ -529,11 +531,11 @@ const Invoices = () => {
             </FormGroup>
           </FormRow>
           <FormGroup>
-            <label>Total Amount (GH₵)</label>
+            <label>Total Amount ({getCurrencySymbol(currency)})</label>
             <input 
               type="text" 
               readOnly 
-              value={`GH₵${invoiceTotal.toFixed(2)}`}
+              value={formatCurrency(invoiceTotal, currency)}
               style={{ background: '#f5f5f5', cursor: 'not-allowed', fontWeight: 800, fontSize: '1.1rem', color: '#6F240A' }}
             />
           </FormGroup>

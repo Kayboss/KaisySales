@@ -3,10 +3,11 @@
 -- Run this in your Supabase SQL Editor
 -- ============================================================
 
--- 1. Add role + last_sign_in_at + status to profiles
+-- 1. Add columns to profiles
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_sign_in_at TIMESTAMPTZ;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active' CHECK (status IN ('active', 'suspended'));
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'GHS';
 
 -- 2. Create is_admin() security definer function
 CREATE OR REPLACE FUNCTION is_admin()

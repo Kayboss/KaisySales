@@ -5,6 +5,8 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchSales, createSale, updateSale, deleteSale, fetchInventory, updateInventoryItem } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
+import { useSettingsStore } from '../../store/settingsStore';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
 
 const Header = styled.div`
   display: flex;
@@ -363,6 +365,7 @@ const ModalActions = styled.div`
 `;
 
 const DailySales = () => {
+  const { currency } = useSettingsStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [sales, setSales] = useState([]);
   const [page, setPage] = useState(1);
@@ -452,7 +455,7 @@ const DailySales = () => {
   };
 
   const handleEdit = (sale) => {
-    const parsedAmt = sale.amount ? parseFloat(String(sale.amount).replace('GH₵', '').replace(',', '')) : 0;
+    const parsedAmt = sale.amount ? parseFloat(String(sale.amount).replace(/[^\d.-]/g, '')) : 0;
     setFormData({
       item: sale.item,
       quantity: sale.quantity || 1,
@@ -582,7 +585,7 @@ const DailySales = () => {
               />
             </FormGroup>
             <FormGroup>
-              <label>Unit Price (GH₵)</label>
+              <label>Unit Price ({getCurrencySymbol(currency)})</label>
               <input 
                 type="number" 
                 step="0.01" 
@@ -616,7 +619,7 @@ const DailySales = () => {
             </FormGroup>
           </FormRow>
           <FormGroup>
-            <label>Total Amount (GH₵)</label>
+            <label>Total Amount ({getCurrencySymbol(currency)})</label>
             <input 
               type="text" 
               readOnly 
@@ -638,7 +641,7 @@ const DailySales = () => {
       <StatsGrid>
         <StatCard>
           <StatLabel>Today's Revenue</StatLabel>
-          <StatValue className="data-tabular">GH₵{todayRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</StatValue>
+          <StatValue className="data-tabular">{formatCurrencyShort(todayRevenue, currency)}</StatValue>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#25432F', fontSize: '0.75rem', fontWeight: 700 }}>
             <TrendingUp size={14} /> Live from database
           </div>
