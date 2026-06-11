@@ -401,7 +401,7 @@ const Invoices = () => {
         </div>
       </Header>
 
-      <Modal isOpen={isModalOpen} onClose={closeModal} title={isEditing ? "Edit Invoice" : "Create New Invoice"}>
+      <Modal wide isOpen={isModalOpen} onClose={closeModal} title={isEditing ? "Edit Invoice" : "Create New Invoice"}>
         <form onSubmit={handleSave}>
           <FormGroup>
             <label>Customer (Retail Store)</label>

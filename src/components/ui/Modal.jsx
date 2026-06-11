@@ -20,7 +20,7 @@ const ModalContainer = styled.div`
   background: white;
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   width: 100%;
-  max-width: 500px;
+  max-width: ${({ $wide }) => $wide ? '720px' : '500px'};
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: ${({ theme }) => theme.shadows.ambient};
@@ -74,7 +74,7 @@ const Content = styled.div`
   padding: 1.5rem;
 `;
 
-const Modal = ({ isOpen, onClose, title, children }) => {
+const Modal = ({ isOpen, onClose, title, children, wide }) => {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -90,7 +90,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 
   return (
     <Overlay onClick={onClose}>
-      <ModalContainer onClick={(e) => e.stopPropagation()}>
+      <ModalContainer $wide={wide} onClick={(e) => e.stopPropagation()}>
         <Header>
           <h2>{title}</h2>
           <CloseButton onClick={onClose}>
