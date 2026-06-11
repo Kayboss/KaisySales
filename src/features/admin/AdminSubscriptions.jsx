@@ -323,15 +323,15 @@ const AdminSubscriptions = () => {
   const FEATURES = {
     free: [
       'Up to 10 sales',
-      'Up to 5 invoices',
-      'Up to 20 products',
-      'Basic reports',
-      '7-day free trial',
+      'Up to 2 invoices',
+      'Up to 5 products',
+      'Basic reporting',
+      '3-day free trial',
     ],
     silver: [
       'Up to 50 sales per month',
       'Up to 20 invoices per month',
-      'Up to 100 products',
+      'Up to 50 products',
       'Basic reports',
       'Email support',
     ],
