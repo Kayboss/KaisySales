@@ -143,7 +143,7 @@ const getMonthlyData = (sales, invoices) => {
   return months;
 };
 
-const GrowthChart = ({ data }) => {
+const GrowthChart = ({ data, currency }) => {
   const maxAmount = Math.max(...data.map(item => item.amount), 0);
   const points = data.map((d, i) => {
     const x = 50 + i * 140; // Spacing: 50, 190, 330, 470, 610, 750
@@ -422,7 +422,7 @@ const BusinessOverview = () => {
         </div>
         
         <ChartContainer>
-          <GrowthChart data={stats.monthlyData} />
+          <GrowthChart data={stats.monthlyData} currency={currency} />
         </ChartContainer>
       </section>
 
