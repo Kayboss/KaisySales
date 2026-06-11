@@ -356,8 +356,8 @@ const AdminSubscriptions = () => {
         <CardGrid>
           {[
             { key: 'free', label: 'Free Trial', price: '0', period: '3 days' },
-            { key: 'silver', label: 'Silver', price: '50', period: '/month' },
-            { key: 'gold', label: 'Gold', price: '100', period: '/month' },
+            { key: 'silver', label: 'Silver', price: '35', period: '/month' },
+            { key: 'gold', label: 'Gold', price: '75', period: '/month' },
           ].map(p => (
             <PlanCard key={p.key}>
               <Crown size={24} color={p.key === 'gold' ? '#875200' : p.key === 'silver' ? '#6F240A' : '#89726C'} style={{ marginBottom: '0.5rem' }} />

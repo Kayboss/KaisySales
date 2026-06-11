@@ -278,7 +278,7 @@ const SubscriptionSettings = () => {
       await recordPayment({
         userId: user.uid,
         plan: showPayment,
-        amount: showPayment === 'silver' ? 50 : 100,
+        amount: showPayment === 'silver' ? 35 : 75,
         reference: reference || null,
         paymentMethod,
       });
@@ -328,8 +328,8 @@ const SubscriptionSettings = () => {
         <CardGrid>
           {[
             { key: 'free', label: 'Free Trial', price: 0, period: '3 days' },
-            { key: 'silver', label: 'Silver', price: 50, period: '/month' },
-            { key: 'gold', label: 'Gold', price: 100, period: '/month' },
+            { key: 'silver', label: 'Silver', price: 35, period: '/month' },
+            { key: 'gold', label: 'Gold', price: 75, period: '/month' },
           ].map(p => (
             <PlanCard key={p.key} $active={currentPlan === p.key && isActive}>
               <Crown size={24} color={p.key === 'gold' ? '#875200' : p.key === 'silver' ? '#6F240A' : '#89726C'} style={{ marginBottom: '0.5rem' }} />
@@ -392,7 +392,7 @@ const SubscriptionSettings = () => {
               <CreditCard size={24} color="#6F240A" />
               <div>
                 <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>Subscribe to {showPayment === 'silver' ? 'Silver' : 'Gold'}</div>
-                <div style={{ fontSize: '0.8rem', color: '#89726C' }}>GH₵{showPayment === 'silver' ? 50 : 100}/month</div>
+                <div style={{ fontSize: '0.8rem', color: '#89726C' }}>GH₵{showPayment === 'silver' ? 35 : 75}/month</div>
               </div>
             </div>
 
