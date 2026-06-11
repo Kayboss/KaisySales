@@ -433,7 +433,7 @@ const SubscriptionSettings = () => {
         <Section>
           <SectionTitle>Payment History</SectionTitle>
           <SectionDesc>Your recent subscription payments.</SectionDesc>
-          <div style={{ background: 'white', borderRadius: 12, border: '1px solid #F0EEE8' }}>
+          <div style={{ background: 'white', borderRadius: 12, border: '1px solid #F0EEE8', padding: '0 1rem' }}>
             {payments.map(p => (
               <ReceiptRow key={p.id}>
                 <div>
