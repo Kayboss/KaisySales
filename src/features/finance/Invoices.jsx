@@ -115,12 +115,58 @@ const FormRow = styled.div`
   gap: 1rem;
 `;
 
+const MobileLabel = styled.span`
+  display: none;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #89726C;
+  margin-bottom: 0.2rem;
+
+  @media (max-width: 768px) {
+    display: block;
+  }
+`;
+
+const FieldWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+`;
+
+const FormGridHeader = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 80px 100px 100px 36px;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #89726C;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+`;
+
 const LineItemRow = styled.div`
   display: grid;
   grid-template-columns: 1fr 80px 100px 100px 36px;
   gap: 0.75rem;
   align-items: end;
   margin-bottom: 0.75rem;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: #FCF9F3;
+    border-radius: 8px;
+    border: 1px solid #F0EEE8;
+
+    & > :nth-child(1) { grid-column: 1 / -1; } /* item selector */
+    & > :nth-child(2) { grid-column: 1; }      /* quantity */
+    & > :nth-child(3) { grid-column: 2; }      /* price */
+    & > :nth-child(4) { grid-column: 1; }      /* total */
+    & > :nth-child(5) { grid-column: 2; justify-self: end; align-self: end; } /* remove */
+  }
 `;
 
 const ModalActions = styled.div`
@@ -449,13 +495,13 @@ const Invoices = () => {
                 <PlusCircle size={14} /> Add Item
               </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 100px 36px', gap: '0.75rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 700, color: '#89726C' }}>
+            <FormGridHeader>
               <span>Item</span>
               <span style={{ textAlign: 'right' }}>Qty</span>
               <span style={{ textAlign: 'right' }}>Price</span>
               <span style={{ textAlign: 'right' }}>Total</span>
               <span></span>
-            </div>
+            </FormGridHeader>
             {formData.items.map((item, idx) => (
               <LineItemRow key={idx}>
                 {inventoryItems.length === 0 ? (
@@ -463,40 +509,52 @@ const Invoices = () => {
                     <a href="/inventory" style={{ color: '#6F240A', fontWeight: 700 }}>Add inventory first</a>.
                   </div>
                 ) : (
-                  <select 
-                    required={idx === 0}
-                    value={item.name}
-                    onChange={e => updateItem(idx, 'name', e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit' }}
-                  >
-                    <option value="">-- Select --</option>
-                    {inventoryItems.map(inv => (
-                      <option key={inv.id} value={inv.name}>
-                        {inv.name} {inv.stock > 0 ? `(${inv.stock})` : '(0)'}
-                      </option>
-                    ))}
-                  </select>
+                  <FieldWrapper>
+                    <MobileLabel>Item</MobileLabel>
+                    <select 
+                      required={idx === 0}
+                      value={item.name}
+                      onChange={e => updateItem(idx, 'name', e.target.value)}
+                      style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit' }}
+                    >
+                      <option value="">-- Select --</option>
+                      {inventoryItems.map(inv => (
+                        <option key={inv.id} value={inv.name}>
+                          {inv.name} {inv.stock > 0 ? `(${inv.stock})` : '(0)'}
+                        </option>
+                      ))}
+                    </select>
+                  </FieldWrapper>
                 )}
-                <input 
-                  type="number" 
-                  min="1"
-                  required={idx === 0}
-                  value={item.quantity}
-                  onChange={e => updateItem(idx, 'quantity', e.target.value)}
-                  style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', textAlign: 'right' }}
-                />
-                <input 
-                  type="number" 
-                  step="0.01"
-                  required={idx === 0}
-                  value={item.unitPrice}
-                  onChange={e => updateItem(idx, 'unitPrice', e.target.value)}
-                  style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', textAlign: 'right' }}
-                  placeholder="0.00"
-                />
-                <div style={{ padding: '0.6rem 0', textAlign: 'right', fontWeight: 700, color: '#6F240A', fontSize: '0.85rem' }}>
-                  {formatCurrency(lineTotal(item), currency)}
-                </div>
+                <FieldWrapper>
+                  <MobileLabel>Qty</MobileLabel>
+                  <input 
+                    type="number" 
+                    min="1"
+                    required={idx === 0}
+                    value={item.quantity}
+                    onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                    style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', textAlign: 'right' }}
+                  />
+                </FieldWrapper>
+                <FieldWrapper>
+                  <MobileLabel>Price</MobileLabel>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    required={idx === 0}
+                    value={item.unitPrice}
+                    onChange={e => updateItem(idx, 'unitPrice', e.target.value)}
+                    style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', textAlign: 'right' }}
+                    placeholder="0.00"
+                  />
+                </FieldWrapper>
+                <FieldWrapper>
+                  <MobileLabel>Total</MobileLabel>
+                  <div style={{ padding: '0.6rem 0', textAlign: 'right', fontWeight: 700, color: '#6F240A', fontSize: '0.85rem' }}>
+                    {formatCurrency(lineTotal(item), currency)}
+                  </div>
+                </FieldWrapper>
                 <button 
                   type="button" 
                   onClick={() => removeItem(idx)}
