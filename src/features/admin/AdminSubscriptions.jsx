@@ -355,7 +355,7 @@ const AdminSubscriptions = () => {
       {subTab === 'plans' && (
         <CardGrid>
           {[
-            { key: 'free', label: 'Free Trial', price: '0', period: '7 days' },
+            { key: 'free', label: 'Free Trial', price: '0', period: '3 days' },
             { key: 'silver', label: 'Silver', price: '50', period: '/month' },
             { key: 'gold', label: 'Gold', price: '100', period: '/month' },
           ].map(p => (

@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
 
 -- Insert default plans
 INSERT INTO subscription_plans (name, price, duration_days, features) VALUES
-  ('free', 0.00, 7, '{"max_sales_month": 10, "max_invoices_month": 5, "max_products": 20, "reports": "basic", "support": "email", "trial": true}'),
+  ('free', 0.00, 3, '{"max_sales_month": 10, "max_invoices_month": 5, "max_products": 20, "reports": "basic", "support": "email", "trial": true}'),
   ('silver', 50.00, 30, '{"max_sales_month": 50, "max_invoices_month": 20, "max_products": 100, "reports": "basic", "support": "email"}'),
   ('gold', 100.00, 30, '{"max_sales_month": -1, "max_invoices_month": -1, "max_products": -1, "reports": "advanced", "support": "priority"}')
 ON CONFLICT (name) DO NOTHING;

@@ -231,7 +231,7 @@ const FEATURES = {
     'Up to 5 invoices',
     'Up to 20 products',
     'Basic reports',
-    '7-day free trial',
+    '3-day free trial',
   ],
   silver: [
     'Up to 50 sales per month',
@@ -327,7 +327,7 @@ const SubscriptionSettings = () => {
         <SectionDesc>Upgrade to unlock more features.</SectionDesc>
         <CardGrid>
           {[
-            { key: 'free', label: 'Free Trial', price: 0, period: '7 days' },
+            { key: 'free', label: 'Free Trial', price: 0, period: '3 days' },
             { key: 'silver', label: 'Silver', price: 50, period: '/month' },
             { key: 'gold', label: 'Gold', price: 100, period: '/month' },
           ].map(p => (
