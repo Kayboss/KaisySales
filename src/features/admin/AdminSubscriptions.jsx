@@ -376,6 +376,7 @@ const AdminSubscriptions = () => {
   const [subTab, setSubTab] = useState('users');
   const [assignTarget, setAssignTarget] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState('silver');
+  const [assignYearly, setAssignYearly] = useState(false);
   const [yearly, setYearly] = useState(false);
   const { user } = useAuthStore();
 
@@ -395,7 +396,8 @@ const AdminSubscriptions = () => {
   const handleAssign = async () => {
     if (!assignTarget) return;
     try {
-      await assignSubscription(assignTarget.id, selectedPlan);
+      const durationDays = assignYearly ? 365 : 30;
+      await assignSubscription(assignTarget.id, selectedPlan, durationDays);
       await loadData();
     } catch (err) {
       console.error('Failed to assign subscription', err);
@@ -649,10 +651,32 @@ const AdminSubscriptions = () => {
             <ModalTitle>Assign Plan — {assignTarget.ownerName || assignTarget.businessName || 'User'}</ModalTitle>
             <p style={{ marginBottom: '0.75rem', color: '#55423D', fontSize: '0.875rem' }}>Select a subscription plan:</p>
             <PlanSelect value={selectedPlan} onChange={e => setSelectedPlan(e.target.value)} style={{ width: '100%' }}>
-              {plans.map(p => (
-                <option key={p.name} value={p.name}>{p.name.charAt(0).toUpperCase() + p.name.slice(1)} — {formatCurrency(p.price, currency)}</option>
-              ))}
+              {plans.map(p => {
+                const price = assignYearly && p.name !== 'free' ? (p.name === 'silver' ? 350 : p.name === 'gold' ? 750 : p.price) : p.price;
+                return (
+                  <option key={p.name} value={p.name}>{p.name.charAt(0).toUpperCase() + p.name.slice(1)} — {formatCurrency(price, currency)}{assignYearly && p.name !== 'free' ? '/yr' : p.name === 'free' ? '' : '/mo'}</option>
+                );
+              })}
             </PlanSelect>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', margin: '0.75rem 0' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: assignYearly ? '#89726C' : '#6F240A' }}>Monthly</span>
+              <button
+                type="button"
+                onClick={() => setAssignYearly(!assignYearly)}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, border: 'none',
+                  background: assignYearly ? '#6F240A' : '#D0C8C4',
+                  position: 'relative', cursor: 'pointer', transition: 'background 0.2s'
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 2, left: assignYearly ? '23px' : '3px',
+                  width: 20, height: 20, borderRadius: '50%', background: 'white',
+                  transition: 'left 0.2s'
+                }} />
+              </button>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: assignYearly ? '#6F240A' : '#89726C' }}>Yearly</span>
+            </div>
             <ModalActions>
               <ModalCancelBtn onClick={() => setAssignTarget(null)}>Cancel</ModalCancelBtn>
               <ModalConfirmBtn onClick={handleAssign}>Assign</ModalConfirmBtn>
