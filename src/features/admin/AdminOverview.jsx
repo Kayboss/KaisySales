@@ -114,13 +114,18 @@ const ErrorFeed = styled.div`
 
 const ErrorItem = styled.div`
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem;
   border-bottom: 1px solid #F0EEE8;
   font-size: 0.8rem;
 
   &:last-child { border-bottom: none; }
+
+  @media (min-width: 768px) {
+    align-items: center;
+    padding: 0.75rem 1rem;
+  }
 `;
 
 const ErrorText = styled.span`
@@ -130,6 +135,7 @@ const ErrorText = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 `;
 
 const ErrorPage = styled.span`
@@ -304,13 +310,17 @@ const AdminOverview = () => {
           <ErrorFeed>
             {errorLogs.map(e => (
               <ErrorItem key={e.id}>
-                <Bug size={14} color="#BA1A1A" />
-                <ErrorText title={e.error}>{e.error}</ErrorText>
-                <ErrorPage>{e.page || '—'}</ErrorPage>
-                <ErrorUser title={e.userEmail || e.userBusinessName || e.userId}>
-                  {e.userBusinessName || e.userEmail || e.userId?.slice(0, 8) || '—'}
-                </ErrorUser>
-                <ErrorTime>{e.createdAt ? new Date(e.createdAt).toLocaleString() : '—'}</ErrorTime>
+                <Bug size={14} color="#BA1A1A" style={{ marginTop: '2px' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <ErrorText title={e.error}>{e.error}</ErrorText>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                    <ErrorPage>{e.page || '—'}</ErrorPage>
+                    <ErrorUser title={e.userEmail || e.userBusinessName || e.userId}>
+                      {e.userBusinessName || e.userEmail || e.userId?.slice(0, 8) || '—'}
+                    </ErrorUser>
+                    <ErrorTime>{e.createdAt ? new Date(e.createdAt).toLocaleString() : '—'}</ErrorTime>
+                  </div>
+                </div>
               </ErrorItem>
             ))}
           </ErrorFeed>

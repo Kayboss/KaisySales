@@ -29,11 +29,13 @@ const SearchBar = styled.div`
   align-items: center;
   gap: 0.75rem;
   background: white;
-  padding: 0.75rem 1.25rem;
+  padding: 0.75rem 1rem;
   border-radius: 8px;
   border: 1px solid #D0C8C4;
   margin-bottom: 1.5rem;
   max-width: 400px;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const SearchInput = styled.input`
@@ -132,6 +134,49 @@ const Empty = styled.div`
   color: #89726C;
 `;
 
+const MobileCardGrid = styled.div`
+  display: none;
+
+  @media (max-width: 768px) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+`;
+
+const SubCard = styled.div`
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #F0EEE8;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+`;
+
+const CardRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+  font-size: 0.82rem;
+  border-bottom: 1px solid #F5F3F0;
+
+  &:last-child { border-bottom: none; }
+`;
+
+const CardLabel = styled.span`
+  color: #89726C;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+`;
+
+const CardValue = styled.span`
+  font-weight: 700;
+  color: #1C1C18;
+  text-align: right;
+`;
+
 const Overlay = styled.div`
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -199,9 +244,17 @@ const PlanSelect = styled.select`
 
 const CardGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: 1fr;
   gap: 1rem;
   margin-bottom: 2rem;
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
 `;
 
 const PlanCard = styled.div`
@@ -485,48 +538,101 @@ const AdminSubscriptions = () => {
           {filtered.length === 0 ? (
             <Empty>{search ? 'No users match your search.' : 'No users found.'}</Empty>
           ) : (
-            <TableWrapper>
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>User</Th>
-                    <Th>Plan</Th>
-                    <Th>Status</Th>
-                    <Th>Expires</Th>
-                    <Th>Actions</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(u => {
-                    const plan = getUserPlan(u);
-                    const subStatus = getUserSubStatus(u);
-                    return (
-                      <tr key={u.id}>
-                        <Td>
-                          <div style={{ fontWeight: 700 }}>{u.ownerName || '—'}</div>
+            <>
+              <TableWrapper>
+                <Table>
+                  <thead>
+                    <tr>
+                      <Th>User</Th>
+                      <Th>Plan</Th>
+                      <Th>Status</Th>
+                      <Th>Expires</Th>
+                      <Th>Actions</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(u => {
+                      const plan = getUserPlan(u);
+                      const subStatus = getUserSubStatus(u);
+                      return (
+                        <tr key={u.id}>
+                          <Td>
+                            <div style={{ fontWeight: 700 }}>{u.ownerName || '—'}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#89726C' }}>{u.businessName || u.email || '—'}</div>
+                          </Td>
+                          <Td>
+                            <PlanBadge $plan={plan}>
+                              {plan === 'gold' || plan === 'silver' ? <Crown size={11} /> : null}
+                              {plan === 'none' ? 'None' : plan === 'free' ? 'Free Trial' : plan.charAt(0).toUpperCase() + plan.slice(1)}
+                            </PlanBadge>
+                          </Td>
+                          <Td>
+                            <StatusBadge $status={subStatus === 'active' ? 'active' : subStatus === 'pending' ? 'pending' : 'expired'}>
+                              {subStatus === 'active' ? <CheckCircle size={11} /> : <Clock size={11} />}
+                              {subStatus}
+                            </StatusBadge>
+                          </Td>
+                          <Td>
+                            <span style={{ fontSize: '0.8rem', color: '#55423D' }}>
+                              {u.subscriptionExpiresAt
+                                ? new Date(u.subscriptionExpiresAt).toLocaleDateString()
+                                : '—'}
+                            </span>
+                          </Td>
+                          <Td>
+                            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                              <ActionBtn onClick={() => { setAssignTarget(u); setSelectedPlan('silver'); }}>
+                                {plan === 'none' || plan === 'free' ? 'Assign' : 'Change'}
+                              </ActionBtn>
+                              {plan !== 'none' && plan !== 'free' && (
+                                <ActionBtn $color="#BA1A1A" onClick={() => handleCancel(u)}>Remove</ActionBtn>
+                              )}
+                            </div>
+                          </Td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+              </TableWrapper>
+
+              <MobileCardGrid>
+                {filtered.map(u => {
+                  const plan = getUserPlan(u);
+                  const subStatus = getUserSubStatus(u);
+                  return (
+                    <SubCard key={u.id}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1C1C18' }}>{u.ownerName || '—'}</div>
                           <div style={{ fontSize: '0.75rem', color: '#89726C' }}>{u.businessName || u.email || '—'}</div>
-                        </Td>
-                        <Td>
+                        </div>
+                      </div>
+                      <CardRow>
+                        <CardLabel>Plan</CardLabel>
+                        <CardValue>
                           <PlanBadge $plan={plan}>
-                            {plan === 'gold' || plan === 'silver' ? <Crown size={11} /> : null}
                             {plan === 'none' ? 'None' : plan === 'free' ? 'Free Trial' : plan.charAt(0).toUpperCase() + plan.slice(1)}
                           </PlanBadge>
-                        </Td>
-                        <Td>
+                        </CardValue>
+                      </CardRow>
+                      <CardRow>
+                        <CardLabel>Status</CardLabel>
+                        <CardValue>
                           <StatusBadge $status={subStatus === 'active' ? 'active' : subStatus === 'pending' ? 'pending' : 'expired'}>
                             {subStatus === 'active' ? <CheckCircle size={11} /> : <Clock size={11} />}
                             {subStatus}
                           </StatusBadge>
-                        </Td>
-                        <Td>
-                          <span style={{ fontSize: '0.8rem', color: '#55423D' }}>
-                            {u.subscriptionExpiresAt
-                              ? new Date(u.subscriptionExpiresAt).toLocaleDateString()
-                              : '—'}
-                          </span>
-                        </Td>
-                        <Td>
-                          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                        </CardValue>
+                      </CardRow>
+                      <CardRow>
+                        <CardLabel>Expires</CardLabel>
+                        <CardValue>{u.subscriptionExpiresAt ? new Date(u.subscriptionExpiresAt).toLocaleDateString() : '—'}</CardValue>
+                      </CardRow>
+                      <CardRow style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                        <CardLabel>Actions</CardLabel>
+                        <CardValue>
+                          <div style={{ display: 'flex', gap: '0.35rem' }}>
                             <ActionBtn onClick={() => { setAssignTarget(u); setSelectedPlan('silver'); }}>
                               {plan === 'none' || plan === 'free' ? 'Assign' : 'Change'}
                             </ActionBtn>
@@ -534,13 +640,13 @@ const AdminSubscriptions = () => {
                               <ActionBtn $color="#BA1A1A" onClick={() => handleCancel(u)}>Remove</ActionBtn>
                             )}
                           </div>
-                        </Td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-            </TableWrapper>
+                        </CardValue>
+                      </CardRow>
+                    </SubCard>
+                  );
+                })}
+              </MobileCardGrid>
+            </>
           )}
         </>
       )}

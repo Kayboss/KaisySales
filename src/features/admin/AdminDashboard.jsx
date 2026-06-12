@@ -18,9 +18,13 @@ const TopBar = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 2rem;
+  padding: 0.75rem 1rem;
   background: #1C1C18;
   color: #F5E6D3;
+
+  @media (min-width: 768px) {
+    padding: 1rem 2rem;
+  }
 `;
 
 const TopBarLeft = styled.div`
@@ -57,10 +61,15 @@ const BackBtn = styled.button`
 const TopBarTitle = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
   font-weight: 800;
-  font-size: 1rem;
+  font-size: 0.85rem;
   letter-spacing: 1px;
+
+  @media (min-width: 768px) {
+    gap: 0.5rem;
+    font-size: 1rem;
+  }
 `;
 
 const LogoutBtn = styled.button`
@@ -85,7 +94,11 @@ const LogoutBtn = styled.button`
 const Container = styled.div`
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem;
+
+  @media (min-width: 768px) {
+    padding: 2rem;
+  }
 `;
 
 const Header = styled.div`
@@ -93,15 +106,23 @@ const Header = styled.div`
 `;
 
 const Title = styled.h1`
-  font-size: 1.75rem;
+  font-size: 1.35rem;
   color: #1C1C18;
   margin: 0;
+
+  @media (min-width: 768px) {
+    font-size: 1.75rem;
+  }
 `;
 
 const Subtitle = styled.p`
   color: #55423D;
   margin: 0.25rem 0 0;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+
+  @media (min-width: 768px) {
+    font-size: 0.9rem;
+  }
 `;
 
 const Tabs = styled.div`
@@ -115,20 +136,26 @@ const Tabs = styled.div`
 const Tab = styled.button`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
+  gap: 0.35rem;
+  padding: 0.6rem 0.85rem;
   background: none;
   border: none;
   border-bottom: 3px solid ${props => props.$active ? '#6F240A' : 'transparent'};
   color: ${props => props.$active ? '#6F240A' : '#89726C'};
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
 
   &:hover {
     color: #6F240A;
+  }
+
+  @media (min-width: 768px) {
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.9rem;
   }
 `;
 
@@ -137,7 +164,7 @@ const TABS = [
   { id: 'users', label: 'Users', icon: Users },
   { id: 'activity', label: 'Activity', icon: Activity },
   { id: 'support', label: 'Support', icon: MessageSquare },
-  { id: 'subscriptions', label: 'Subscriptions', icon: Crown },
+  { id: 'subscriptions', label: 'Subs', icon: Crown },
 ];
 
 const AdminDashboard = () => {
