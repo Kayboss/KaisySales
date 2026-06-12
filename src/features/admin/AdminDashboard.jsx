@@ -127,23 +127,29 @@ const Subtitle = styled.p`
 
 const Tabs = styled.div`
   display: flex;
-  gap: 0.5rem;
+  gap: 0.25rem;
   border-bottom: 1px solid #F0EEE8;
   margin-bottom: 2rem;
-  overflow-x: auto;
+  flex-wrap: wrap;
+
+  @media (min-width: 768px) {
+    gap: 0.5rem;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
 `;
 
 const Tab = styled.button`
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.6rem 0.85rem;
+  padding: 0.5rem 0.6rem;
   background: none;
   border: none;
   border-bottom: 3px solid ${props => props.$active ? '#6F240A' : 'transparent'};
   color: ${props => props.$active ? '#6F240A' : '#89726C'};
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
@@ -152,10 +158,18 @@ const Tab = styled.button`
     color: #6F240A;
   }
 
+  .tab-icon {
+    display: none;
+  }
+
   @media (min-width: 768px) {
     gap: 0.5rem;
     padding: 0.75rem 1.25rem;
     font-size: 0.9rem;
+
+    .tab-icon {
+      display: inline-flex;
+    }
   }
 `;
 
@@ -205,7 +219,7 @@ const AdminDashboard = () => {
         <Tabs>
           {TABS.map(tab => (
             <Tab key={tab.id} $active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
-              <tab.icon size={18} />
+              <span className="tab-icon"><tab.icon size={18} /></span>
               {tab.label}
             </Tab>
           ))}
