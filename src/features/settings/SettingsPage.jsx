@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
@@ -290,8 +291,17 @@ const SETTINGS_TABS = [
 ];
 
 const SettingsPage = () => {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('profile');
   const { user } = useAuthStore();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'subscription') {
+      setActiveTab('subscription');
+    }
+  }, [location.search]);
   const settings = useSettingsStore();
   
   const [formData, setFormData] = useState({
