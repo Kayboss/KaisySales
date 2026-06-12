@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Package, Search, Plus, Minus, Edit2, Trash2, Download } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
@@ -6,6 +7,9 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchInventory, createInventoryItem, updateInventoryItem, deleteInventoryItem, fetchCategories, createCategory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../../services/supabase';
+import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
 
 const PAGE_SIZE = 20;
@@ -354,7 +358,9 @@ const ModalActions = styled.div`
 `;
 
 const InventoryManagement = () => {
-  const { currency } = useSettingsStore();
+  const { currency, subscriptionPlan } = useSettingsStore();
+  const navigate = useNavigate();
+  const user = useAuthStore(s => s.user);
   const [inventory, setInventory] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
@@ -364,6 +370,7 @@ const InventoryManagement = () => {
   const [editId, setEditId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [limitError, setLimitError] = useState(null);
 
   const [formData, setFormData] = useState({
     name: '', category: '', stock: '', price: '', minStock: 5, newCategory: ''
@@ -389,6 +396,17 @@ const InventoryManagement = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setLimitError(null);
+
+    if (!isEditing) {
+      const check = await checkCreateLimit(supabase, user?.uid, subscriptionPlan, 'products');
+      if (!check.allowed) {
+        setLimitError(check);
+        setSaving(false);
+        return;
+      }
+    }
+
     let selectedCategory = formData.category;
     
     if (selectedCategory === 'new_category' && formData.newCategory) {
@@ -525,6 +543,20 @@ const InventoryManagement = () => {
 
       <Modal isOpen={isModalOpen} onClose={closeModal} title={isEditing ? "Edit Inventory Item" : "Add Inventory Item"}>
         <form onSubmit={handleSave}>
+          {limitError && (
+            <div style={{ padding: '1rem', background: '#FFF0F0', borderRadius: '8px', border: '1px solid #FFD0D0', marginBottom: '1rem', fontSize: '0.9rem', color: '#CC0000' }}>
+              <strong>Limit reached!</strong><br />
+              {limitError.message}
+              <div style={{ marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => navigate('/settings?tab=subscription')} style={{ padding: '0.5rem 1rem', background: '#6F240A', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>
+                  Upgrade Plan
+                </button>
+                <button type="button" onClick={() => setLimitError(null)} style={{ padding: '0.5rem 1rem', background: 'transparent', color: '#6F240A', border: '1px solid #6F240A', borderRadius: '6px', cursor: 'pointer', marginLeft: '0.5rem', fontWeight: 600 }}>
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
           <FormGroup>
             <label>Item Name</label>
             <input 

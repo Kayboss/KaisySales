@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircle } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
@@ -6,6 +7,9 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
 import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory, updateInventoryItem, createSale, deleteSale } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../../services/supabase';
+import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
 
@@ -198,8 +202,10 @@ const ModalActions = styled.div`
 `;
 
 const Invoices = () => {
-  const { currency } = useSettingsStore();
+  const { currency, subscriptionPlan } = useSettingsStore();
   const { businessName, phone: businessPhone, location: businessLocation } = useSettingsStore();
+  const navigate = useNavigate();
+  const user = useAuthStore(s => s.user);
   const [invoices, setInvoices] = useState([]);
   const [stores, setStores] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -210,6 +216,7 @@ const Invoices = () => {
   const [previewInvoice, setPreviewInvoice] = useState(null);
   const [saving, setSaving] = useState(false);
   const [inventoryItems, setInventoryItems] = useState([]);
+  const [limitError, setLimitError] = useState(null);
   const prevStatus = useRef('pending');
 
   const [formData, setFormData] = useState({
@@ -269,6 +276,17 @@ const Invoices = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setLimitError(null);
+
+    if (!isEditing) {
+      const check = await checkCreateLimit(supabase, user?.uid, subscriptionPlan, 'invoices');
+      if (!check.allowed) {
+        setLimitError(check);
+        setSaving(false);
+        return;
+      }
+    }
+
     const items = formData.items.filter(i => i.name);
     const subtotal = items.reduce((sum, i) => sum + (parseFloat(i.quantity) * parseFloat(i.unitPrice)), 0);
     const totalQty = items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0);
@@ -449,6 +467,20 @@ const Invoices = () => {
 
       <Modal wide isOpen={isModalOpen} onClose={closeModal} title={isEditing ? "Edit Invoice" : "Create New Invoice"}>
         <form onSubmit={handleSave}>
+          {limitError && (
+            <div style={{ padding: '1rem', background: '#FFF0F0', borderRadius: '8px', border: '1px solid #FFD0D0', marginBottom: '1rem', fontSize: '0.9rem', color: '#CC0000' }}>
+              <strong>Limit reached!</strong><br />
+              {limitError.message}
+              <div style={{ marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => navigate('/settings?tab=subscription')} style={{ padding: '0.5rem 1rem', background: '#6F240A', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>
+                  Upgrade Plan
+                </button>
+                <button type="button" onClick={() => setLimitError(null)} style={{ padding: '0.5rem 1rem', background: 'transparent', color: '#6F240A', border: '1px solid #6F240A', borderRadius: '6px', cursor: 'pointer', marginLeft: '0.5rem', fontWeight: 600 }}>
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
           <FormGroup>
             <label>Customer (Retail Store)</label>
             {stores.length === 0 ? (

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Plus, Search, Tag, TrendingUp, Calendar, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
@@ -6,6 +7,9 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchSales, createSale, updateSale, deleteSale, fetchInventory, updateInventoryItem } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../../services/supabase';
+import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
 
 const Header = styled.div`
@@ -365,7 +369,9 @@ const ModalActions = styled.div`
 `;
 
 const DailySales = () => {
-  const { currency } = useSettingsStore();
+  const { currency, subscriptionPlan } = useSettingsStore();
+  const navigate = useNavigate();
+  const user = useAuthStore(s => s.user);
   const [searchTerm, setSearchTerm] = useState('');
   const [sales, setSales] = useState([]);
   const [page, setPage] = useState(1);
@@ -377,6 +383,7 @@ const DailySales = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const [saving, setSaving] = useState(false);
+  const [limitError, setLimitError] = useState(null);
 
   const [formData, setFormData] = useState({
     item: '', quantity: 1, unitPrice: '', paymentMethod: 'Cash', discount: 0
@@ -402,6 +409,16 @@ const DailySales = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setLimitError(null);
+
+    if (!isEditing) {
+      const check = await checkCreateLimit(supabase, user?.uid, subscriptionPlan, 'sales');
+      if (!check.allowed) {
+        setLimitError(check);
+        setSaving(false);
+        return;
+      }
+    }
 
     const subtotal = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
     const discountPct = parseFloat(formData.discount) || 0;
@@ -543,6 +560,20 @@ const DailySales = () => {
 
       <Modal isOpen={isModalOpen} onClose={closeModal} title={isEditing ? "Edit Sale" : "Record New Sale"}>
         <form onSubmit={handleSave}>
+          {limitError && (
+            <div style={{ padding: '1rem', background: '#FFF0F0', borderRadius: '8px', border: '1px solid #FFD0D0', marginBottom: '1rem', fontSize: '0.9rem', color: '#CC0000' }}>
+              <strong>Limit reached!</strong><br />
+              {limitError.message}
+              <div style={{ marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => navigate('/settings?tab=subscription')} style={{ padding: '0.5rem 1rem', background: '#6F240A', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>
+                  Upgrade Plan
+                </button>
+                <button type="button" onClick={() => setLimitError(null)} style={{ padding: '0.5rem 1rem', background: 'transparent', color: '#6F240A', border: '1px solid #6F240A', borderRadius: '6px', cursor: 'pointer', marginLeft: '0.5rem', fontWeight: 600 }}>
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
           <FormGroup>
             <label>Item Sold</label>
             {inventoryItems.length === 0 ? (

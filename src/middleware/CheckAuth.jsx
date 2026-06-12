@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { Navigate, useLocation, Outlet } from 'react-router-dom';
+import { Navigate, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import OnboardingWizard from '../features/auth/OnboardingWizard';
 import styled from 'styled-components';
-import { Leaf, Ban } from 'lucide-react';
+import { Leaf, Ban, Crown } from 'lucide-react';
+import { isSubscriptionExpired } from '../utils/subscriptionLimits';
 
 const LoaderContainer = styled.div`
   height: 100vh;
@@ -51,8 +52,9 @@ const SuspendedContainer = styled.div`
 
 const CheckAuth = () => {
   const { isAuthenticated, isInitialized, user } = useAuthStore();
-  const { isOnboarded, loadSettings, isLoading, clearSettings, status, role } = useSettingsStore();
+  const { isOnboarded, loadSettings, isLoading, clearSettings, status, role, subscriptionPlan, subscriptionStatus, subscriptionExpiresAt } = useSettingsStore();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Load user business settings and details from Firestore when authenticated
   useEffect(() => {
@@ -100,6 +102,28 @@ const CheckAuth = () => {
         <p style={{ fontSize: '0.85rem', color: '#55423D' }}>
           <a href="mailto:support@kaisysales.com" style={{ color: '#6F240A' }}>support@kaisysales.com</a>
         </p>
+      </SuspendedContainer>
+    );
+  }
+
+  // Block expired subscriptions (skip admins)
+  if (role !== 'admin' && isSubscriptionExpired(subscriptionPlan, subscriptionStatus, subscriptionExpiresAt)) {
+    const expiredMsg = subscriptionPlan === 'free' || subscriptionPlan === 'none'
+      ? 'Your free trial has ended. Please upgrade to continue using KaisySales.'
+      : 'Your subscription has expired. Please renew to continue using KaisySales.';
+    return (
+      <SuspendedContainer>
+        <Crown size={48} />
+        <h2 style={{ color: '#1C1B1F', margin: 0 }}>Subscription Required</h2>
+        <p style={{ color: '#55423D', maxWidth: 400 }}>{expiredMsg}</p>
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+          <button onClick={() => navigate('/settings?tab=subscription')} style={{ padding: '0.75rem 1.5rem', background: '#6F240A', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>
+            View Plans
+          </button>
+          <button onClick={() => { useAuthStore.getState().logout(); navigate('/login'); }} style={{ padding: '0.75rem 1.5rem', background: 'transparent', color: '#6F240A', border: '1px solid #6F240A', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '1rem' }}>
+            Sign Out
+          </button>
+        </div>
       </SuspendedContainer>
     );
   }
