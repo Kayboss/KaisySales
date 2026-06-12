@@ -129,7 +129,12 @@ const ActionBtn = styled.button`
   background: ${props => props.$color || '#6F240A'};
   transition: all 0.15s ease;
 
-  &:hover { opacity: 0.8; }
+  &:hover:not(:disabled) { opacity: 0.8; }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const Empty = styled.div`
@@ -223,6 +228,11 @@ const ModalCancelBtn = styled.button`
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const ModalConfirmBtn = styled.button`
@@ -235,6 +245,11 @@ const ModalConfirmBtn = styled.button`
   font-weight: 700;
   font-size: 0.875rem;
   cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const PlanSelect = styled.select`
@@ -378,6 +393,9 @@ const AdminSubscriptions = () => {
   const [selectedPlan, setSelectedPlan] = useState('silver');
   const [assignYearly, setAssignYearly] = useState(false);
   const [yearly, setYearly] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [confirmingId, setConfirmingId] = useState(null);
   const { user } = useAuthStore();
 
   const loadData = async () => {
@@ -394,7 +412,8 @@ const AdminSubscriptions = () => {
   useEffect(() => { loadData(); }, []);
 
   const handleAssign = async () => {
-    if (!assignTarget) return;
+    if (!assignTarget || assigning) return;
+    setAssigning(true);
     try {
       const durationDays = assignYearly ? 365 : 30;
       await assignSubscription(assignTarget.id, selectedPlan, durationDays);
@@ -402,25 +421,32 @@ const AdminSubscriptions = () => {
     } catch (err) {
       console.error('Failed to assign subscription', err);
     }
+    setAssigning(false);
     setAssignTarget(null);
   };
 
   const handleCancel = async (u) => {
+    if (cancellingId) return;
+    setCancellingId(u.id);
     try {
       await cancelSubscription(u.id);
       await loadData();
     } catch (err) {
       console.error('Failed to cancel subscription', err);
     }
+    setCancellingId(null);
   };
 
   const handleConfirmPayment = async (payment) => {
+    if (confirmingId) return;
+    setConfirmingId(payment.id);
     try {
       await confirmPayment(payment.id, user.uid);
       await loadData();
     } catch (err) {
       console.error('Failed to confirm payment', err);
     }
+    setConfirmingId(null);
   };
 
   const filtered = users.filter(u =>
@@ -525,7 +551,9 @@ const AdminSubscriptions = () => {
                     {p.status}
                   </StatusBadge>
                   {p.status === 'pending' && (
-                    <ActionBtn onClick={() => handleConfirmPayment(p)}>Confirm</ActionBtn>
+                    <ActionBtn disabled={confirmingId === p.id} onClick={() => handleConfirmPayment(p)}>
+                      {confirmingId === p.id ? '...' : 'Confirm'}
+                    </ActionBtn>
                   )}
                 </PaymentItem>
               ))}
@@ -586,14 +614,16 @@ const AdminSubscriptions = () => {
                             </span>
                           </Td>
                           <Td>
-                            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                              <ActionBtn onClick={() => { setAssignTarget(u); setSelectedPlan('silver'); }}>
-                                {plan === 'none' || plan === 'free' ? 'Assign' : 'Change'}
+                        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                            <ActionBtn onClick={() => { setAssignTarget(u); setSelectedPlan('silver'); }}>
+                              {plan === 'none' || plan === 'free' ? 'Assign' : 'Change'}
+                            </ActionBtn>
+                            {plan !== 'none' && plan !== 'free' && (
+                              <ActionBtn $color="#BA1A1A" disabled={cancellingId === u.id} onClick={() => handleCancel(u)}>
+                                {cancellingId === u.id ? '...' : 'Remove'}
                               </ActionBtn>
-                              {plan !== 'none' && plan !== 'free' && (
-                                <ActionBtn $color="#BA1A1A" onClick={() => handleCancel(u)}>Remove</ActionBtn>
-                              )}
-                            </div>
+                            )}
+                          </div>
                           </Td>
                         </tr>
                       );
@@ -633,7 +663,9 @@ const AdminSubscriptions = () => {
                           {plan === 'none' || plan === 'free' ? 'Assign' : 'Change'}
                         </ActionBtn>
                         {plan !== 'none' && plan !== 'free' && (
-                          <ActionBtn $color="#BA1A1A" onClick={() => handleCancel(u)} style={{ flex: 1 }}>Remove</ActionBtn>
+                          <ActionBtn $color="#BA1A1A" disabled={cancellingId === u.id} onClick={() => handleCancel(u)} style={{ flex: 1 }}>
+                            {cancellingId === u.id ? 'Removing...' : 'Remove'}
+                          </ActionBtn>
                         )}
                       </div>
                     </SubCard>
@@ -678,8 +710,8 @@ const AdminSubscriptions = () => {
               <span style={{ fontSize: '0.8rem', fontWeight: 600, color: assignYearly ? '#6F240A' : '#89726C' }}>Yearly</span>
             </div>
             <ModalActions>
-              <ModalCancelBtn onClick={() => setAssignTarget(null)}>Cancel</ModalCancelBtn>
-              <ModalConfirmBtn onClick={handleAssign}>Assign</ModalConfirmBtn>
+              <ModalCancelBtn disabled={assigning} onClick={() => setAssignTarget(null)}>Cancel</ModalCancelBtn>
+              <ModalConfirmBtn disabled={assigning} onClick={handleAssign}>{assigning ? 'Assigning...' : 'Assign'}</ModalConfirmBtn>
             </ModalActions>
           </ModalCard>
         </Overlay>

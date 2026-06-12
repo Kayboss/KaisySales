@@ -95,8 +95,13 @@ const ToggleBtn = styled.button`
   background: ${props => props.$suspended ? '#E8F0EC' : '#FFE8E8'};
   transition: all 0.15s ease;
 
-  &:hover {
+  &:hover:not(:disabled) {
     opacity: 0.8;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 `;
 
@@ -173,6 +178,7 @@ const AdminUsers = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [suspendTarget, setSuspendTarget] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
 
   const loadData = async () => {
     try {
@@ -189,6 +195,7 @@ const AdminUsers = () => {
   }, []);
 
   const handleToggleStatus = async (u) => {
+    setTogglingId(u.id);
     const newStatus = u.status === 'suspended' ? 'active' : 'suspended';
     try {
       await updateUserStatus(u.id, newStatus);
@@ -196,6 +203,7 @@ const AdminUsers = () => {
     } catch (err) {
       console.error('Failed to update user status', err);
     }
+    setTogglingId(null);
     setSuspendTarget(null);
   };
 
@@ -291,10 +299,11 @@ const AdminUsers = () => {
                       <Td>
                         <ToggleBtn
                           $suspended={isSuspended}
+                          disabled={togglingId === u.id}
                           onClick={() => setSuspendTarget(u)}
                         >
-                          {isSuspended ? <ToggleLeft size={15} /> : <ToggleRight size={15} />}
-                          {isSuspended ? 'Activate' : 'Suspend'}
+                          {togglingId === u.id ? '...' : isSuspended ? <ToggleLeft size={15} /> : <ToggleRight size={15} />}
+                          {togglingId === u.id ? 'Processing' : isSuspended ? 'Activate' : 'Suspend'}
                         </ToggleBtn>
                       </Td>
                     </tr>
@@ -317,10 +326,11 @@ const AdminUsers = () => {
                     </div>
                     <ToggleBtn
                       $suspended={isSuspended}
+                      disabled={togglingId === u.id}
                       onClick={() => setSuspendTarget(u)}
                     >
-                      {isSuspended ? <ToggleLeft size={14} /> : <ToggleRight size={14} />}
-                      {isSuspended ? 'Activate' : 'Suspend'}
+                      {togglingId === u.id ? '...' : isSuspended ? <ToggleLeft size={14} /> : <ToggleRight size={14} />}
+                      {togglingId === u.id ? 'Processing' : isSuspended ? 'Activate' : 'Suspend'}
                     </ToggleBtn>
                   </div>
                   <CardRow>
