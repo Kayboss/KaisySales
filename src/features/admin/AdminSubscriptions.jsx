@@ -115,11 +115,11 @@ const StatusBadge = styled.span`
 `;
 
 const ActionBtn = styled.button`
-  padding: 0.35rem 0.6rem;
-  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
   border: none;
   cursor: pointer;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: white;
   background: ${props => props.$color || '#6F240A'};
@@ -148,7 +148,7 @@ const SubCard = styled.div`
   background: white;
   border-radius: 12px;
   border: 1px solid #F0EEE8;
-  padding: 1rem;
+  padding: 0.85rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 `;
 
@@ -600,48 +600,36 @@ const AdminSubscriptions = () => {
                 {filtered.map(u => {
                   const plan = getUserPlan(u);
                   const subStatus = getUserSubStatus(u);
+                  const planLabel = plan === 'none' ? 'None' : plan === 'free' ? 'Free Trial' : plan.charAt(0).toUpperCase() + plan.slice(1);
                   return (
                     <SubCard key={u.id}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                        <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1C1C18' }}>{u.ownerName || '—'}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#89726C' }}>{u.businessName || u.email || '—'}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#89726C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.businessName || u.email || '—'}</div>
                         </div>
+                        <PlanBadge $plan={plan} style={{ flexShrink: 0, marginLeft: '0.5rem' }}>
+                          {plan === 'gold' || plan === 'silver' ? <Crown size={11} /> : null}
+                          {planLabel}
+                        </PlanBadge>
                       </div>
-                      <CardRow>
-                        <CardLabel>Plan</CardLabel>
-                        <CardValue>
-                          <PlanBadge $plan={plan}>
-                            {plan === 'none' ? 'None' : plan === 'free' ? 'Free Trial' : plan.charAt(0).toUpperCase() + plan.slice(1)}
-                          </PlanBadge>
-                        </CardValue>
-                      </CardRow>
-                      <CardRow>
-                        <CardLabel>Status</CardLabel>
-                        <CardValue>
-                          <StatusBadge $status={subStatus === 'active' ? 'active' : subStatus === 'pending' ? 'pending' : 'expired'}>
-                            {subStatus === 'active' ? <CheckCircle size={11} /> : <Clock size={11} />}
-                            {subStatus}
-                          </StatusBadge>
-                        </CardValue>
-                      </CardRow>
-                      <CardRow>
-                        <CardLabel>Expires</CardLabel>
-                        <CardValue>{u.subscriptionExpiresAt ? new Date(u.subscriptionExpiresAt).toLocaleDateString() : '—'}</CardValue>
-                      </CardRow>
-                      <CardRow style={{ borderBottom: 'none', paddingBottom: 0 }}>
-                        <CardLabel>Actions</CardLabel>
-                        <CardValue>
-                          <div style={{ display: 'flex', gap: '0.35rem' }}>
-                            <ActionBtn onClick={() => { setAssignTarget(u); setSelectedPlan('silver'); }}>
-                              {plan === 'none' || plan === 'free' ? 'Assign' : 'Change'}
-                            </ActionBtn>
-                            {plan !== 'none' && plan !== 'free' && (
-                              <ActionBtn $color="#BA1A1A" onClick={() => handleCancel(u)}>Remove</ActionBtn>
-                            )}
-                          </div>
-                        </CardValue>
-                      </CardRow>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.65rem' }}>
+                        <StatusBadge $status={subStatus === 'active' ? 'active' : subStatus === 'pending' ? 'pending' : 'expired'}>
+                          {subStatus === 'active' ? <CheckCircle size={11} /> : <Clock size={11} />}
+                          {subStatus}
+                        </StatusBadge>
+                        <span style={{ fontSize: '0.75rem', color: '#55423D' }}>
+                          Expires: {u.subscriptionExpiresAt ? new Date(u.subscriptionExpiresAt).toLocaleDateString() : '—'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <ActionBtn onClick={() => { setAssignTarget(u); setSelectedPlan('silver'); }} style={{ flex: 1 }}>
+                          {plan === 'none' || plan === 'free' ? 'Assign' : 'Change'}
+                        </ActionBtn>
+                        {plan !== 'none' && plan !== 'free' && (
+                          <ActionBtn $color="#BA1A1A" onClick={() => handleCancel(u)} style={{ flex: 1 }}>Remove</ActionBtn>
+                        )}
+                      </div>
                     </SubCard>
                   );
                 })}
