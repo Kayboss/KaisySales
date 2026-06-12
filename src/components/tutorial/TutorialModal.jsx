@@ -200,7 +200,7 @@ const TutorialModal = ({ isOpen, onClose, autoShow }) => {
   }, [isOpen]);
 
   const handleClose = () => {
-    if (autoShow && step === steps.length - 1) {
+    if (autoShow) {
       localStorage.setItem(STORAGE_KEY, 'true');
     }
     onClose();
