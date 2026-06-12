@@ -52,6 +52,10 @@ const TableWrapper = styled.div`
   border-radius: 12px;
   border: 1px solid #F0EEE8;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+
+  @media (max-width: 768px) {
+    display: none;
+  }
 `;
 
 const Table = styled.table`
