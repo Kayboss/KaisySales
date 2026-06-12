@@ -154,7 +154,7 @@ const AdminDashboard = () => {
     <PageWrapper>
       <TopBar>
         <TopBarLeft>
-          <BackBtn onClick={() => navigate('/')}>
+          <BackBtn onClick={() => navigate('/', { state: { adminView: true } })}>
             <ArrowLeft size={15} /> Back to App
           </BackBtn>
           <TopBarTitle>

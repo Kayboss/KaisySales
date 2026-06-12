@@ -128,8 +128,8 @@ const CheckAuth = () => {
     );
   }
 
-  // Redirect admins to admin dashboard on initial login
-  if (role === 'admin' && location.pathname === '/') {
+  // Redirect admins to admin dashboard on initial login (skip if coming from "Back to App")
+  if (role === 'admin' && location.pathname === '/' && !location.state?.adminView) {
     return <Navigate to="/admin" replace />;
   }
 
