@@ -284,7 +284,7 @@ const FEATURES = {
     '3-day free trial',
   ],
   silver: [
-    'Up to 50 sales per month',
+    'Up to 100 sales per month',
     'Up to 20 invoices per month',
     'Up to 50 products',
     'Basic reports',

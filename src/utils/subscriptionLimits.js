@@ -1,6 +1,6 @@
 const PLAN_LIMITS = {
   free: { maxSalesMonth: 10, maxInvoicesMonth: 2, maxProducts: 5 },
-  silver: { maxSalesMonth: 50, maxInvoicesMonth: 20, maxProducts: 50 },
+  silver: { maxSalesMonth: 100, maxInvoicesMonth: 20, maxProducts: 50 },
   gold: { maxSalesMonth: -1, maxInvoicesMonth: -1, maxProducts: -1 },
 };
 
