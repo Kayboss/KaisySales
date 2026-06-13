@@ -154,10 +154,6 @@ const CatRow = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   background: ${({ theme }) => theme.colors.background.main};
   gap: 0.5rem;
-
-  @media (max-width: 500px) {
-    flex-wrap: wrap;
-  }
 `;
 
 const CatName = styled.span`
@@ -634,9 +630,9 @@ const SettingsPage = () => {
                         </>
                       ) : (
                         <>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <Tag size={16} color="#89726C" />
-                            <CatName style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</CatName>
+                            <CatName>{cat.name}</CatName>
                             <TypeBadge $type={cat.type || 'sales'}>{cat.type || 'sales'}</TypeBadge>
                           </div>
                           <CatActions>
