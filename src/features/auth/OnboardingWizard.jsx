@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { dbService } from '../../services/supabase';
+import { CURRENCY_OPTIONS } from '../../utils/currency';
 import { 
   Sparkles, 
   ArrowRight, 
@@ -12,7 +13,9 @@ import {
   Phone, 
   MapPin, 
   Check, 
-  Briefcase 
+  Briefcase,
+  Crown,
+  CheckCircle
 } from 'lucide-react';
 
 const Container = styled.div`
@@ -253,6 +256,127 @@ const SeedCheckCircle = styled.div`
   flex-shrink: 0;
 `;
 
+const PlanGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const PlanCard = styled.div`
+  border: 2px solid ${props => props.$selected ? '#6F240A' : '#F0EEE8'};
+  background: ${props => props.$selected ? 'rgba(111, 36, 10, 0.04)' : 'white'};
+  border-radius: 12px;
+  padding: 1.25rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: #6F240A;
+  }
+`;
+
+const PlanCardTitle = styled.div`
+  font-size: 1rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #1C1C18;
+  margin-top: 0.5rem;
+`;
+
+const PlanCardPrice = styled.div`
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #6F240A;
+  margin: 0.35rem 0;
+`;
+
+const PlanPeriod = styled.div`
+  font-size: 0.75rem;
+  color: #89726C;
+  margin-bottom: 0.75rem;
+`;
+
+const PlanFeatureList = styled.div`
+  text-align: left;
+  font-size: 0.8rem;
+  color: #55423D;
+`;
+
+const PlanFeatureItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid #F0EEE8;
+
+  &:last-child { border-bottom: none; }
+`;
+
+const ToggleRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+`;
+
+const ToggleLabel = styled.span`
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: ${props => props.$active ? '#6F240A' : '#89726C'};
+`;
+
+const ToggleSwitch = styled.button`
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  border: none;
+  background: ${props => props.$yearly ? '#6F240A' : '#D0C8C4'};
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: ${props => props.$yearly ? '23px' : '2px'};
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    transition: left 0.2s ease;
+  }
+`;
+
+const SaveBadge = styled.span`
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: white;
+  background: #25432F;
+  margin-left: 0.3rem;
+  vertical-align: middle;
+`;
+
+const InfoBox = styled.div`
+  padding: 0.75rem;
+  background: #FFF0E0;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #875200;
+  text-align: center;
+  margin-top: 0.5rem;
+`;
+
 const Footer = styled.div`
   padding: 2rem 3rem;
   border-top: 1px solid ${({ theme }) => theme.colors.outlineVariant};
@@ -312,12 +436,36 @@ const NextButton = styled.button`
   }
 `;
 
+const PLANS = {
+  free: {
+    key: 'free',
+    label: 'Free Trial',
+    priceLabel: '3 days free',
+    features: ['Up to 10 sales', 'Up to 2 invoices', 'Up to 5 products', 'Basic reporting'],
+  },
+  silver: {
+    key: 'silver',
+    label: 'Silver',
+    monthlyPrice: 35,
+    yearlyPrice: 350,
+    features: ['Up to 100 sales/mo', 'Up to 20 invoices/mo', 'Up to 50 products', 'Email support'],
+  },
+  gold: {
+    key: 'gold',
+    label: 'Gold',
+    monthlyPrice: 75,
+    yearlyPrice: 750,
+    features: ['Unlimited sales', 'Unlimited invoices', 'Unlimited products', 'Priority support'],
+  },
+};
+
 const OnboardingWizard = () => {
   const { user, logout } = useAuthStore();
   const updateSettings = useSettingsStore(state => state.updateSettings);
   
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [yearly, setYearly] = useState(false);
   const [formData, setFormData] = useState({
     ownerName: '',
     businessName: '',
@@ -325,6 +473,8 @@ const OnboardingWizard = () => {
     location: 'Accra, Greater Accra',
     category: 'Food & Beverage',
     avatarColor: '#6F240A',
+    currency: 'GHS',
+    subscriptionPlan: 'free',
     seedData: true
   });
 
@@ -341,13 +491,17 @@ const OnboardingWizard = () => {
     setFormData(prev => ({ ...prev, avatarColor: col }));
   };
 
+  const setPlan = (plan) => {
+    setFormData(prev => ({ ...prev, subscriptionPlan: plan }));
+  };
+
   const toggleSeed = () => {
     setFormData(prev => ({ ...prev, seedData: !prev.seedData }));
   };
 
   const handleNext = (e) => {
     e.preventDefault();
-    if (step < 4) {
+    if (step < 5) {
       setStep(step + 1);
     } else {
       handleSubmit();
@@ -358,6 +512,16 @@ const OnboardingWizard = () => {
     if (step > 1) {
       setStep(step - 1);
     }
+  };
+
+  const getDisplayPrice = (plan) => {
+    if (plan.key === 'free') return null;
+    return yearly ? plan.yearlyPrice : plan.monthlyPrice;
+  };
+
+  const getPeriod = (plan) => {
+    if (plan.key === 'free') return '3 days';
+    return yearly ? '/year' : '/month';
   };
 
   // Seeding helper to populate collection data for KaisySales exploration
@@ -469,22 +633,23 @@ const OnboardingWizard = () => {
         location: formData.location,
         category: formData.category,
         avatarColor: formData.avatarColor,
+        currency: formData.currency,
         email: user.email,
         isOnboarded: true
       };
-      
-      // Seed database and save profile concurrently to eliminate finalization lag
-      await Promise.all([
-        formData.seedData ? seedSampleDatabase(user.uid) : Promise.resolve(),
-        updateSettings(user.uid, finalProfile)
-      ]);
-    } catch (error) {
-      console.error('🔥 Onboarding submit failed:', error);
-      alert('Could not save your profile details. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+
+        // Seed database and save profile concurrently to eliminate finalization lag
+        await Promise.all([
+          formData.seedData ? seedSampleDatabase(user.uid) : Promise.resolve(),
+          updateSettings(user.uid, finalProfile)
+        ]);
+      } catch (error) {
+        console.error('🔥 Onboarding submit failed:', error);
+        alert('Could not save your profile details. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
   const isStepValid = () => {
     if (step === 1) return formData.ownerName.trim().length > 2;
@@ -494,6 +659,7 @@ const OnboardingWizard = () => {
   };
 
   const avatarColors = ['#6F240A', '#875200', '#25432F', '#D4AF37', '#8E3A1F'];
+  const planKeys = ['free', 'silver', 'gold'];
 
   return (
     <Container>
@@ -520,6 +686,7 @@ const OnboardingWizard = () => {
           <ProgressSegment $active={step >= 2} />
           <ProgressSegment $active={step >= 3} />
           <ProgressSegment $active={step >= 4} />
+          <ProgressSegment $active={step >= 5} />
         </TopProgressBar>
 
         <Content>
@@ -617,8 +784,8 @@ const OnboardingWizard = () => {
           {step === 3 && (
             <div>
               <StepHeader>
-                <h2>Contact & Origin</h2>
-                <p>Enter your telephone number and regional location to configure local currencies and taxes.</p>
+                <h2>Contact & Currency</h2>
+                <p>Enter your telephone number, location, and preferred currency.</p>
               </StepHeader>
               <Form onSubmit={handleNext}>
                 <div>
@@ -655,11 +822,74 @@ const OnboardingWizard = () => {
                     </Select>
                   </InputWrapper>
                 </div>
+                <div>
+                  <Label>Preferred Currency</Label>
+                  <InputWrapper>
+                    <span style={{ position: 'absolute', left: '1rem', fontSize: '1rem', color: '#89726C' }}>₵</span>
+                    <Select 
+                      name="currency" 
+                      value={formData.currency}
+                      onChange={handleChange}
+                      style={{ paddingLeft: '2.75rem' }}
+                    >
+                      {CURRENCY_OPTIONS.map(c => (
+                        <option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>
+                      ))}
+                    </Select>
+                  </InputWrapper>
+                </div>
               </Form>
             </div>
           )}
 
           {step === 4 && (
+            <div>
+              <StepHeader>
+                <h2>Choose Your Plan</h2>
+                <p>Start with a free trial and upgrade anytime, or pick a paid plan now.</p>
+              </StepHeader>
+
+              <ToggleRow>
+                <ToggleLabel $active={!yearly}>Monthly</ToggleLabel>
+                <ToggleSwitch $yearly={yearly} onClick={() => setYearly(!yearly)} />
+                <ToggleLabel $active={yearly}>Yearly <SaveBadge>Save 2mo</SaveBadge></ToggleLabel>
+              </ToggleRow>
+
+              <PlanGrid>
+                {planKeys.map(key => {
+                  const p = PLANS[key];
+                  const selected = formData.subscriptionPlan === key;
+                  return (
+                    <PlanCard key={key} $selected={selected} onClick={() => setPlan(key)}>
+                      <Crown size={22} color={key === 'gold' ? '#875200' : key === 'silver' ? '#6F240A' : '#89726C'} />
+                      <PlanCardTitle>{p.label}</PlanCardTitle>
+                      {key === 'free' ? (
+                        <PlanCardPrice style={{ fontSize: '1rem', color: '#25432F' }}>{p.priceLabel}</PlanCardPrice>
+                      ) : (
+                        <>
+                          <PlanCardPrice>GH₵{getDisplayPrice(p)}</PlanCardPrice>
+                          <PlanPeriod>{getPeriod(p)}</PlanPeriod>
+                        </>
+                      )}
+                      <PlanFeatureList>
+                        {p.features.map((f, i) => (
+                          <PlanFeatureItem key={i}>
+                            <CheckCircle size={11} color="#25432F" />
+                            {f}
+                          </PlanFeatureItem>
+                        ))}
+                      </PlanFeatureList>
+                      {selected && key !== 'free' && (
+                        <InfoBox>Our team will contact you to arrange payment</InfoBox>
+                      )}
+                    </PlanCard>
+                  );
+                })}
+              </PlanGrid>
+            </div>
+          )}
+
+          {step === 5 && (
             <div>
               <StepHeader>
                 <h2>A Fresh Start</h2>
@@ -721,7 +951,7 @@ const OnboardingWizard = () => {
           >
             {loading ? (
               'Setting up your workspace...'
-            ) : step === 4 ? (
+            ) : step === 5 ? (
               <>
                 Open KaisySales
                 <Sparkles size={16} />
