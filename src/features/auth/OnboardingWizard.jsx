@@ -880,7 +880,7 @@ const OnboardingWizard = () => {
                         ))}
                       </PlanFeatureList>
                       {selected && key !== 'free' && (
-                        <InfoBox>Our team will contact you to arrange payment</InfoBox>
+                        <InfoBox>Pay via Mobile Money to <strong>055 088 4398</strong> (Kevin Carl Asamany). Use your business name as reference.</InfoBox>
                       )}
                     </PlanCard>
                   );

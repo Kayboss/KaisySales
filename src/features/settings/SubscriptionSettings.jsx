@@ -464,7 +464,7 @@ const SubscriptionSettings = () => {
             </div>
 
             <div style={{ margin: '1rem 0', padding: '0.75rem', background: '#FFF0E0', borderRadius: 8, fontSize: '0.8rem', color: '#875200' }}>
-              Pay via Mobile Money to: <strong>055 123 4567</strong> (KaisySales). Enter the transaction reference below.
+              Pay via Mobile Money to: <strong>055 088 4398</strong> (Kevin Carl Asamany). Enter your business name as the reference.
             </div>
 
             <PaymentForm>
