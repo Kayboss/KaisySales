@@ -154,6 +154,11 @@ const CatRow = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   background: ${({ theme }) => theme.colors.background.main};
   gap: 0.5rem;
+
+  @media (max-width: 500px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
 `;
 
 const CatName = styled.span`
@@ -164,6 +169,10 @@ const CatName = styled.span`
 const CatActions = styled.div`
   display: flex;
   gap: 0.5rem;
+
+  @media (max-width: 500px) {
+    justify-content: flex-end;
+  }
 `;
 
 const IconBtn = styled.button`
@@ -190,11 +199,6 @@ const EditInput = styled.input`
   font-size: 0.9rem;
   outline: none;
   min-width: 0;
-
-  @media (max-width: 500px) {
-    flex: 1 1 100%;
-    order: -1;
-  }
 `;
 
 const TypeSelect = styled.select`
@@ -206,10 +210,6 @@ const TypeSelect = styled.select`
   outline: none;
   background: white;
   cursor: pointer;
-
-  @media (max-width: 500px) {
-    flex: 1;
-  }
 `;
 
 const EmptyState = styled.p`
@@ -618,15 +618,17 @@ const SettingsPage = () => {
                             autoFocus
                             onKeyDown={e => { if (e.key === 'Enter') handleSaveCategory(cat.id); if (e.key === 'Escape') handleCancelEdit(); }}
                           />
-                          <TypeSelect value={editingCatType} onChange={e => setEditingCatType(e.target.value)}>
-                            <option value="sales">Sales</option>
-                            <option value="expense">Expense</option>
-                            <option value="inventory">Inventory</option>
-                          </TypeSelect>
-                          <CatActions>
-                            <IconBtn onClick={() => handleSaveCategory(cat.id)}><Check size={16} /></IconBtn>
-                            <IconBtn onClick={handleCancelEdit}><X size={16} /></IconBtn>
-                          </CatActions>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <TypeSelect value={editingCatType} onChange={e => setEditingCatType(e.target.value)}>
+                              <option value="sales">Sales</option>
+                              <option value="expense">Expense</option>
+                              <option value="inventory">Inventory</option>
+                            </TypeSelect>
+                            <CatActions>
+                              <IconBtn onClick={() => handleSaveCategory(cat.id)}><Check size={16} /></IconBtn>
+                              <IconBtn onClick={handleCancelEdit}><X size={16} /></IconBtn>
+                            </CatActions>
+                          </div>
                         </>
                       ) : (
                         <>
