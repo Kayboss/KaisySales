@@ -257,26 +257,32 @@ const WelcomePage = () => {
 
     try {
       if (isSignUp) {
-        await signup(email, password);
+        const result = await signup(email, password);
+        if (result) {
+          setSuccess('Account created! Check your email for the confirmation link, then log in.');
+          setPassword('');
+          setConfirmPassword('');
+        }
       } else {
         await login(email, password);
       }
     } catch (err) {
       console.error('🔥 Authentication error:', err);
-      let userFriendlyMessage = err.message;
+      let msg = err?.message || err?.error_description || 'Something went wrong. Please try again.';
       
-      // Translate complex auth codes into humanized alerts
-      if (err.message.includes('auth/email-already-in-use')) {
-        userFriendlyMessage = 'This email is already registered. Please log in instead.';
-      } else if (err.message.includes('auth/wrong-password') || err.message.includes('auth/invalid-credential') || err.message.includes('auth/user-not-found')) {
-        userFriendlyMessage = 'Invalid business email or secret passphrase. Please review your entries.';
-      } else if (err.message.includes('auth/invalid-email')) {
-        userFriendlyMessage = 'Please enter a valid business email address.';
-      } else if (err.message.includes('auth/weak-password')) {
-        userFriendlyMessage = 'The passphrase is too weak. Please use a stronger combination.';
+      if (/already registered|email already in use|already exists/i.test(msg)) {
+        msg = 'This email is already registered. Please log in instead.';
+      } else if (/invalid login credentials|wrong password|invalid-credential|user not found/i.test(msg)) {
+        msg = 'Invalid business email or secret passphrase. Please review your entries.';
+      } else if (/invalid email/i.test(msg)) {
+        msg = 'Please enter a valid business email address.';
+      } else if (/weak password|password is too weak/i.test(msg)) {
+        msg = 'The passphrase is too weak. Please use a stronger combination.';
+      } else if (/rate limit/i.test(msg)) {
+        msg = 'Too many attempts. Please wait a moment and try again.';
       }
       
-      setError(userFriendlyMessage);
+      setError(msg);
     } finally {
       setLoading(false);
     }
