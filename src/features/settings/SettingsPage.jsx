@@ -153,6 +153,11 @@ const CatRow = styled.div`
   border-radius: ${({ theme }) => theme.borderRadius.md};
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   background: ${({ theme }) => theme.colors.background.main};
+  gap: 0.5rem;
+
+  @media (max-width: 500px) {
+    flex-wrap: wrap;
+  }
 `;
 
 const CatName = styled.span`
@@ -188,6 +193,12 @@ const EditInput = styled.input`
   font-family: inherit;
   font-size: 0.9rem;
   outline: none;
+  min-width: 0;
+
+  @media (max-width: 500px) {
+    flex: 1 1 100%;
+    order: -1;
+  }
 `;
 
 const TypeSelect = styled.select`
@@ -199,6 +210,10 @@ const TypeSelect = styled.select`
   outline: none;
   background: white;
   cursor: pointer;
+
+  @media (max-width: 500px) {
+    flex: 1;
+  }
 `;
 
 const EmptyState = styled.p`
@@ -227,8 +242,13 @@ const TypeBadge = styled.span`
 
 const ColorGrid = styled.div`
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   margin-top: 0.5rem;
+  flex-wrap: wrap;
+
+  @media (max-width: 500px) {
+    gap: 0.5rem;
+  }
 `;
 
 const ColorOption = styled.button`
@@ -247,6 +267,11 @@ const ColorOption = styled.button`
 
   &:hover {
     transform: scale(1.1);
+  }
+
+  @media (max-width: 500px) {
+    width: 40px;
+    height: 40px;
   }
 `;
 
@@ -609,9 +634,9 @@ const SettingsPage = () => {
                         </>
                       ) : (
                         <>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
                             <Tag size={16} color="#89726C" />
-                            <CatName>{cat.name}</CatName>
+                            <CatName style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</CatName>
                             <TypeBadge $type={cat.type || 'sales'}>{cat.type || 'sales'}</TypeBadge>
                           </div>
                           <CatActions>
