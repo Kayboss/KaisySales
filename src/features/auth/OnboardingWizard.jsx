@@ -40,6 +40,12 @@ const Container = styled.div`
     opacity: 0.05;
     z-index: 1;
   }
+
+  @media (max-width: 500px) {
+    padding: 1rem;
+    align-items: flex-start;
+    padding-top: 2rem;
+  }
 `;
 
 const WizardCard = styled.div`
@@ -161,6 +167,11 @@ const ColorGrid = styled.div`
   display: flex;
   gap: 1rem;
   margin-top: 0.5rem;
+  flex-wrap: wrap;
+
+  @media (max-width: 500px) {
+    gap: 0.5rem;
+  }
 `;
 
 const ColorOption = styled.button`
@@ -179,6 +190,11 @@ const ColorOption = styled.button`
 
   &:hover {
     transform: scale(1.1);
+  }
+
+  @media (max-width: 500px) {
+    width: 40px;
+    height: 40px;
   }
 `;
 
@@ -375,6 +391,7 @@ const InfoBox = styled.div`
   color: #875200;
   text-align: center;
   margin-top: 0.5rem;
+  word-break: break-word;
 `;
 
 const Footer = styled.div`
