@@ -618,7 +618,7 @@ const SettingsPage = () => {
                             autoFocus
                             onKeyDown={e => { if (e.key === 'Enter') handleSaveCategory(cat.id); if (e.key === 'Escape') handleCancelEdit(); }}
                           />
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
                             <TypeSelect value={editingCatType} onChange={e => setEditingCatType(e.target.value)}>
                               <option value="sales">Sales</option>
                               <option value="expense">Expense</option>
