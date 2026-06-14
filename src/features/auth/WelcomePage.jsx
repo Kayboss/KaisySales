@@ -36,8 +36,7 @@ const HeroSection = styled.div`
   }
 
   @media (max-width: 768px) {
-    flex: none;
-    padding: 2.5rem 1.5rem;
+    display: none;
   }
 `;
 
