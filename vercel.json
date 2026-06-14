@@ -1,3 +1,9 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "beforeFiles": [
+    { "source": "/", "destination": "/landing/index.html" }
+  ],
+  "rewrites": [
+    { "source": "/landing/{:path*}", "destination": "/landing/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
