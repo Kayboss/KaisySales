@@ -1,9 +1,9 @@
 {
-  "beforeFiles": [
-    { "source": "/", "destination": "/landing/index.html" }
-  ],
-  "rewrites": [
-    { "source": "/landing/{:path*}", "destination": "/landing/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "routes": [
+    { "src": "/", "dest": "/landing/index.html" },
+    { "src": "/landing/(.*)", "dest": "/landing/$1" },
+    { "src": "/pages/(.*)", "dest": "/landing/pages/$1" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
