@@ -214,7 +214,7 @@ const RetailStores = () => {
   const loadData = async () => {
     try {
       const [data, allInvoices] = await Promise.all([fetchStores(), fetchInvoices()]);
-      setStores(data.reverse());
+      setStores(data);
       const counts = {};
       allInvoices.forEach(inv => {
         if (inv.customer) {

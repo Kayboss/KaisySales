@@ -379,7 +379,7 @@ const InventoryManagement = () => {
   const loadData = async () => {
     try {
       const data = await fetchInventory();
-      setInventory(data.reverse());
+      setInventory(data);
       setPage(1);
       const cats = await fetchCategories('inventory');
       setCategories(cats);

@@ -261,7 +261,7 @@ const Invoices = () => {
   const loadData = async () => {
     try {
       const [data, storeData, inv] = await Promise.all([fetchInvoices(), fetchStores(), fetchInventory()]);
-      setInvoices(data.reverse());
+      setInvoices(data);
       setStores(storeData);
       setInventoryItems(inv);
     } catch (error) {

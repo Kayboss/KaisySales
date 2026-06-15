@@ -351,7 +351,7 @@ const ExpenseTracking = () => {
       const [data, largestCat] = await Promise.all([
         fetchExpenses(), fetchLargestExpenseCategory()
       ]);
-      setExpenses(data.reverse());
+      setExpenses(data);
       setPage(1);
       setLargestCategory(largestCat);
       const cats = await fetchCategories('expense');
