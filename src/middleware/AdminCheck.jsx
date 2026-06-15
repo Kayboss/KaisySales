@@ -12,7 +12,7 @@ const AdminCheck = ({ children }) => {
   }
 
   if (role !== 'admin') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;

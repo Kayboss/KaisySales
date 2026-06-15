@@ -164,7 +164,7 @@ const App = () => {
       <ErrorBoundary>
         <GlobalStyles />
         <Routes>
-          <Route path="/login" element={!user ? <WelcomePage /> : <Navigate to="/" />} />
+          <Route path="/login" element={!user ? <WelcomePage /> : <Navigate to="/dashboard" />} />
           
           <Route element={<CheckAuth />}>
             <Route path="/*" element={
