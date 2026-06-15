@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriangle, ArrowRight, BookOpen } from 'lucide-react';
+import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriangle, ArrowRight, BookOpen, Clock } from 'lucide-react';
 import { fetchSales, fetchExpenses, fetchInvoices, fetchInventory } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
@@ -86,6 +86,92 @@ const ChartContainer = styled.div`
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   box-shadow: ${({ theme }) => theme.shadows.soft};
+`;
+
+const RecentSalesCard = styled.div`
+  background: white;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  box-shadow: ${({ theme }) => theme.shadows.soft};
+  overflow: hidden;
+`;
+
+const RecentSalesHeader = styled.div`
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+
+const SaleRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.5rem;
+  border-bottom: 1px solid #F0EEE8;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #FCF9F3;
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const SaleInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+`;
+
+const SaleItem = styled.div`
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #1C1B1F;
+`;
+
+const SaleMeta = styled.div`
+  font-size: 0.8rem;
+  color: #89726C;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const PaymentBadge = styled.span`
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #6F240A;
+  background: rgba(111, 36, 10, 0.08);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+`;
+
+const SaleAmount = styled.div`
+  font-weight: 800;
+  font-size: 1rem;
+  color: #6F240A;
+`;
+
+const ViewAllLink = styled.button`
+  background: none;
+  border: none;
+  color: #6F240A;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0;
+
+  &:hover {
+    text-decoration: underline;
+  }
 `;
 
 const getBezierPath = (points) => {
@@ -271,6 +357,7 @@ const BusinessOverview = () => {
     salesToday: 0,
     netProfit: 0,
     lowStock: 0,
+    recentSales: [],
     monthlyData: [],
     loading: true
   });
@@ -309,11 +396,22 @@ const BusinessOverview = () => {
       // Compute monthly dynamic performance trends
       const monthlyData = getMonthlyData(sales, invoices);
 
+      // Recent sales (top 5, already newest-first from API)
+      const recentSales = sales.slice(0, 5).map(s => ({
+        id: s.id,
+        item: s.item || 'Sale',
+        amount: s.amount || s.totalAmount,
+        paymentMethod: s.paymentMethod || 'Cash',
+        date: s.date,
+        quantity: s.quantity
+      }));
+
       setStats({
         revenue: totalRevenue,
         salesToday: salesTodayCount,
         netProfit: netProfit,
         lowStock: lowStockCount,
+        recentSales: recentSales,
         monthlyData: monthlyData,
         loading: false
       });
@@ -402,6 +500,36 @@ const BusinessOverview = () => {
           </div>
         </StatCard>
       </Grid>
+
+      <div style={{ marginBottom: '2.5rem' }}>
+        <RecentSalesCard>
+          <RecentSalesHeader>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, color: '#1C1B1F' }}>
+              <Clock size={18} /> Recent Sales
+            </div>
+            <ViewAllLink onClick={() => navigate('/sales')}>
+              View All <ArrowRight size={14} />
+            </ViewAllLink>
+          </RecentSalesHeader>
+          {stats.recentSales.length === 0 ? (
+            <SaleRow>
+              <SaleMeta style={{ padding: '0.5rem 0' }}>No sales recorded yet</SaleMeta>
+            </SaleRow>
+          ) : stats.recentSales.map(sale => (
+            <SaleRow key={sale.id}>
+              <SaleInfo>
+                <SaleItem>{sale.item}</SaleItem>
+                <SaleMeta>
+                  <span>{sale.date}</span>
+                  {sale.quantity > 1 && <span>Qty: {sale.quantity}</span>}
+                  <PaymentBadge>{sale.paymentMethod}</PaymentBadge>
+                </SaleMeta>
+              </SaleInfo>
+              <SaleAmount>{sale.amount}</SaleAmount>
+            </SaleRow>
+          ))}
+        </RecentSalesCard>
+      </div>
 
       <section>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1.5rem' }}>
