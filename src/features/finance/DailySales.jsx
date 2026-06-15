@@ -394,7 +394,7 @@ const DailySales = () => {
       const [data, inv] = await Promise.all([
         fetchSales(), fetchInventory()
       ]);
-      setSales(data.reverse());
+      setSales(data);
       setPage(1);
       setInventoryItems(inv);
     } catch (error) {
