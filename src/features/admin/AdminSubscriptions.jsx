@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Crown, Search, CheckCircle, XCircle, Clock, DollarSign } from 'lucide-react';
 import { fetchUsersWithStats, fetchSubscriptionPlans, assignSubscription, cancelSubscription, fetchAllPayments, confirmPayment } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
-import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrency } from '../../utils/currency';
 import { useSettingsStore } from '../../store/settingsStore';
 
 const TabRow = styled.div`

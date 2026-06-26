@@ -73,10 +73,16 @@ export const useSettingsStore = create((set) => ({
   updateSettings: async (uid, newSettings) => {
     set({ isLoading: true });
     try {
-      const updated = await dbService.saveUserProfile(uid, newSettings);
+      // Strip privileged fields to prevent client-side privilege escalation
+      const { role, subscriptionPlan, subscriptionStatus, subscriptionExpiresAt, ...safeSettings } = newSettings;
+      const updated = await dbService.saveUserProfile(uid, safeSettings);
       set((state) => ({
         ...state,
         ...updated,
+        role: state.role,
+        subscriptionPlan: state.subscriptionPlan,
+        subscriptionStatus: state.subscriptionStatus,
+        subscriptionExpiresAt: state.subscriptionExpiresAt,
         isLoading: false
       }));
     } catch (error) {

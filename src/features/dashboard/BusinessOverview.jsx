@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriangle, ArrowRight, BookOpen, Clock } from 'lucide-react';
 import { fetchSales, fetchExpenses, fetchInvoices, fetchInventory } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
-import { formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrencyShort } from '../../utils/currency';
 import TutorialModal, { STORAGE_KEY } from '../../components/tutorial/TutorialModal';
 
 const Grid = styled.div`

@@ -234,11 +234,20 @@ const WelcomePage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [blockedUntil, setBlockedUntil] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    // Rate limiting
+    if (blockedUntil && Date.now() < blockedUntil) {
+      const waitSeconds = Math.ceil((blockedUntil - Date.now()) / 1000);
+      setError(`Too many attempts. Please wait ${waitSeconds} seconds.`);
+      return;
+    }
 
     // Pre-submission checks for signup
     if (isSignUp) {
@@ -246,8 +255,16 @@ const WelcomePage = () => {
         setError('Secret passphrases do not match.');
         return;
       }
-      if (password.length < 6) {
-        setError('Secret passphrase must be at least 6 characters long.');
+      if (password.length < 8) {
+        setError('Secret passphrase must be at least 8 characters long.');
+        return;
+      }
+      if (!/[A-Z]/.test(password)) {
+        setError('Passphrase must contain at least one uppercase letter.');
+        return;
+      }
+      if (!/[0-9]/.test(password)) {
+        setError('Passphrase must contain at least one number.');
         return;
       }
     }
@@ -282,6 +299,13 @@ const WelcomePage = () => {
       }
       
       setError(msg);
+      setAttempts(prev => {
+        const next = prev + 1;
+        if (next >= 5) {
+          setBlockedUntil(Date.now() + Math.min(60000 * Math.pow(2, next - 5), 1800000));
+        }
+        return next;
+      });
     } finally {
       setLoading(false);
     }

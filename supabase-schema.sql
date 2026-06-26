@@ -44,7 +44,7 @@ BEGIN
   VALUES (NEW.id, NEW.email);
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS sales (
   item TEXT NOT NULL,
   category TEXT DEFAULT '',
   quantity INTEGER DEFAULT 1,
-  unit_price REAL DEFAULT 0,
+  unit_price DECIMAL(10,2) DEFAULT 0,
   amount TEXT DEFAULT '',
   payment_method TEXT DEFAULT 'Cash',
   date DATE DEFAULT NULL,
@@ -82,7 +82,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   customer TEXT NOT NULL,
   customer_location TEXT DEFAULT '',
   date DATE DEFAULT NULL,
-  total REAL DEFAULT 0,
+  total DECIMAL(10,2) DEFAULT 0,
+  amount TEXT DEFAULT '',
   status TEXT DEFAULT 'Pending',
   items JSONB DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -102,7 +103,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  amount REAL DEFAULT 0,
+  amount TEXT DEFAULT '',
   category TEXT DEFAULT '',
   date DATE DEFAULT NULL,
   trend TEXT DEFAULT 'down',
@@ -209,10 +210,16 @@ CREATE POLICY "Allow anon to delete old keep_alive records"
 -- Grant Data API access (tables must be accessible to roles for REST API to expose them)
 -- RLS policies still control row-level access per role
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
-GRANT SELECT, INSERT, DELETE ON keep_alive TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+GRANT SELECT, INSERT ON keep_alive TO anon;
 GRANT USAGE ON SEQUENCE keep_alive_id_seq TO anon;
+
+-- Migration: fix column types for existing databases
+ALTER TABLE sales ALTER COLUMN unit_price TYPE DECIMAL(10,2);
+ALTER TABLE expenses ALTER COLUMN amount TYPE TEXT;
+ALTER TABLE invoices ALTER COLUMN total TYPE DECIMAL(10,2);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS amount TEXT DEFAULT '';
 
 -- Reload PostgREST schema cache so tables are immediately available via REST API
 NOTIFY pgrst, 'reload schema';

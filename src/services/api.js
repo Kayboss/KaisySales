@@ -1,5 +1,6 @@
 import { dbService, authService, supabase } from './supabase';
 import { useAuthStore } from '../store/authStore';
+import { useSettingsStore } from '../store/settingsStore';
 
 
 /**
@@ -205,8 +206,18 @@ export const deleteCategory = async (id) => {
 // ====================================================
 // 7. ADMIN
 // ====================================================
+
+const requireAdmin = () => {
+  const { user } = useAuthStore.getState();
+  const { role } = useSettingsStore.getState();
+  if (role !== 'admin') {
+    throw new Error('Unauthorized. Admin access required.');
+  }
+  return user?.uid;
+};
 export const fetchAllProfiles = async () => {
   try {
+    requireAdmin();
     return await dbService.fetchAllProfiles();
   } catch (error) {
     console.error('Failed to fetch all profiles', error);
@@ -216,6 +227,7 @@ export const fetchAllProfiles = async () => {
 
 export const fetchUsersWithStats = async () => {
   try {
+    requireAdmin();
     return await dbService.fetchUsersWithStats();
   } catch (error) {
     console.error('Failed to fetch users with stats', error);
@@ -225,6 +237,7 @@ export const fetchUsersWithStats = async () => {
 
 export const fetchRecentActivity = async (limit = 20) => {
   try {
+    requireAdmin();
     return await dbService.fetchRecentActivity(limit);
   } catch (error) {
     console.error('Failed to fetch recent activity', error);
@@ -234,6 +247,7 @@ export const fetchRecentActivity = async (limit = 20) => {
 
 export const createSupportNote = async (note) => {
   try {
+    requireAdmin();
     return await dbService.createSupportNote(note);
   } catch (error) {
     console.error('Failed to create support note', error);
@@ -243,6 +257,7 @@ export const createSupportNote = async (note) => {
 
 export const fetchSupportNotes = async (userId) => {
   try {
+    requireAdmin();
     return await dbService.fetchSupportNotes(userId);
   } catch (error) {
     console.error('Failed to fetch support notes', error);
@@ -252,6 +267,7 @@ export const fetchSupportNotes = async (userId) => {
 
 export const fetchErrorLogs = async (limit = 20) => {
   try {
+    requireAdmin();
     return await dbService.fetchErrorLogs(limit);
   } catch (error) {
     console.error('Failed to fetch error logs', error);
@@ -261,6 +277,7 @@ export const fetchErrorLogs = async (limit = 20) => {
 
 export const updateUserStatus = async (userId, status) => {
   try {
+    requireAdmin();
     return await dbService.updateUserStatus(userId, status);
   } catch (error) {
     console.error('Failed to update user status', error);
@@ -282,6 +299,7 @@ export const fetchSubscriptionPlans = async () => {
 
 export const assignSubscription = async (userId, plan, durationDays) => {
   try {
+    requireAdmin();
     return await dbService.assignSubscription(userId, plan, durationDays);
   } catch (error) {
     console.error('Failed to assign subscription', error);
@@ -291,6 +309,7 @@ export const assignSubscription = async (userId, plan, durationDays) => {
 
 export const cancelSubscription = async (userId) => {
   try {
+    requireAdmin();
     return await dbService.cancelSubscription(userId);
   } catch (error) {
     console.error('Failed to cancel subscription', error);
@@ -309,6 +328,7 @@ export const recordPayment = async (paymentData) => {
 
 export const confirmPayment = async (paymentId, adminId) => {
   try {
+    requireAdmin();
     return await dbService.confirmPayment(paymentId, adminId);
   } catch (error) {
     console.error('Failed to confirm payment', error);
@@ -318,6 +338,7 @@ export const confirmPayment = async (paymentId, adminId) => {
 
 export const fetchAllPayments = async (limit = 50) => {
   try {
+    requireAdmin();
     return await dbService.fetchAllPayments(limit);
   } catch (error) {
     console.error('Failed to fetch payments', error);
@@ -327,6 +348,11 @@ export const fetchAllPayments = async (limit = 50) => {
 
 export const fetchUserPayments = async (userId) => {
   try {
+    const currentUid = getUid();
+    const { role } = useSettingsStore.getState();
+    if (currentUid !== userId && role !== 'admin') {
+      throw new Error('Unauthorized');
+    }
     return await dbService.fetchUserPayments(userId);
   } catch (error) {
     console.error('Failed to fetch user payments', error);

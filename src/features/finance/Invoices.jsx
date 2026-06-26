@@ -11,7 +11,8 @@ import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
-import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrency, getCurrencySymbol } from '../../utils/currency';
+import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
   display: flex;
@@ -288,22 +289,22 @@ const Invoices = () => {
     }
 
     const items = formData.items.filter(i => i.name);
-    const subtotal = items.reduce((sum, i) => sum + (parseFloat(i.quantity) * parseFloat(i.unitPrice)), 0);
-    const totalQty = items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0);
-    const discountPct = parseFloat(formData.discount) || 0;
+    const subtotal = items.reduce((sum, i) => sum + (sanitizeNumber(i.quantity) * sanitizeNumber(i.unitPrice)), 0);
+    const totalQty = items.reduce((sum, i) => sum + (sanitizeNumber(i.quantity) || 0), 0);
+    const discountPct = sanitizeNumber(formData.discount) || 0;
     const totalAmount = subtotal * (1 - discountPct / 100);
     const isPaid = formData.status === 'paid';
     
     const invoicePayload = {
-      customer: formData.customer,
-      customerLocation: formData.customerLocation,
+      customer: sanitizeInput(formData.customer, 100),
+      customerLocation: sanitizeInput(formData.customerLocation, 200),
       date: formData.date,
       quantity: totalQty,
       unitPrice: items[0]?.unitPrice || '',
       status: formData.status,
       amount: `GH₵${totalAmount.toFixed(2)}`,
       items: [
-        ...items.map(i => ({ name: i.name, quantity: parseInt(i.quantity), unitPrice: parseFloat(i.unitPrice) })),
+        ...items.map(i => ({ name: sanitizeInput(i.name, 100), quantity: sanitizeNumber(i.quantity), unitPrice: sanitizeNumber(i.unitPrice) })),
         ...(discountPct > 0 ? [{ type: '_meta', discount: discountPct }] : [])
       ]
     };
@@ -371,7 +372,7 @@ const Invoices = () => {
       closeModal();
     } catch (error) {
       console.error('Failed to save invoice', error);
-      alert('Failed to save invoice: ' + error.message);
+      alert('Failed to save invoice. Please try again.');
     } finally {
       setSaving(false);
     }

@@ -8,6 +8,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, Crown, DollarSign } from 'lucide-react';
 import SubscriptionSettings from './SubscriptionSettings';
 import { CURRENCY_OPTIONS } from '../../utils/currency';
+import { sanitizeInput } from '../../utils/sanitize';
 
 const Header = styled.div`
   display: flex;
@@ -364,14 +365,14 @@ const SettingsPage = () => {
   const handleSaveCategory = async (id) => {
     if (!editingCatName.trim()) return;
     try {
-      await updateCategory(id, { name: editingCatName.trim(), type: editingCatType });
+      await updateCategory(id, { name: sanitizeInput(editingCatName.trim(), 50), type: editingCatType });
       setEditingCatId(null);
       setEditingCatName('');
       setEditingCatType('sales');
       await loadCategories();
     } catch (error) {
       console.error('Failed to update category', error);
-      alert('Failed to update category: ' + error.message);
+      alert('Failed to update category. Please try again.');
     }
   };
 
@@ -388,7 +389,7 @@ const SettingsPage = () => {
       await loadCategories();
     } catch (error) {
       console.error('Failed to delete category', error);
-      alert('Failed to delete category: ' + error.message);
+      alert('Failed to delete category. Please try again.');
     }
   };
 
@@ -404,7 +405,12 @@ const SettingsPage = () => {
     
     setSaving(true);
     try {
-      await settings.updateSettings(user.uid, formData);
+      await settings.updateSettings(user.uid, {
+        ...formData,
+        businessName: sanitizeInput(formData.businessName, 100),
+        phone: sanitizeInput(formData.phone, 20),
+        location: sanitizeInput(formData.location, 200),
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 4000);
     } catch (error) {

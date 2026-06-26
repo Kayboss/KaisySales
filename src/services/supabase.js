@@ -14,6 +14,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { parseAmount } from '../utils/currency';
 
 // ----------------------------------------------------------------
 // Configuration
@@ -36,7 +37,7 @@ if (isConfigured) {
 let authListeners = [];
 
 function notifyListeners(user) {
-  authListeners.forEach((fn) => { try { fn(user); } catch {} });
+  authListeners.forEach((fn) => { try { fn(user); } catch (e) { if (import.meta.env.DEV) console.error('Auth listener error:', e); } });
 }
 
 function mapUser(sbUser) {
@@ -148,7 +149,9 @@ export const authService = {
           throw new Error('Your account has been suspended. Please contact support.');
         }
         migrateLocalData(data.user.id);
-        supabase.from('profiles').update({ last_sign_in_at: new Date().toISOString() }).eq('id', data.user.id).then().catch(() => {});
+        supabase.from('profiles').update({ last_sign_in_at: new Date().toISOString() }).eq('id', data.user.id).then().catch((err) => {
+          if (import.meta.env.DEV) console.error('Failed to update last_sign_in_at:', err);
+        });
       }
       return mapUser(data.user);
     }
@@ -170,10 +173,15 @@ export const authService = {
   onAuthStateChanged(callback) {
     authListeners.push(callback);
     if (supabase) {
-      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      // Get initial session first (recommended pattern for v2)
+      supabase.auth.getSession().then(({ data: { session } }) => {
         callback(session?.user ? mapUser(session.user) : null);
       });
-      return () => data.subscription.unsubscribe();
+      // Listen for subsequent changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        callback(session?.user ? mapUser(session.user) : null);
+      });
+      return () => subscription.unsubscribe();
     }
     // Mock — emit null immediately so isInitialized becomes true
     setTimeout(() => callback(null), 0);
@@ -290,12 +298,6 @@ export const dbService = {
     if (!supabase) return [];
     const profiles = await this.fetchAllProfiles();
 
-    const parseAmt = (v) => {
-      if (typeof v === 'number') return v;
-      if (typeof v !== 'string') return 0;
-      return parseFloat(v.replace(/[^\d.]/g, '')) || 0;
-    };
-
     const [allSales, allInvoices, allExpenses, allInventory] = await Promise.all([
       supabase.from('sales').select('user_id, amount'),
       supabase.from('invoices').select('user_id, total'),
@@ -308,7 +310,7 @@ export const dbService = {
       (records || []).forEach(r => {
         if (!map[r.user_id]) map[r.user_id] = { count: 0, total: 0 };
         map[r.user_id].count++;
-        if (valueKey) map[r.user_id].total += parseAmt(r[valueKey]);
+        if (valueKey) map[r.user_id].total += parseAmount(r[valueKey]);
       });
       return map;
     };
@@ -392,9 +394,12 @@ export const dbService = {
 
   async fetchSupportNotes(userId) {
     if (supabase) {
-      let query = supabase.from('support_notes').select('*').order('created_at', { ascending: false });
-      if (userId) query = query.eq('user_id', userId);
-      const { data, error } = await query;
+      if (!userId) throw new Error('userId required');
+      const { data, error } = await supabase
+        .from('support_notes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return (data || []).map(r => toCamelCase(r));
     }
@@ -514,15 +519,19 @@ export const dbService = {
   // ---------------------------------------------------
   async ensureFreeTrial(userId) {
     if (!supabase) return;
-    const { data: existing } = await supabase.from('profiles').select('subscription_plan').eq('id', userId).maybeSingle();
-    if (existing?.subscription_plan && existing.subscription_plan !== 'none') return;
-    const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-    await supabase.from('profiles').update({
-      subscription_plan: 'free',
-      subscription_status: 'active',
-      subscription_expires_at: expiresAt,
-      subscription_updated_at: new Date().toISOString(),
-    }).eq('id', userId).then().catch(() => {});
+    try {
+      const { data: existing } = await supabase.from('profiles').select('subscription_plan').eq('id', userId).maybeSingle();
+      if (existing?.subscription_plan && existing.subscription_plan !== 'none') return;
+      const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+      await supabase.from('profiles').update({
+        subscription_plan: 'free',
+        subscription_status: 'active',
+        subscription_expires_at: expiresAt,
+        subscription_updated_at: new Date().toISOString(),
+      }).eq('id', userId);
+    } catch (err) {
+      if (import.meta.env.DEV) console.error('Failed to assign free trial:', err);
+    }
   },
 
   async fetchSubscriptionPlans() {
@@ -571,6 +580,17 @@ export const dbService = {
 
   async recordPayment({ userId, plan, amount, reference, paymentMethod }) {
     if (supabase) {
+      // Server-side price validation — look up the plan's actual price
+      const { data: planRow, error: planError } = await supabase
+        .from('subscription_plans')
+        .select('price')
+        .eq('name', plan)
+        .single();
+      if (planError || !planRow) throw new Error('Invalid subscription plan.');
+      const actualPrice = parseFloat(planRow.price);
+      if (actualPrice > 0 && parseFloat(amount) !== actualPrice) {
+        throw new Error('Payment amount does not match plan price.');
+      }
       const { data, error } = await supabase
         .from('subscription_payments')
         .insert({
@@ -591,6 +611,13 @@ export const dbService = {
 
   async confirmPayment(paymentId, adminId) {
     if (supabase) {
+      const { data: adminCheck } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', adminId)
+        .eq('role', 'admin')
+        .single();
+      if (!adminCheck) throw new Error('Unauthorized. Admin access required.');
       const { data: payment } = await supabase
         .from('subscription_payments')
         .update({ status: 'confirmed', admin_id: adminId, confirmed_at: new Date().toISOString() })
@@ -647,13 +674,24 @@ export const dbService = {
 };
 
 // Standalone error logger — call from anywhere
+const SENSITIVE_PATTERNS = [
+  /Bearer\s+\S+/gi,
+  /(api[_-]?key|secret|token|password|authorization)\s*[:=]\s*['"]?\S+['"]?/gi,
+  /eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g,
+];
+const sanitizeError = (msg) => {
+  let safe = String(msg).slice(0, 1000);
+  SENSITIVE_PATTERNS.forEach((re) => { safe = safe.replace(re, '[REDACTED]'); });
+  return safe;
+};
 export const logClientError = async (error, page) => {
   if (!supabase) return;
   try {
     const { data: { user } } = await supabase.auth.getUser();
+    const errorMsg = typeof error === 'string' ? error : (error?.message || String(error));
     await supabase.from('error_logs').insert({
       user_id: user?.id || null,
-      error: typeof error === 'string' ? error : (error?.message || String(error)),
+      error: sanitizeError(errorMsg),
       page: page || window.location.pathname,
     });
   } catch {

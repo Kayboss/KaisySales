@@ -35,7 +35,7 @@ export function formatCurrency(amount, currencyCode) {
   const currency = currencyCode
     ? Object.values(CURRENCY_MAP).find(c => c.code === currencyCode) || FALLBACK
     : FALLBACK;
-  const num = typeof amount === 'string' ? parseFloat(amount.replace(/[^\d.-]/g, '')) || 0 : amount || 0;
+  const num = parseAmount(amount);
   try {
     return new Intl.NumberFormat(currency.locale, {
       style: 'currency',
@@ -52,7 +52,7 @@ export function formatCurrencyShort(amount, currencyCode) {
   const currency = currencyCode
     ? Object.values(CURRENCY_MAP).find(c => c.code === currencyCode) || FALLBACK
     : FALLBACK;
-  const num = typeof amount === 'string' ? parseFloat(amount.replace(/[^\d.-]/g, '')) || 0 : amount || 0;
+  const num = parseAmount(amount);
   return `${currency.symbol}${num.toLocaleString()}`;
 }
 
@@ -66,3 +66,9 @@ export function getCurrencySymbol(currencyCode) {
 export const CURRENCY_OPTIONS = Object.values(CURRENCY_MAP).filter(
   (c, i, arr) => arr.findIndex(x => x.code === c.code) === i
 ).map(c => ({ code: c.code, symbol: c.symbol }));
+
+export function parseAmount(amt) {
+  if (typeof amt === 'number') return amt;
+  if (typeof amt !== 'string') return 0;
+  return parseFloat(amt.replace(/[^\d.-]/g, '')) || 0;
+}

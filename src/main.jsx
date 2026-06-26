@@ -6,12 +6,21 @@ import { ThemeContextProvider } from './context/ThemeContext';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { logClientError } from './services/supabase';
 
+// Rate-limit client error logging (max 1 per 5 seconds)
+let lastErrorLog = 0;
+const rateLimitedLog = (error, source) => {
+  const now = Date.now();
+  if (now - lastErrorLog < 5000) return;
+  lastErrorLog = now;
+  logClientError(error, source);
+};
+
 // Global error handler — logs uncaught errors to the database
 window.onerror = (message, source, lineno, colno, error) => {
-  logClientError(error || message, source);
+  rateLimitedLog(error || message, source);
 };
 window.onunhandledrejection = (event) => {
-  logClientError(event.reason || 'Unhandled Promise rejection', window.location.pathname);
+  rateLimitedLog(event.reason || 'Unhandled Promise rejection', window.location.pathname);
 };
 
 ReactDOM.createRoot(document.getElementById('root')).render(

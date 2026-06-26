@@ -8,9 +8,9 @@ import { fetchSales, createSale, updateSale, deleteSale, fetchInventory, updateI
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
-import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
-import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
+import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
   display: flex;
@@ -420,17 +420,17 @@ const DailySales = () => {
       }
     }
 
-    const subtotal = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
-    const discountPct = parseFloat(formData.discount) || 0;
+    const subtotal = sanitizeNumber(formData.quantity) * sanitizeNumber(formData.unitPrice);
+    const discountPct = sanitizeNumber(formData.discount) || 0;
     const totalAmount = subtotal * (1 - discountPct / 100);
     
     const invMatch = inventoryItems.find(i => i.name === formData.item);
     
     const salePayload = {
-      item: formData.item,
+      item: sanitizeInput(formData.item, 100),
       category: invMatch?.category || '',
-      quantity: formData.quantity,
-      unitPrice: formData.unitPrice,
+      quantity: sanitizeNumber(formData.quantity),
+      unitPrice: sanitizeNumber(formData.unitPrice),
       paymentMethod: formData.paymentMethod,
       date: new Date().toISOString().split('T')[0],
       time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
@@ -465,7 +465,7 @@ const DailySales = () => {
       closeModal();
     } catch (error) {
       console.error('Failed to save sale', error);
-      alert('Failed to save sale: ' + error.message);
+      alert('Failed to save sale. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -510,12 +510,6 @@ const DailySales = () => {
 
   const totalPages = Math.ceil(filteredSales.length / PAGE_SIZE);
   const paginatedSales = filteredSales.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const parseAmount = (amt) => {
-    if (typeof amt === 'number') return amt;
-    if (typeof amt !== 'string') return 0;
-    return parseFloat(amt.replace(/[^\d.]/g, '')) || 0;
-  };
 
   const todayRevenue = sales.reduce((acc, sale) => acc + parseAmount(sale.amount || sale.totalAmount), 0);
   const itemsSold = sales.reduce((acc, sale) => acc + (parseInt(sale.quantity) || 1), 0);

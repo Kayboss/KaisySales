@@ -5,7 +5,7 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchStores, createStore, updateStore, deleteStore, fetchInvoices } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
-import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrency } from '../../utils/currency';
 
 const Header = styled.div`
   display: flex;
@@ -249,7 +249,7 @@ const RetailStores = () => {
       closeModal();
     } catch (error) {
       console.error('Failed to save store', error);
-      alert('Failed to save store: ' + error.message);
+      alert('Failed to save store. Please try again.');
     } finally {
       setSaving(false);
     }

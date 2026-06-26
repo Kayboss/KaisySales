@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { dbService } from '../../services/supabase';
 import { CURRENCY_OPTIONS } from '../../utils/currency';
+import { sanitizeInput } from '../../utils/sanitize';
 import { 
   Sparkles, 
   ArrowRight, 
@@ -644,11 +645,11 @@ const OnboardingWizard = () => {
     setLoading(true);
     try {
       const finalProfile = {
-        ownerName: formData.ownerName,
-        businessName: formData.businessName,
-        phone: formData.phone,
-        location: formData.location,
-        category: formData.category,
+        ownerName: sanitizeInput(formData.ownerName, 100),
+        businessName: sanitizeInput(formData.businessName, 100),
+        phone: sanitizeInput(formData.phone, 20),
+        location: sanitizeInput(formData.location, 200),
+        category: sanitizeInput(formData.category, 50),
         avatarColor: formData.avatarColor,
         currency: formData.currency,
         email: user.email,

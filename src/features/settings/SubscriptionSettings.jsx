@@ -4,7 +4,7 @@ import { Crown, CheckCircle, Clock, AlertCircle, CreditCard } from 'lucide-react
 import { fetchSubscriptionPlans, recordPayment, fetchUserPayments } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
-import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrency } from '../../utils/currency';
 
 const Section = styled.div`
   margin-bottom: 2rem;

@@ -6,7 +6,8 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchCategories, createCategory, fetchInvoices, fetchLargestExpenseCategory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
-import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
+import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
   display: flex;
@@ -381,13 +382,13 @@ const ExpenseTracking = () => {
       }
     }
 
-    const totalAmount = parseFloat(formData.quantity) * parseFloat(formData.unitPrice);
+    const totalAmount = sanitizeNumber(formData.quantity) * sanitizeNumber(formData.unitPrice);
 
     const expensePayload = {
-      title: formData.title,
-      category: selectedCategory,
-      quantity: formData.quantity,
-      unitPrice: formData.unitPrice,
+      title: sanitizeInput(formData.title, 100),
+      category: sanitizeInput(selectedCategory, 50),
+      quantity: sanitizeNumber(formData.quantity),
+      unitPrice: sanitizeNumber(formData.unitPrice),
       date: formData.date,
       amount: `GH₵${totalAmount.toFixed(2)}`,
       trend: 'up' // default
@@ -403,7 +404,7 @@ const ExpenseTracking = () => {
       closeModal();
     } catch (error) {
       console.error('Failed to save expense', error);
-      alert('Failed to save expense: ' + error.message);
+      alert('Failed to save expense. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -452,12 +453,6 @@ const ExpenseTracking = () => {
     };
     const csv = convertToCSV(expenses, headers);
     downloadCSV(csv, `Expenses_${new Date().toISOString().split('T')[0]}.csv`);
-  };
-
-  const parseAmount = (amt) => {
-    if (typeof amt === 'number') return amt;
-    if (typeof amt !== 'string') return 0;
-    return parseFloat(amt.replace(/[^\d.-]/g, '')) || 0;
   };
 
   const totalExpenses = expenses.reduce((acc, exp) => acc + parseAmount(exp.amount), 0);

@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Search, Mail, Calendar, Package, ShoppingCart, CreditCard, ToggleLeft, ToggleRight } from 'lucide-react';
 import { fetchUsersWithStats, updateUserStatus } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrencyShort } from '../../utils/currency';
 import { useSettingsStore } from '../../store/settingsStore';
 
 const SearchBar = styled.div`
@@ -190,8 +190,12 @@ const AdminUsers = () => {
   };
 
   useEffect(() => {
-    loadData();
-    setLoading(false);
+    const init = async () => {
+      setLoading(true);
+      await loadData();
+      setLoading(false);
+    };
+    init();
   }, []);
 
   const handleToggleStatus = async (u) => {

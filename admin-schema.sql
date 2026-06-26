@@ -11,9 +11,35 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'GHS';
 
 -- 2. Create is_admin() security definer function
 CREATE OR REPLACE FUNCTION is_admin()
-RETURNS BOOLEAN AS $$
-  SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin');
+RETURNS BOOLEAN SET search_path = '' AS $$
+  SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin');
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- 2b. Trigger to prevent non-admin users from changing privileged columns
+CREATE OR REPLACE FUNCTION prevent_privilege_escalation()
+RETURNS TRIGGER SET search_path = '' AS $$
+BEGIN
+  IF NEW.role IS DISTINCT FROM OLD.role AND NOT EXISTS 
+    (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin') THEN
+    RAISE EXCEPTION 'Cannot change role without admin privileges';
+  END IF;
+  IF NEW.subscription_plan IS DISTINCT FROM OLD.subscription_plan AND NOT EXISTS 
+    (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin') THEN
+    RAISE EXCEPTION 'Cannot change subscription plan without admin privileges';
+  END IF;
+  IF NEW.subscription_status IS DISTINCT FROM OLD.subscription_status AND NOT EXISTS 
+    (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin') THEN
+    RAISE EXCEPTION 'Cannot change subscription status without admin privileges';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS check_profile_update ON public.profiles;
+CREATE TRIGGER check_profile_update
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION prevent_privilege_escalation();
 
 -- 3. Create support_notes table
 CREATE TABLE IF NOT EXISTS support_notes (
@@ -51,10 +77,18 @@ DROP POLICY IF EXISTS "Admins can delete support notes" ON support_notes;
 CREATE POLICY "Admins can delete support notes" ON support_notes
   FOR DELETE USING (is_admin());
 
+DROP POLICY IF EXISTS "Users can read own support notes" ON support_notes;
+CREATE POLICY "Users can read own support notes" ON support_notes
+  FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert own support notes" ON support_notes;
+CREATE POLICY "Users can insert own support notes" ON support_notes
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
 -- 7. RLS policies for error_logs
 DROP POLICY IF EXISTS "Anyone can insert error logs" ON error_logs;
 CREATE POLICY "Anyone can insert error logs" ON error_logs
-  FOR INSERT WITH CHECK (true);
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
 DROP POLICY IF EXISTS "Admins can read error logs" ON error_logs;
 CREATE POLICY "Admins can read error logs" ON error_logs
@@ -169,5 +203,61 @@ UPDATE profiles SET role = 'admin' WHERE email = 'tripelkay@gmail.com';
 -- 11. Verify
 SELECT email, business_name, role FROM profiles WHERE role = 'admin';
 
--- 12. Reload schema cache
+-- 12. TOCTOU prevention: atomic limit enforcement trigger
+CREATE OR REPLACE FUNCTION check_subscription_limit()
+RETURNS TRIGGER SET search_path = '' AS $$
+DECLARE
+  plan_limit INTEGER;
+  current_count INTEGER;
+  plan_name TEXT;
+BEGIN
+  SELECT subscription_plan INTO plan_name FROM public.profiles WHERE id = NEW.user_id;
+  IF plan_name IS NULL OR plan_name = 'none' OR plan_name = 'gold' THEN
+    RETURN NEW;
+  END IF;
+  IF TG_TABLE_NAME = 'sales' THEN
+    SELECT (features->>'max_sales_month')::INTEGER INTO plan_limit
+      FROM public.subscription_plans WHERE name = plan_name;
+    SELECT COUNT(*) INTO current_count FROM public.sales
+      WHERE user_id = NEW.user_id
+        AND date >= date_trunc('month', CURRENT_DATE)
+        AND date < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month';
+  ELSIF TG_TABLE_NAME = 'invoices' THEN
+    SELECT (features->>'max_invoices_month')::INTEGER INTO plan_limit
+      FROM public.subscription_plans WHERE name = plan_name;
+    SELECT COUNT(*) INTO current_count FROM public.invoices
+      WHERE user_id = NEW.user_id
+        AND date >= date_trunc('month', CURRENT_DATE)
+        AND date < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month';
+  ELSIF TG_TABLE_NAME = 'inventory' THEN
+    SELECT (features->>'max_products')::INTEGER INTO plan_limit
+      FROM public.subscription_plans WHERE name = plan_name;
+    SELECT COUNT(*) INTO current_count FROM public.inventory
+      WHERE user_id = NEW.user_id;
+  ELSE
+    RETURN NEW;
+  END IF;
+  IF plan_limit IS NOT NULL AND plan_limit >= 0 AND current_count >= plan_limit THEN
+    RAISE EXCEPTION 'Plan limit reached for %: maximum % % this period', plan_name, plan_limit, TG_TABLE_NAME;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS enforce_subscription_limit ON public.sales;
+CREATE TRIGGER enforce_subscription_limit
+  BEFORE INSERT ON public.sales
+  FOR EACH ROW EXECUTE FUNCTION check_subscription_limit();
+
+DROP TRIGGER IF EXISTS enforce_subscription_limit ON public.invoices;
+CREATE TRIGGER enforce_subscription_limit
+  BEFORE INSERT ON public.invoices
+  FOR EACH ROW EXECUTE FUNCTION check_subscription_limit();
+
+DROP TRIGGER IF EXISTS enforce_subscription_limit ON public.inventory;
+CREATE TRIGGER enforce_subscription_limit
+  BEFORE INSERT ON public.inventory
+  FOR EACH ROW EXECUTE FUNCTION check_subscription_limit();
+
+-- 13. Reload schema cache
 NOTIFY pgrst, 'reload schema';

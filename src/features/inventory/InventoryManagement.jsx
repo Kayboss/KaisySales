@@ -8,9 +8,9 @@ import { fetchInventory, createInventoryItem, updateInventoryItem, deleteInvento
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
-import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const PAGE_SIZE = 20;
 
@@ -419,14 +419,14 @@ const InventoryManagement = () => {
       }
     }
 
-    const stockNum = parseInt(formData.stock, 10);
-    const minStock = parseInt(formData.minStock) || 5;
+    const stockNum = sanitizeNumber(formData.stock);
+    const minStock = sanitizeNumber(formData.minStock) || 5;
     const itemPayload = {
-      name: formData.name,
-      category: selectedCategory,
+      name: sanitizeInput(formData.name, 100),
+      category: sanitizeInput(selectedCategory, 50),
       stock: stockNum,
       minStock: minStock,
-      price: `GH₵${parseFloat(formData.price).toFixed(2)}`,
+      price: `GH₵${sanitizeNumber(formData.price).toFixed(2)}`,
       status: stockNum > minStock ? 'In Stock' : stockNum > 0 ? 'Low Stock' : 'Out of Stock'
     };
     
@@ -440,7 +440,7 @@ const InventoryManagement = () => {
       closeModal();
     } catch (error) {
       console.error('Failed to save inventory item', error);
-      alert('Failed to save inventory item: ' + error.message);
+      alert('Failed to save inventory item. Please try again.');
     } finally {
       setSaving(false);
     }

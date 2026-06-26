@@ -49,7 +49,7 @@ export const checkCreateLimit = async (supabase, uid, plan, type) => {
     .gte(dateField, start)
     .lte(dateField, end);
 
-  if (error) return { allowed: true };
+  if (error) return { allowed: false, message: 'Unable to verify plan limits. Please try again.' };
 
   if (count >= limit) {
     const planName = plan === 'none' ? 'No plan' : plan.charAt(0).toUpperCase() + plan.slice(1);
@@ -69,7 +69,7 @@ export const isSubscriptionExpired = (plan, status, expiresAt) => {
   if (plan === 'gold' || plan === 'silver') {
     if (status === 'confirmed' || status === 'active') return false;
     if (expiresAt && new Date(expiresAt) < new Date()) return true;
-    return status !== 'pending';
+    return true;
   }
   if (plan === 'free') {
     if (expiresAt && new Date(expiresAt) < new Date()) return true;
