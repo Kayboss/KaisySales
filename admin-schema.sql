@@ -125,6 +125,16 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT '
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS subscription_updated_at TIMESTAMPTZ;
 
+-- Replace handle_new_user to set free trial atomically on profile creation
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER SET search_path = '' AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, subscription_plan, subscription_status, subscription_expires_at)
+  VALUES (NEW.id, NEW.email, 'free', 'active', NOW() + INTERVAL '3 days');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- 11b. Create subscription_plans table
 CREATE TABLE IF NOT EXISTS subscription_plans (
   id BIGSERIAL PRIMARY KEY,

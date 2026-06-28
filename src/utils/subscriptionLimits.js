@@ -65,7 +65,7 @@ export const checkCreateLimit = async (supabase, uid, plan, type) => {
 };
 
 export const isSubscriptionExpired = (plan, status, expiresAt) => {
-  if (plan === 'none' || !plan) return true;
+  if (plan === 'none' || !plan) return false;
   if (plan === 'gold' || plan === 'silver') {
     if (status === 'confirmed' || status === 'active') return false;
     if (expiresAt && new Date(expiresAt) < new Date()) return true;
