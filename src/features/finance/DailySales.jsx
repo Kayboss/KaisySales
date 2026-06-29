@@ -8,6 +8,7 @@ import { fetchSales, createSale, updateSale, deleteSale, fetchInventory, updateI
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';

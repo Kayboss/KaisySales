@@ -530,7 +530,7 @@ export const dbService = {
         subscription_updated_at: new Date().toISOString(),
       }).eq('id', userId);
     } catch (err) {
-      if (import.meta.env.DEV) console.error('Failed to assign free trial:', err);
+      console.error('Failed to assign free trial:', err);
     }
   },
 

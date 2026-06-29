@@ -23,13 +23,18 @@ BEGIN
     (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin') THEN
     RAISE EXCEPTION 'Cannot change role without admin privileges';
   END IF;
+  -- Allow users to accept free trial (NULL/'none' → 'free')
   IF NEW.subscription_plan IS DISTINCT FROM OLD.subscription_plan AND NOT EXISTS 
     (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin') THEN
-    RAISE EXCEPTION 'Cannot change subscription plan without admin privileges';
+    IF NOT (NEW.subscription_plan = 'free' AND (OLD.subscription_plan IS NULL OR OLD.subscription_plan = 'none')) THEN
+      RAISE EXCEPTION 'Cannot change subscription plan without admin privileges';
+    END IF;
   END IF;
   IF NEW.subscription_status IS DISTINCT FROM OLD.subscription_status AND NOT EXISTS 
     (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin') THEN
-    RAISE EXCEPTION 'Cannot change subscription status without admin privileges';
+    IF NOT (NEW.subscription_status = 'active' AND (OLD.subscription_status IS NULL OR OLD.subscription_status = 'none')) THEN
+      RAISE EXCEPTION 'Cannot change subscription status without admin privileges';
+    END IF;
   END IF;
   RETURN NEW;
 END;
@@ -210,64 +215,14 @@ GRANT USAGE ON SEQUENCE error_logs_id_seq TO authenticated;
 -- 10. Set yourself as admin
 UPDATE profiles SET role = 'admin' WHERE email = 'tripelkay@gmail.com';
 
--- 11. Verify
+-- 12. Remove subscription limit triggers (causes INSERT hang on sales)
+DROP TRIGGER IF EXISTS enforce_subscription_limit ON public.sales;
+DROP TRIGGER IF EXISTS enforce_subscription_limit ON public.invoices;
+DROP TRIGGER IF EXISTS enforce_subscription_limit ON public.inventory;
+DROP FUNCTION IF EXISTS check_subscription_limit();
+
+-- 13. Verify
 SELECT email, business_name, role FROM profiles WHERE role = 'admin';
 
--- 12. TOCTOU prevention: atomic limit enforcement trigger
-CREATE OR REPLACE FUNCTION check_subscription_limit()
-RETURNS TRIGGER SET search_path = '' AS $$
-DECLARE
-  plan_limit INTEGER;
-  current_count INTEGER;
-  plan_name TEXT;
-BEGIN
-  SELECT subscription_plan INTO plan_name FROM public.profiles WHERE id = NEW.user_id;
-  IF plan_name IS NULL OR plan_name = 'none' OR plan_name = 'gold' THEN
-    RETURN NEW;
-  END IF;
-  IF TG_TABLE_NAME = 'sales' THEN
-    SELECT (features->>'max_sales_month')::INTEGER INTO plan_limit
-      FROM public.subscription_plans WHERE name = plan_name;
-    SELECT COUNT(*) INTO current_count FROM public.sales
-      WHERE user_id = NEW.user_id
-        AND date >= date_trunc('month', CURRENT_DATE)
-        AND date < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month';
-  ELSIF TG_TABLE_NAME = 'invoices' THEN
-    SELECT (features->>'max_invoices_month')::INTEGER INTO plan_limit
-      FROM public.subscription_plans WHERE name = plan_name;
-    SELECT COUNT(*) INTO current_count FROM public.invoices
-      WHERE user_id = NEW.user_id
-        AND date >= date_trunc('month', CURRENT_DATE)
-        AND date < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month';
-  ELSIF TG_TABLE_NAME = 'inventory' THEN
-    SELECT (features->>'max_products')::INTEGER INTO plan_limit
-      FROM public.subscription_plans WHERE name = plan_name;
-    SELECT COUNT(*) INTO current_count FROM public.inventory
-      WHERE user_id = NEW.user_id;
-  ELSE
-    RETURN NEW;
-  END IF;
-  IF plan_limit IS NOT NULL AND plan_limit >= 0 AND current_count >= plan_limit THEN
-    RAISE EXCEPTION 'Plan limit reached for %: maximum % % this period', plan_name, plan_limit, TG_TABLE_NAME;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS enforce_subscription_limit ON public.sales;
-CREATE TRIGGER enforce_subscription_limit
-  BEFORE INSERT ON public.sales
-  FOR EACH ROW EXECUTE FUNCTION check_subscription_limit();
-
-DROP TRIGGER IF EXISTS enforce_subscription_limit ON public.invoices;
-CREATE TRIGGER enforce_subscription_limit
-  BEFORE INSERT ON public.invoices
-  FOR EACH ROW EXECUTE FUNCTION check_subscription_limit();
-
-DROP TRIGGER IF EXISTS enforce_subscription_limit ON public.inventory;
-CREATE TRIGGER enforce_subscription_limit
-  BEFORE INSERT ON public.inventory
-  FOR EACH ROW EXECUTE FUNCTION check_subscription_limit();
-
--- 13. Reload schema cache
+-- 14. Reload schema cache
 NOTIFY pgrst, 'reload schema';
