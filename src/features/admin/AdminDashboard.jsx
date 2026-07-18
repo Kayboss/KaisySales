@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Shield, Users, Activity, MessageSquare, Crown, LogOut, ArrowLeft } from 'lucide-react';
+import { Shield, Users, Activity, MessageSquare, Crown, Bug, LogOut, ArrowLeft } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import AdminOverview from './AdminOverview';
 import AdminUsers from './AdminUsers';
 import AdminActivity from './AdminActivity';
 import AdminSupport from './AdminSupport';
 import AdminSubscriptions from './AdminSubscriptions';
+import AdminErrors from './AdminErrors';
 
 const PageWrapper = styled.div`
   min-height: 100vh;
@@ -178,6 +179,7 @@ const TABS = [
   { id: 'users', label: 'Users', icon: Users },
   { id: 'activity', label: 'Activity', icon: Activity },
   { id: 'support', label: 'Support', icon: MessageSquare },
+  { id: 'errors', label: 'Errors', icon: Bug },
   { id: 'subscriptions', label: 'Subs', icon: Crown },
 ];
 
@@ -229,6 +231,7 @@ const AdminDashboard = () => {
         {activeTab === 'users' && <AdminUsers />}
         {activeTab === 'activity' && <AdminActivity />}
         {activeTab === 'support' && <AdminSupport />}
+        {activeTab === 'errors' && <AdminErrors />}
         {activeTab === 'subscriptions' && <AdminSubscriptions />}
       </Container>
     </PageWrapper>

@@ -13,6 +13,7 @@ export const useSettingsStore = create((set) => ({
   phone: '',
   location: '',
   category: '',
+  businessType: 'retail',
   avatarColor: '#6F240A',
   role: 'user',
   status: 'active',
@@ -38,6 +39,7 @@ export const useSettingsStore = create((set) => ({
           phone: profile.phone || '',
           location: profile.location || '',
           category: profile.category || '',
+          businessType: profile.businessType || profile.business_type || 'retail',
           avatarColor: profile.avatarColor || '#6F240A',
           role: profile.role || 'user',
           status: profile.status || 'active',
@@ -91,6 +93,12 @@ export const useSettingsStore = create((set) => ({
       throw error;
     }
   },
+
+  /**
+   * Live-update avatarColor in local state only (for theme preview).
+   * Does NOT persist to DB — the user must click "Save Changes" for that.
+   */
+  setAvatarColor: (color) => set({ avatarColor: color }),
 
   /**
    * Resets local settings to default empty state

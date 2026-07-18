@@ -342,6 +342,7 @@ const ExpenseTracking = () => {
   const [largestCategory, setLargestCategory] = useState('N/A');
 
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '', category: '', quantity: 1, unitPrice: '', date: '', newCategory: ''
@@ -426,13 +427,16 @@ const ExpenseTracking = () => {
   };
 
   const handleDelete = async (id) => {
+    setDeleting(true);
     try {
       await deleteExpense(id);
       await loadData();
     } catch (error) {
       console.error('Failed to delete expense', error);
+    } finally {
+      setDeleteTarget(null);
+      setDeleting(false);
     }
-    setDeleteTarget(null);
   };
 
   const closeModal = () => {
@@ -685,11 +689,13 @@ const ExpenseTracking = () => {
 
       {deleteTarget && (
         <ConfirmDialog
+          isOpen={!!deleteTarget}
           title="Delete Expense"
           message={'Delete ' + deleteTarget.title + '? This cannot be undone.'}
           confirmLabel="Delete"
           onConfirm={() => handleDelete(deleteTarget.id)}
           onCancel={() => setDeleteTarget(null)}
+          confirmLoading={deleting}
         />
       )}
     </div>

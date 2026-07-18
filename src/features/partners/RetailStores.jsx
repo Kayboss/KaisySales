@@ -200,6 +200,7 @@ const RetailStores = () => {
   const [editId, setEditId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '', type: '', location: '', phone: '', contactName: ''
@@ -269,13 +270,16 @@ const RetailStores = () => {
   };
 
   const handleDelete = async (id) => {
+    setDeleting(true);
     try {
       await deleteStore(id);
       await loadData();
     } catch (error) {
       console.error('Failed to delete store', error);
+    } finally {
+      setDeleteTarget(null);
+      setDeleting(false);
     }
-    setDeleteTarget(null);
   };
 
   const closeModal = () => {
@@ -498,11 +502,13 @@ const RetailStores = () => {
 
       {deleteTarget && (
         <ConfirmDialog
+          isOpen={!!deleteTarget}
           title="Delete Store"
           message={'Delete ' + deleteTarget.name + '? This cannot be undone.'}
           confirmLabel="Delete"
           onConfirm={() => handleDelete(deleteTarget.id)}
           onCancel={() => setDeleteTarget(null)}
+          confirmLoading={deleting}
         />
       )}
     </div>

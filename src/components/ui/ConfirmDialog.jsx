@@ -99,16 +99,17 @@ const DeleteBtn = styled.button`
   padding: 0.75rem;
   border-radius: 10px;
   border: none;
-  background: #BA1A1A;
+  background: ${({ $loading }) => $loading ? '#D88C8C' : '#BA1A1A'};
   color: white;
   font-weight: 700;
   font-size: 0.875rem;
-  cursor: pointer;
+  cursor: ${({ $loading }) => $loading ? 'not-allowed' : 'pointer'};
 
-  &:hover { background: #93000A; }
+  &:hover { background: ${({ $loading }) => $loading ? '#D88C8C' : '#93000A'}; }
 `;
 
-const ConfirmDialog = ({ title, message, confirmLabel, onConfirm, onCancel }) => {
+const ConfirmDialog = ({ isOpen, title, message, confirmLabel, onConfirm, onCancel, confirmLoading }) => {
+  if (!isOpen) return null;
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
@@ -126,7 +127,7 @@ const ConfirmDialog = ({ title, message, confirmLabel, onConfirm, onCancel }) =>
           <Message>{message}</Message>
           <Actions>
             <CancelBtn onClick={onCancel}>Cancel</CancelBtn>
-            <DeleteBtn onClick={onConfirm}>{confirmLabel || 'Delete'}</DeleteBtn>
+            <DeleteBtn $loading={confirmLoading} disabled={confirmLoading} onClick={onConfirm}>{confirmLoading ? 'Deleting...' : (confirmLabel || 'Delete')}</DeleteBtn>
           </Actions>
         </Body>
       </Card>

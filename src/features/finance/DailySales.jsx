@@ -385,6 +385,7 @@ const DailySales = () => {
 
   const [saving, setSaving] = useState(false);
   const [limitError, setLimitError] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     item: '', quantity: 1, unitPrice: '', paymentMethod: 'Cash', discount: 0
@@ -487,14 +488,16 @@ const DailySales = () => {
   };
 
   const handleDelete = async (id) => {
+    setDeleting(true);
     try {
       await deleteSale(id);
       await loadData();
     } catch (error) {
       console.error('Failed to delete sale', error);
-      alert('Delete failed: ' + error.message);
+    } finally {
+      setDeleteTarget(null);
+      setDeleting(false);
     }
-    setDeleteTarget(null);
   };
 
   const closeModal = () => {
@@ -796,11 +799,13 @@ const DailySales = () => {
 
       {deleteTarget && (
         <ConfirmDialog
+          isOpen={!!deleteTarget}
           title="Delete Sale"
           message={'Delete ' + deleteTarget.item + '? This cannot be undone.'}
           confirmLabel="Delete"
           onConfirm={() => handleDelete(deleteTarget.id)}
           onCancel={() => setDeleteTarget(null)}
+          confirmLoading={deleting}
         />
       )}
     </div>

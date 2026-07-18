@@ -372,6 +372,8 @@ const InventoryManagement = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [saving, setSaving] = useState(false);
   const [limitError, setLimitError] = useState(null);
+  const [adjustingId, setAdjustingId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '', category: '', stock: '', price: '', minStock: 5, newCategory: ''
@@ -463,13 +465,16 @@ const InventoryManagement = () => {
   };
 
   const handleDelete = async (id) => {
+    setDeleting(true);
     try {
       await deleteInventoryItem(id);
       await loadData();
     } catch (error) {
       console.error('Failed to delete inventory item', error);
+    } finally {
+      setDeleteTarget(null);
+      setDeleting(false);
     }
-    setDeleteTarget(null);
   };
 
   const closeModal = () => {
@@ -480,6 +485,7 @@ const InventoryManagement = () => {
   };
 
   const adjustStock = async (item, delta) => {
+    setAdjustingId(item.id);
     try {
       const newStock = Math.max(0, (parseInt(item.stock) || 0) + delta);
       const minStock = parseInt(item.minStock) || 5;
@@ -490,6 +496,8 @@ const InventoryManagement = () => {
       await loadData();
     } catch (error) {
       console.error('Failed to adjust stock', error);
+    } finally {
+      setAdjustingId(null);
     }
   };
 
@@ -663,9 +671,9 @@ const InventoryManagement = () => {
               <Td>{item.category}</Td>
               <Td className="data-tabular">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <button type="button" onClick={() => adjustStock(item, -1)} style={{ background: 'none', border: '1px solid #D0C8C4', borderRadius: '4px', cursor: 'pointer', display: 'flex', padding: '2px', color: '#BA1A1A' }} title="Decrease"><Minus size={14} /></button>
+                  <button type="button" disabled={adjustingId === item.id} onClick={() => adjustStock(item, -1)} style={{ background: 'none', border: '1px solid #D0C8C4', borderRadius: '4px', cursor: adjustingId === item.id ? 'not-allowed' : 'pointer', display: 'flex', padding: '2px', color: '#BA1A1A', opacity: adjustingId === item.id ? 0.5 : 1 }} title="Decrease"><Minus size={14} /></button>
                   <span style={{ minWidth: '24px', textAlign: 'center' }}>{item.stock}</span>
-                  <button type="button" onClick={() => adjustStock(item, 1)} style={{ background: 'none', border: '1px solid #D0C8C4', borderRadius: '4px', cursor: 'pointer', display: 'flex', padding: '2px', color: '#25432F' }} title="Increase"><Plus size={14} /></button>
+                  <button type="button" disabled={adjustingId === item.id} onClick={() => adjustStock(item, 1)} style={{ background: 'none', border: '1px solid #D0C8C4', borderRadius: '4px', cursor: adjustingId === item.id ? 'not-allowed' : 'pointer', display: 'flex', padding: '2px', color: '#25432F', opacity: adjustingId === item.id ? 0.5 : 1 }} title="Increase"><Plus size={14} /></button>
                 </div>
               </Td>
               <Td className="data-tabular" style={{ fontWeight: 600 }}>{item.price}</Td>
@@ -698,9 +706,9 @@ const InventoryManagement = () => {
               <InvStockRow>
                 <InvStockLabel>Stock</InvStockLabel>
                 <InvStockControls>
-                  <InvStockBtn onClick={() => adjustStock(item, -1)} $color="#BA1A1A"><Minus size={14} /></InvStockBtn>
+                  <InvStockBtn disabled={adjustingId === item.id} onClick={() => adjustStock(item, -1)} $color="#BA1A1A" style={{ opacity: adjustingId === item.id ? 0.5 : 1 }}><Minus size={14} /></InvStockBtn>
                   <InvStockValue className="data-tabular">{item.stock}</InvStockValue>
-                  <InvStockBtn onClick={() => adjustStock(item, 1)} $color="#25432F"><Plus size={14} /></InvStockBtn>
+                  <InvStockBtn disabled={adjustingId === item.id} onClick={() => adjustStock(item, 1)} $color="#25432F" style={{ opacity: adjustingId === item.id ? 0.5 : 1 }}><Plus size={14} /></InvStockBtn>
                 </InvStockControls>
               </InvStockRow>
               <InvPriceRow>
@@ -739,11 +747,13 @@ const InventoryManagement = () => {
 
       {deleteTarget && (
         <ConfirmDialog
+          isOpen={!!deleteTarget}
           title="Delete Item"
           message={'Delete ' + deleteTarget.name + '? This cannot be undone.'}
           confirmLabel="Delete"
           onConfirm={() => handleDelete(deleteTarget.id)}
           onCancel={() => setDeleteTarget(null)}
+          confirmLoading={deleting}
         />
       )}
     </div>

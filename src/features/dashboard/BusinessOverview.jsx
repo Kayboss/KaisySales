@@ -349,7 +349,7 @@ const RestockLink = styled.button`
 `;
 
 const BusinessOverview = () => {
-  const { currency } = useSettingsStore();
+  const { currency, businessType } = useSettingsStore();
   const navigate = useNavigate();
   const [showTutorial, setShowTutorial] = useState(false);
   const [stats, setStats] = useState({
@@ -424,7 +424,7 @@ const BusinessOverview = () => {
   useEffect(() => {
     loadStats();
 
-    if (!localStorage.getItem(STORAGE_KEY)) {
+    if (!localStorage.getItem(STORAGE_KEY) && businessType !== 'services') {
       setShowTutorial(true);
     }
 
@@ -450,9 +450,11 @@ const BusinessOverview = () => {
           <h1 style={{ fontSize: '2rem' }}>Business Dashboard</h1>
           <p style={{ color: '#55423D' }}>Your revenue, sales, and growth at a glance.</p>
         </div>
+        {businessType !== 'services' && (
         <button onClick={() => setShowTutorial(true)} style={{ background: 'white', border: '1px solid #E0D6D0', borderRadius: '20px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#6F240A' }}>
           <BookOpen size={14} /> Tutorial
         </button>
+        )}
       </header>
 
       {stats.lowStock > 0 && (
@@ -554,11 +556,13 @@ const BusinessOverview = () => {
         </ChartContainer>
       </section>
 
-      <TutorialModal
-        isOpen={showTutorial}
-        onClose={() => setShowTutorial(false)}
-        autoShow
-      />
+      {businessType !== 'services' && (
+        <TutorialModal
+          isOpen={showTutorial}
+          onClose={() => setShowTutorial(false)}
+          autoShow
+        />
+      )}
     </div>
   );
 };

@@ -221,5 +221,29 @@ ALTER TABLE expenses ALTER COLUMN amount TYPE TEXT;
 ALTER TABLE invoices ALTER COLUMN total TYPE DECIMAL(10,2);
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS amount TEXT DEFAULT '';
 
+-- Page Visits Tracking
+CREATE TABLE IF NOT EXISTS page_visits (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  device_type TEXT DEFAULT 'desktop',
+  location TEXT DEFAULT '',
+  page TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE page_visits ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admins can read all visits" ON page_visits;
+CREATE POLICY "Admins can read all visits"
+  ON page_visits FOR SELECT
+  USING (auth.uid() IN (SELECT id FROM profiles WHERE role = 'admin'));
+
+DROP POLICY IF EXISTS "Users can insert own visits" ON page_visits;
+CREATE POLICY "Users can insert own visits"
+  ON page_visits FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+GRANT SELECT, INSERT ON page_visits TO authenticated;
+
 -- Reload PostgREST schema cache so tables are immediately available via REST API
 NOTIFY pgrst, 'reload schema';

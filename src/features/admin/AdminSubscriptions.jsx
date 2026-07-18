@@ -460,23 +460,29 @@ const AdminSubscriptions = () => {
 
   const FEATURES = {
     free: [
-      'Up to 10 sales',
+      'Up to 10 sales/income records',
       'Up to 2 invoices',
       'Up to 5 products',
+      'Up to 5 customers',
+      'Up to 3 projects',
       'Basic reporting',
       '3-day free trial',
     ],
     silver: [
-      'Up to 100 sales per month',
+      'Up to 100 sales/income records per month',
       'Up to 20 invoices per month',
       'Up to 50 products',
+      'Unlimited customers',
+      'Unlimited projects',
       'Basic reports',
       'Email support',
     ],
     gold: [
-      'Unlimited sales',
+      'Unlimited sales/income records',
       'Unlimited invoices',
       'Unlimited products',
+      'Unlimited customers',
+      'Unlimited projects',
       'Advanced reports & charts',
       'Priority support',
     ],

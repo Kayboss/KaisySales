@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Users, TrendingUp, ShoppingCart, DollarSign, Clock, AlertCircle, Bug } from 'lucide-react';
+import { Users, TrendingUp, ShoppingCart, Clock, AlertCircle, DollarSign } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { fetchAllProfiles, fetchRecentActivity, fetchErrorLogs } from '../../services/api';
+import { fetchAllProfiles, fetchRecentActivity, fetchUsersWithStats, fetchVisitStats } from '../../services/api';
+import { formatCurrencyShort } from '../../utils/currency';
+import { useSettingsStore } from '../../store/settingsStore';
 
 const Grid = styled.div`
   display: grid;
@@ -105,62 +107,71 @@ const StatusPill = styled.div`
   font-size: 0.85rem;
 `;
 
-const ErrorFeed = styled.div`
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #F0EEE8;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-`;
-
-const ErrorItem = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border-bottom: 1px solid #F0EEE8;
-  font-size: 0.8rem;
-
-  &:last-child { border-bottom: none; }
+const ThreeCol = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 1.5rem;
 
   @media (min-width: 768px) {
-    align-items: center;
-    padding: 0.75rem 1rem;
+    grid-template-columns: repeat(3, 1fr);
   }
 `;
 
-const ErrorText = styled.span`
-  flex: 1;
-  color: #BA1A1A;
+const InsightCard = styled.div`
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #F0EEE8;
+  padding: 1.25rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+`;
+
+const InsightTitle = styled.h4`
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #89726C;
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #F0EEE8;
+`;
+
+const InsightUser = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  font-size: 0.82rem;
+  border-bottom: 1px solid #F5F3F0;
+
+  &:last-child { border-bottom: none; }
+`;
+
+const InsightName = styled.span`
   font-weight: 600;
+  color: #1C1C18;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0;
 `;
 
-const ErrorPage = styled.span`
-  color: #89726C;
-  font-size: 0.7rem;
-  font-weight: 600;
-`;
-
-const ErrorTime = styled.span`
-  color: #89726C;
-  font-size: 0.7rem;
+const InsightValue = styled.span`
+  font-weight: 800;
+  color: #6F240A;
+  font-size: 0.82rem;
   white-space: nowrap;
+  margin-left: 0.5rem;
 `;
 
-const ErrorUser = styled.span`
-  color: #55423D;
-  font-size: 0.7rem;
-  font-weight: 600;
-  background: #F0EEE8;
-  padding: 2px 6px;
-  border-radius: 4px;
-  white-space: nowrap;
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+const UserStatusDot = styled.span`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: ${props =>
+    props.$status === 'active' ? '#25432F' :
+    props.$status === 'dormant' ? '#875200' : '#BA1A1A'};
+  flex-shrink: 0;
 `;
 
 const getUserStatus = (lastSignInAt) => {
@@ -172,22 +183,26 @@ const getUserStatus = (lastSignInAt) => {
 };
 
 const AdminOverview = () => {
+  const { currency } = useSettingsStore();
   const [profiles, setProfiles] = useState([]);
+  const [usersWithStats, setUsersWithStats] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
-  const [errorLogs, setErrorLogs] = useState([]);
+  const [visitStats, setVisitStats] = useState({ deviceData: [], locationData: [], dailyVisits: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [p, a, e] = await Promise.all([
+        const [p, u, a, v] = await Promise.all([
           fetchAllProfiles(),
+          fetchUsersWithStats(),
           fetchRecentActivity(20),
-          fetchErrorLogs(10),
+          fetchVisitStats(),
         ]);
         setProfiles(p);
+        setUsersWithStats(u);
         setRecentActivity(a);
-        setErrorLogs(e);
+        setVisitStats(v);
       } catch (err) {
         console.error('Failed to load overview data', err);
       } finally {
@@ -222,7 +237,7 @@ const AdminOverview = () => {
   }).length;
 
   const activityCount = recentActivity.length;
-  const recentSales = recentActivity.filter(a => a.type === 'sales').length;
+  const recentSales = recentActivity.filter(a => a.type === 'sales' || a.type === 'service_income').length;
 
   const chartData = [];
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -235,6 +250,18 @@ const AdminOverview = () => {
     }).length;
     chartData.push({ day: dayLabel, signups: count });
   }
+
+  const topRevenue = [...usersWithStats]
+    .sort((a, b) => ((b.salesRevenue || 0) + (b.serviceIncomeTotal || 0)) - ((a.salesRevenue || 0) + (a.serviceIncomeTotal || 0)))
+    .slice(0, 5);
+
+  const activeUserList = profiles
+    .filter(p => getUserStatus(p.lastSignInAt) === 'active')
+    .sort((a, b) => new Date(b.lastSignInAt || 0) - new Date(a.lastSignInAt || 0));
+
+  const dormantUserList = profiles
+    .filter(p => getUserStatus(p.lastSignInAt) === 'dormant')
+    .sort((a, b) => new Date(b.lastSignInAt || 0) - new Date(a.lastSignInAt || 0));
 
   if (loading) {
     return <p style={{ color: '#89726C' }}>Loading overview...</p>;
@@ -269,16 +296,7 @@ const AdminOverview = () => {
             <StatIcon $bg="#FFF0E0" $color="#875200"><ShoppingCart size={20} /></StatIcon>
           </StatHeader>
           <StatValue>{activityCount}</StatValue>
-          <StatTrend>{recentSales} sales in latest</StatTrend>
-        </StatCard>
-
-        <StatCard>
-          <StatHeader>
-            <StatLabel>Recent Errors</StatLabel>
-            <StatIcon $bg="#FFE8E8" $color="#BA1A1A"><Bug size={20} /></StatIcon>
-          </StatHeader>
-          <StatValue>{errorLogs.length}</StatValue>
-          <StatTrend>in last 50 actions</StatTrend>
+          <StatTrend>{recentSales} sales & income in latest</StatTrend>
         </StatCard>
       </Grid>
 
@@ -304,28 +322,90 @@ const AdminOverview = () => {
         </ResponsiveContainer>
       </ChartCard>
 
-      {errorLogs.length > 0 && (
-        <>
-          <SectionTitle>Recent Client Errors</SectionTitle>
-          <ErrorFeed>
-            {errorLogs.map(e => (
-              <ErrorItem key={e.id}>
-                <Bug size={14} color="#BA1A1A" style={{ marginTop: '2px' }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <ErrorText title={e.error}>{e.error}</ErrorText>
-                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                    <ErrorPage>{e.page || '—'}</ErrorPage>
-                    <ErrorUser title={e.userEmail || e.userBusinessName || e.userId}>
-                      {e.userBusinessName || e.userEmail || e.userId?.slice(0, 8) || '—'}
-                    </ErrorUser>
-                    <ErrorTime>{e.createdAt ? new Date(e.createdAt).toLocaleString() : '—'}</ErrorTime>
-                  </div>
-                </div>
-              </ErrorItem>
-            ))}
-          </ErrorFeed>
-        </>
-      )}
+      <ThreeCol>
+        <InsightCard>
+          <InsightTitle>Devices (30d)</InsightTitle>
+          {visitStats.deviceData.length === 0 ? <p style={{ color: '#89726C', fontSize: '0.82rem' }}>No data</p> : (
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={visitStats.deviceData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F0EEE8" />
+                <XAxis dataKey="name" tick={{ fill: '#89726C', fontSize: 11 }} />
+                <YAxis hide />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #F0EEE8', fontSize: '13px' }} />
+                <Bar dataKey="value" fill="#6F240A" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </InsightCard>
+
+        <InsightCard>
+          <InsightTitle>Locations (30d)</InsightTitle>
+          {visitStats.locationData.length === 0 ? <p style={{ color: '#89726C', fontSize: '0.82rem' }}>No data</p> : (
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={visitStats.locationData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F0EEE8" />
+                <XAxis dataKey="name" tick={{ fill: '#89726C', fontSize: 11 }} />
+                <YAxis hide />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #F0EEE8', fontSize: '13px' }} />
+                <Bar dataKey="value" fill="#25432F" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </InsightCard>
+
+        <InsightCard>
+          <InsightTitle>Daily Visits (30d)</InsightTitle>
+          {visitStats.dailyVisits.length === 0 ? <p style={{ color: '#89726C', fontSize: '0.82rem' }}>No data</p> : (
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={visitStats.dailyVisits}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F0EEE8" />
+                <XAxis dataKey="day" tick={{ fill: '#89726C', fontSize: 11 }} />
+                <YAxis hide />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #F0EEE8', fontSize: '13px' }} />
+                <Bar dataKey="visits" fill="#875200" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </InsightCard>
+      </ThreeCol>
+
+      <ThreeCol>
+        <InsightCard>
+          <InsightTitle>Top 5 by Revenue</InsightTitle>
+          {topRevenue.length === 0 ? <p style={{ color: '#89726C', fontSize: '0.8rem' }}>No data</p> : topRevenue.map((u, i) => (
+            <InsightUser key={u.id}>
+              <InsightName>{i + 1}. {u.ownerName || u.businessName || '—'}</InsightName>
+              <InsightValue>{formatCurrencyShort(u.salesRevenue + u.serviceIncomeTotal, currency)}</InsightValue>
+            </InsightUser>
+          ))}
+        </InsightCard>
+
+        <InsightCard>
+          <InsightTitle>Active Users ({activeUsers})</InsightTitle>
+          {activeUserList.length === 0 ? <p style={{ color: '#89726C', fontSize: '0.8rem' }}>No active users</p> : activeUserList.map(u => (
+            <InsightUser key={u.id}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
+                <UserStatusDot $status="active" />
+                <InsightName>{u.ownerName || u.businessName || '—'}</InsightName>
+              </div>
+              <InsightValue>{u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleDateString() : '—'}</InsightValue>
+            </InsightUser>
+          ))}
+        </InsightCard>
+
+        <InsightCard>
+          <InsightTitle>Dormant Users ({dormantUsers})</InsightTitle>
+          {dormantUserList.length === 0 ? <p style={{ color: '#89726C', fontSize: '0.8rem' }}>No dormant users</p> : dormantUserList.map(u => (
+            <InsightUser key={u.id}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
+                <UserStatusDot $status="dormant" />
+                <InsightName>{u.ownerName || u.businessName || '—'}</InsightName>
+              </div>
+              <InsightValue>{u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleDateString() : '—'}</InsightValue>
+            </InsightUser>
+          ))}
+        </InsightCard>
+      </ThreeCol>
     </div>
   );
 };

@@ -285,6 +285,16 @@ export const updateUserStatus = async (userId, status) => {
   }
 };
 
+export const updateUserBusinessType = async (userId, businessType) => {
+  try {
+    requireAdmin();
+    return await dbService.updateUserBusinessType(userId, businessType);
+  } catch (error) {
+    console.error('Failed to update user business type', error);
+    throw error;
+  }
+};
+
 // ====================================================
 // 8. SUBSCRIPTIONS
 // ====================================================
@@ -357,5 +367,126 @@ export const fetchUserPayments = async (userId) => {
   } catch (error) {
     console.error('Failed to fetch user payments', error);
     return [];
+  }
+};
+
+// ====================================================
+// 9. CUSTOMERS (Services)
+// ====================================================
+export const fetchCustomers = async () => {
+  try {
+    const uid = getUid();
+    return await dbService.fetchUserRecords(uid, 'customers');
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+    return [];
+  }
+};
+
+export const createCustomer = async (customer) => {
+  const uid = getUid();
+  return await dbService.createUserRecord(uid, 'customers', customer);
+};
+
+export const updateCustomer = async (id, customer) => {
+  const uid = getUid();
+  return await dbService.updateUserRecord(uid, 'customers', id, customer);
+};
+
+export const deleteCustomer = async (id) => {
+  const uid = getUid();
+  await dbService.deleteUserRecord(uid, 'customers', id);
+};
+
+// ====================================================
+// 10. PROJECTS (Services)
+// ====================================================
+export const fetchProjects = async () => {
+  try {
+    const uid = getUid();
+    return await dbService.fetchUserRecords(uid, 'projects');
+  } catch (error) {
+    console.error('Error fetching projects:', error);
+    return [];
+  }
+};
+
+export const createProject = async (project) => {
+  const uid = getUid();
+  return await dbService.createUserRecord(uid, 'projects', project);
+};
+
+export const updateProject = async (id, project) => {
+  const uid = getUid();
+  return await dbService.updateUserRecord(uid, 'projects', id, project);
+};
+
+export const deleteProject = async (id) => {
+  const uid = getUid();
+  await dbService.deleteUserRecord(uid, 'projects', id);
+};
+
+// ====================================================
+// 11. SERVICE INCOME (Services)
+// ====================================================
+export const fetchServiceIncome = async () => {
+  try {
+    const uid = getUid();
+    return await dbService.fetchUserRecords(uid, 'service_income');
+  } catch (error) {
+    console.error('Error fetching service income:', error);
+    return [];
+  }
+};
+
+export const createServiceIncome = async (income) => {
+  const uid = getUid();
+  return await dbService.createUserRecord(uid, 'service_income', income);
+};
+
+export const updateServiceIncome = async (id, income) => {
+  const uid = getUid();
+  return await dbService.updateUserRecord(uid, 'service_income', id, income);
+};
+
+export const deleteServiceIncome = async (id) => {
+  const uid = getUid();
+  await dbService.deleteUserRecord(uid, 'service_income', id);
+};
+
+// ====================================================
+// 12. RECURRING INCOME (Services)
+// ====================================================
+export const fetchRecurringIncome = async () => {
+  try {
+    const uid = getUid();
+    return await dbService.fetchUserRecords(uid, 'recurring_income');
+  } catch (error) {
+    console.error('Error fetching recurring income:', error);
+    return [];
+  }
+};
+
+export const createRecurringIncome = async (item) => {
+  const uid = getUid();
+  return await dbService.createUserRecord(uid, 'recurring_income', item);
+};
+
+export const updateRecurringIncome = async (id, item) => {
+  const uid = getUid();
+  return await dbService.updateUserRecord(uid, 'recurring_income', id, item);
+};
+
+export const deleteRecurringIncome = async (id) => {
+  const uid = getUid();
+  await dbService.deleteUserRecord(uid, 'recurring_income', id);
+};
+
+export const fetchVisitStats = async () => {
+  try {
+    return await dbService.fetchVisitStats();
+  } catch (error) {
+    console.error('Failed to fetch visit stats', error);
+    return { deviceData: [], locationData: [], dailyVisits: [] };
   }
 };

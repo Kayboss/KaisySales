@@ -77,7 +77,7 @@ function mockSet(collection, data) {
  * Called automatically after sign-in/sign-up when Supabase is active.
  */
 async function migrateLocalData(newUid) {
-  const collections = ['sales', 'invoices', 'expenses', 'inventory', 'stores', 'categories'];
+  const collections = ['sales', 'invoices', 'expenses', 'inventory', 'stores', 'categories', 'customers', 'projects', 'service_income', 'recurring_income'];
   let migrated = false;
 
   for (const col of collections) {
@@ -298,11 +298,15 @@ export const dbService = {
     if (!supabase) return [];
     const profiles = await this.fetchAllProfiles();
 
-    const [allSales, allInvoices, allExpenses, allInventory] = await Promise.all([
+    const [allSales, allInvoices, allExpenses, allInventory, allCustomers, allProjects, allServiceIncome, allRecurringIncome] = await Promise.all([
       supabase.from('sales').select('user_id, amount'),
       supabase.from('invoices').select('user_id, total'),
       supabase.from('expenses').select('user_id, amount'),
       supabase.from('inventory').select('user_id'),
+      supabase.from('customers').select('user_id'),
+      supabase.from('projects').select('user_id'),
+      supabase.from('service_income').select('user_id, amount'),
+      supabase.from('recurring_income').select('user_id, amount'),
     ]);
 
     const groupByUser = (records, valueKey) => {
@@ -319,6 +323,10 @@ export const dbService = {
     const invoicesMap = groupByUser(allInvoices.data, 'total');
     const expensesMap = groupByUser(allExpenses.data, 'amount');
     const inventoryMap = groupByUser(allInventory.data, null);
+    const customersMap = groupByUser(allCustomers.data, null);
+    const projectsMap = groupByUser(allProjects.data, null);
+    const serviceIncomeMap = groupByUser(allServiceIncome.data, 'amount');
+    const recurringIncomeMap = groupByUser(allRecurringIncome.data, 'amount');
 
     return profiles.map(p => ({
       ...p,
@@ -329,12 +337,16 @@ export const dbService = {
       expenseCount: expensesMap[p.id]?.count || 0,
       expenseTotal: expensesMap[p.id]?.total || 0,
       inventoryCount: inventoryMap[p.id]?.count || 0,
+      customerCount: customersMap[p.id]?.count || 0,
+      projectCount: projectsMap[p.id]?.count || 0,
+      serviceIncomeTotal: serviceIncomeMap[p.id]?.total || 0,
+      recurringIncomeTotal: recurringIncomeMap[p.id]?.total || 0,
     }));
   },
 
   async fetchRecentActivity(limit = 20) {
     if (!supabase) return [];
-    const collections = ['sales', 'invoices', 'expenses'];
+    const collections = ['sales', 'invoices', 'expenses', 'customers', 'projects', 'service_income', 'recurring_income'];
     const results = [];
     for (const col of collections) {
       const { data, error } = await supabase
@@ -344,11 +356,19 @@ export const dbService = {
         .limit(limit);
       if (error) continue;
       for (const r of data || []) {
+        let label = '';
+        if (col === 'sales') label = r.item;
+        else if (col === 'invoices') label = `Invoice #${r.id}`;
+        else if (col === 'expenses') label = r.title;
+        else if (col === 'customers') label = r.name || r.company || 'New Customer';
+        else if (col === 'projects') label = r.name || 'New Project';
+        else if (col === 'service_income') label = r.title || r.description || 'Service Income';
+        else if (col === 'recurring_income') label = r.title || r.description || 'Recurring Income';
         results.push({
           type: col,
           id: String(r.id),
           userId: r.user_id,
-          label: col === 'sales' ? r.item : col === 'invoices' ? `Invoice #${r.id}` : r.title,
+          label,
           amount: r.amount || r.total,
           date: r.created_at || r.date,
           userEmail: null,
@@ -473,6 +493,10 @@ export const dbService = {
 
   async fetchErrorLogs(limit = 20) {
     if (supabase) {
+      // Auto-cleanup errors older than 30 days
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      await supabase.from('error_logs').delete().lt('created_at', thirtyDaysAgo);
+
       const { data, error } = await supabase
         .from('error_logs')
         .select('*')
@@ -507,6 +531,18 @@ export const dbService = {
       const { error } = await supabase
         .from('profiles')
         .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      if (error) throw error;
+      return true;
+    }
+    return false;
+  },
+
+  async updateUserBusinessType(userId, businessType) {
+    if (supabase) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ business_type: businessType, updated_at: new Date().toISOString() })
         .eq('id', userId);
       if (error) throw error;
       return true;
@@ -670,6 +706,58 @@ export const dbService = {
       return (data || []).map(r => toCamelCase(r));
     }
     return [];
+  },
+
+  async trackPageVisit(userId, page, deviceType, location) {
+    if (!supabase) return;
+    try {
+      await supabase.from('page_visits').insert({
+        user_id: userId,
+        page,
+        device_type: deviceType,
+        location,
+      });
+    } catch { /* silently fail */ }
+  },
+
+  async fetchVisitStats() {
+    if (!supabase) return { deviceData: [], locationData: [], dailyVisits: [] };
+    try {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from('page_visits')
+        .select('device_type, location, created_at')
+        .gte('created_at', thirtyDaysAgo);
+      if (error) throw error;
+      const visits = data || [];
+
+      const deviceCounts = {};
+      const locationCounts = {};
+      const dayCounts = {};
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+      visits.forEach(v => {
+        const device = v.device_type || 'desktop';
+        deviceCounts[device] = (deviceCounts[device] || 0) + 1;
+
+        const loc = v.location || 'Unknown';
+        locationCounts[loc] = (locationCounts[loc] || 0) + 1;
+
+        const day = dayNames[new Date(v.created_at).getDay()];
+        dayCounts[day] = (dayCounts[day] || 0) + 1;
+      });
+
+      const deviceData = Object.entries(deviceCounts).map(([name, value]) => ({ name, value }));
+      const locationData = Object.entries(locationCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([name, value]) => ({ name, value }));
+      const dailyVisits = dayNames.map(day => ({ day, visits: dayCounts[day] || 0 }));
+
+      return { deviceData, locationData, dailyVisits };
+    } catch {
+      return { deviceData: [], locationData: [], dailyVisits: [] };
+    }
   },
 };
 

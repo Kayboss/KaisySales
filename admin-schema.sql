@@ -221,8 +221,15 @@ DROP TRIGGER IF EXISTS enforce_subscription_limit ON public.invoices;
 DROP TRIGGER IF EXISTS enforce_subscription_limit ON public.inventory;
 DROP FUNCTION IF EXISTS check_subscription_limit();
 
--- 13. Verify
+-- 13. Auto-cleanup error logs older than 30 days (runs daily at midnight)
+SELECT cron.schedule(
+  'cleanup-old-error-logs',
+  '0 0 * * *',
+  $$DELETE FROM public.error_logs WHERE created_at < NOW() - INTERVAL '30 days'$$
+);
+
+-- 14. Verify
 SELECT email, business_name, role FROM profiles WHERE role = 'admin';
 
--- 14. Reload schema cache
+-- 15. Reload schema cache
 NOTIFY pgrst, 'reload schema';

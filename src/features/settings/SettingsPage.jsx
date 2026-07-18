@@ -294,7 +294,7 @@ const TabBtn = styled.button`
   transition: all 0.15s ease;
 `;
 
-const avatarColors = ['#6F240A', '#875200', '#25432F', '#D4AF37', '#8E3A1F'];
+const avatarColors = ['#6F240A', '#1E3A8A', '#25432F', '#D4AF37', '#8B5E7C'];
 
 const GroupLabel = styled.div`
   font-size: 0.8rem;
@@ -344,6 +344,8 @@ const SettingsPage = () => {
   const [editingCatName, setEditingCatName] = useState('');
   const [editingCatType, setEditingCatType] = useState('sales');
   const [deleteCatTarget, setDeleteCatTarget] = useState(null);
+  const [savingCat, setSavingCat] = useState(false);
+  const [deletingCat, setDeletingCat] = useState(false);
 
   const loadCategories = async () => {
     try {
@@ -364,6 +366,7 @@ const SettingsPage = () => {
 
   const handleSaveCategory = async (id) => {
     if (!editingCatName.trim()) return;
+    setSavingCat(true);
     try {
       await updateCategory(id, { name: sanitizeInput(editingCatName.trim(), 50), type: editingCatType });
       setEditingCatId(null);
@@ -372,7 +375,8 @@ const SettingsPage = () => {
       await loadCategories();
     } catch (error) {
       console.error('Failed to update category', error);
-      alert('Failed to update category. Please try again.');
+    } finally {
+      setSavingCat(false);
     }
   };
 
@@ -383,13 +387,15 @@ const SettingsPage = () => {
   };
 
   const handleDeleteCategory = async (id) => {
+    setDeletingCat(true);
     try {
       await deleteCategory(id);
       setDeleteCatTarget(null);
       await loadCategories();
     } catch (error) {
       console.error('Failed to delete category', error);
-      alert('Failed to delete category. Please try again.');
+    } finally {
+      setDeletingCat(false);
     }
   };
 
@@ -576,7 +582,10 @@ const SettingsPage = () => {
                       type="button"
                       $color={color}
                       $selected={formData.avatarColor === color}
-                      onClick={() => setFormData(prev => ({ ...prev, avatarColor: color }))}
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, avatarColor: color }));
+                        settings.setAvatarColor(color);
+                      }}
                     >
                       {formData.avatarColor === color && <Check size={18} />}
                     </ColorOption>
@@ -631,7 +640,7 @@ const SettingsPage = () => {
                               <option value="inventory">Inventory</option>
                             </TypeSelect>
                             <CatActions>
-                              <IconBtn onClick={() => handleSaveCategory(cat.id)}><Check size={16} /></IconBtn>
+                              <IconBtn disabled={savingCat} onClick={() => handleSaveCategory(cat.id)} style={{ opacity: savingCat ? 0.5 : 1 }}><Check size={16} /></IconBtn>
                               <IconBtn onClick={handleCancelEdit}><X size={16} /></IconBtn>
                             </CatActions>
                           </div>
@@ -660,11 +669,13 @@ const SettingsPage = () => {
 
       {deleteCatTarget && (
         <ConfirmDialog
+          isOpen={!!deleteCatTarget}
           title="Delete Category"
           message={`Delete "${deleteCatTarget.name}"? This cannot be undone.`}
           confirmLabel="Delete"
           onConfirm={() => handleDeleteCategory(deleteCatTarget.id)}
           onCancel={() => setDeleteCatTarget(null)}
+          confirmLoading={deletingCat}
         />
       )}
       </>}

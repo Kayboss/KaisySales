@@ -10,7 +10,7 @@ const colorThemes = {
     primary: '#875200',
     primaryContainer: '#A06A14',
     secondary: '#6F240A',
-    tertiary: '#25432F',
+    tertiary: '#1E3A8A',
     shadow: '135, 82, 0',
   },
   '#25432F': {
@@ -31,8 +31,22 @@ const colorThemes = {
     primary: '#8E3A1F',
     primaryContainer: '#A85A3E',
     secondary: '#6F240A',
-    tertiary: '#25432F',
+    tertiary: '#8B5E7C',
     shadow: '142, 58, 31',
+  },
+  '#1E3A8A': {
+    primary: '#1E3A8A',
+    primaryContainer: '#3B5CB8',
+    secondary: '#6F240A',
+    tertiary: '#875200',
+    shadow: '30, 58, 138',
+  },
+  '#8B5E7C': {
+    primary: '#8B5E7C',
+    primaryContainer: '#A87A9A',
+    secondary: '#6F240A',
+    tertiary: '#875200',
+    shadow: '139, 94, 124',
   },
 };
 

@@ -5,7 +5,7 @@ import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircl
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
-import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory, updateInventoryItem, createSale, deleteSale } from '../../services/api';
+import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchCustomers, fetchProjects, createSale, deleteSale } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../services/supabase';
@@ -98,7 +98,7 @@ const FormGroup = styled.div`
     color: ${({ theme }) => theme.colors.text.primary};
   }
   
-  input, select {
+  input, select, textarea {
     width: 100%;
     padding: 0.75rem;
     border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
@@ -112,6 +112,8 @@ const FormGroup = styled.div`
       box-shadow: 0 0 0 2px rgba(111, 36, 10, 0.1);
     }
   }
+
+  textarea { resize: vertical; min-height: 80px; }
 `;
 
 const FormRow = styled.div`
@@ -166,11 +168,11 @@ const LineItemRow = styled.div`
     border-radius: 8px;
     border: 1px solid #F0EEE8;
 
-    & > :nth-child(1) { grid-column: 1 / -1; } /* item selector */
-    & > :nth-child(2) { grid-column: 1; }      /* quantity */
-    & > :nth-child(3) { grid-column: 2; }      /* price */
-    & > :nth-child(4) { grid-column: 1; }      /* total */
-    & > :nth-child(5) { grid-column: 2; justify-self: end; align-self: end; } /* remove */
+    & > :nth-child(1) { grid-column: 1 / -1; }
+    & > :nth-child(2) { grid-column: 1; }
+    & > :nth-child(3) { grid-column: 2; }
+    & > :nth-child(4) { grid-column: 1; }
+    & > :nth-child(5) { grid-column: 2; justify-self: end; align-self: end; }
   }
 `;
 
@@ -202,27 +204,37 @@ const ModalActions = styled.div`
   }
 `;
 
-const Invoices = () => {
+const ProjectTag = styled.span`
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: #E8F5E9;
+  color: #2E7D32;
+  font-weight: 600;
+  margin-left: 0.35rem;
+`;
+
+const ServiceInvoices = () => {
   const { currency, subscriptionPlan } = useSettingsStore();
   const { businessName, phone: businessPhone, location: businessLocation } = useSettingsStore();
   const navigate = useNavigate();
   const user = useAuthStore(s => s.user);
   const [invoices, setInvoices] = useState([]);
-  const [stores, setStores] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
-
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [previewInvoice, setPreviewInvoice] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [inventoryItems, setInventoryItems] = useState([]);
   const [limitError, setLimitError] = useState(null);
   const prevStatus = useRef('pending');
 
   const [formData, setFormData] = useState({
-    customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0
+    customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }],
+    status: 'pending', discount: 0, projectId: '', notes: '',
   });
 
   const [statusFilter, setStatusFilter] = useState('all');
@@ -240,12 +252,6 @@ const Invoices = () => {
     setFormData(prev => {
       const items = [...prev.items];
       items[index] = { ...items[index], [field]: value };
-      if (field === 'name') {
-        const selected = inventoryItems.find(i => i.name === value);
-        if (selected?.price) {
-          items[index].unitPrice = parseFloat(selected.price.replace(/[^0-9.]/g, ''));
-        }
-      }
       return { ...prev, items };
     });
   };
@@ -262,18 +268,16 @@ const Invoices = () => {
 
   const loadData = async () => {
     try {
-      const [data, storeData, inv] = await Promise.all([fetchInvoices(), fetchStores(), fetchInventory()]);
+      const [data, cust, proj] = await Promise.all([fetchInvoices(), fetchCustomers(), fetchProjects()]);
       setInvoices(data);
-      setStores(storeData);
-      setInventoryItems(inv);
+      setCustomers(cust);
+      setProjects(proj);
     } catch (error) {
       console.error('Failed to load invoices', error);
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -292,10 +296,10 @@ const Invoices = () => {
     const items = formData.items.filter(i => i.name);
     const subtotal = items.reduce((sum, i) => sum + (sanitizeNumber(i.quantity) * sanitizeNumber(i.unitPrice)), 0);
     const totalQty = items.reduce((sum, i) => sum + (sanitizeNumber(i.quantity) || 0), 0);
-    const discountPct = sanitizeNumber(formData.discount) || 0;
-    const totalAmount = subtotal * (1 - discountPct / 100);
+    const discPct = sanitizeNumber(formData.discount) || 0;
+    const totalAmount = subtotal * (1 - discPct / 100);
     const isPaid = formData.status === 'paid';
-    
+
     const invoicePayload = {
       customer: sanitizeInput(formData.customer, 100),
       customerLocation: sanitizeInput(formData.customerLocation, 200),
@@ -304,12 +308,14 @@ const Invoices = () => {
       unitPrice: items[0]?.unitPrice || '',
       status: formData.status,
       amount: `GH₵${totalAmount.toFixed(2)}`,
+      project_id: formData.projectId || null,
+      notes: sanitizeInput(formData.notes, 500),
       items: [
         ...items.map(i => ({ name: sanitizeInput(i.name, 100), quantity: sanitizeNumber(i.quantity), unitPrice: sanitizeNumber(i.unitPrice) })),
-        ...(discountPct > 0 ? [{ type: '_meta', discount: discountPct }] : [])
+        ...(discPct > 0 ? [{ type: '_meta', discount: discPct }] : [])
       ]
     };
-    
+
     try {
       let invoiceId = isEditing ? editId : null;
       if (isEditing) {
@@ -319,35 +325,13 @@ const Invoices = () => {
         invoiceId = created?.id;
       }
 
-      // Deduct inventory
-      try {
-        const inv = await fetchInventory();
-        for (const item of items) {
-          const match = inv.find(i => i.name.toLowerCase() === item.name.toLowerCase());
-          if (match) {
-            const qty = parseInt(item.quantity) || 1;
-            const newStock = Math.max(0, (parseInt(match.stock) || 0) - qty);
-            await updateInventoryItem(match.id, {
-              ...match,
-              stock: newStock,
-              status: newStock > 5 ? 'In Stock' : newStock > 0 ? 'Low Stock' : 'Out of Stock'
-            });
-          }
-        }
-      } catch (invErr) {
-        console.warn('Inventory auto-deduct skipped:', invErr);
-      }
-
-      // Create sale if newly paid
       const shouldCreateSale = isPaid && (!isEditing || prevStatus.current !== 'paid');
       if (shouldCreateSale) {
         try {
-          const inv = await fetchInventory();
           const firstItem = items[0];
-          const invMatch = firstItem ? inv.find(i => i.name.toLowerCase() === firstItem.name.toLowerCase()) : null;
           const saleResult = await createSale({
-            item: firstItem?.name || '',
-            category: invMatch?.category || '',
+            item: firstItem?.name || 'Service Invoice',
+            category: 'Services',
             quantity: totalQty,
             unitPrice: firstItem?.unitPrice || '',
             paymentMethod: 'Invoice',
@@ -355,11 +339,11 @@ const Invoices = () => {
             time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
             amount: `GH₵${totalAmount.toFixed(2)}`
           });
-          // Store sale reference back in invoice
           if (invoiceId && saleResult?.id) {
-            const currentInvoice = await fetchInvoices().then(all => all.find(i => String(i.id) === String(invoiceId)));
-            if (currentInvoice) {
-              const rawItems = Array.isArray(currentInvoice.items) ? currentInvoice.items : [];
+            const allInvs = await fetchInvoices();
+            const current = allInvs.find(i => String(i.id) === String(invoiceId));
+            if (current) {
+              const rawItems = Array.isArray(current.items) ? current.items : [];
               const updatedItems = [...rawItems.filter(i => i.type !== '_saleId'), { type: '_saleId', saleId: saleResult.id }];
               await updateInvoice(invoiceId, { items: updatedItems });
             }
@@ -394,7 +378,9 @@ const Invoices = () => {
       date: invoice.date,
       items: finalItems,
       status: invoice.status,
-      discount
+      discount,
+      projectId: invoice.project_id || '',
+      notes: invoice.notes || '',
     });
     setEditId(invoice.id);
     setIsEditing(true);
@@ -410,14 +396,11 @@ const Invoices = () => {
         if (target) {
           const rawItems = Array.isArray(target.items) ? target.items : [];
           const saleRef = rawItems.find(i => i.type === '_saleId');
-          if (saleRef?.saleId) {
-            await deleteSale(saleRef.saleId);
-          }
+          if (saleRef?.saleId) await deleteSale(saleRef.saleId);
         }
       } catch (saleErr) {
         console.warn('Associated sale delete skipped:', saleErr);
       }
-
       await deleteInvoice(id);
       await loadData();
     } catch (error) {
@@ -433,32 +416,24 @@ const Invoices = () => {
     setIsEditing(false);
     setEditId(null);
     prevStatus.current = 'pending';
-    setFormData({ customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0 });
+    setFormData({ customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0, projectId: '', notes: '' });
   };
 
-  const handleExport = () => {
-    const headers = {
-      id: 'Invoice ID',
-      date: 'Date',
-      customer: 'Customer',
-      quantity: 'Quantity',
-      unitPrice: 'Unit Price',
-      amount: 'Total Amount',
-      status: 'Status'
-    };
-    const csv = convertToCSV(invoices, headers);
-    downloadCSV(csv, `Invoices_${new Date().toISOString().split('T')[0]}.csv`);
-  };
+  const selectedProject = projects.find(p => String(p.id) === String(formData.projectId));
 
   return (
     <div>
       <Header>
         <div>
-          <h1 style={{ fontSize: '2rem' }}>Wholesale Invoices</h1>
-          <p style={{ color: '#55423D' }}>Manage your high-volume partner transactions.</p>
+          <h1 style={{ fontSize: '2rem' }}>Service Invoices</h1>
+          <p style={{ color: '#55423D' }}>Invoice clients for projects and services.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <ActionButton onClick={handleExport} style={{ background: 'white', color: '#6F240A', border: '1px solid #6F240A' }}>
+          <ActionButton onClick={() => {
+            const headers = { id: 'Invoice ID', date: 'Date', customer: 'Customer', quantity: 'Quantity', amount: 'Total Amount', status: 'Status' };
+            const csv = convertToCSV(invoices, headers);
+            downloadCSV(csv, `ServiceInvoices_${new Date().toISOString().split('T')[0]}.csv`);
+          }} style={{ background: 'white', color: '#6F240A', border: '1px solid #6F240A' }}>
             Export CSV
           </ActionButton>
           <ActionButton onClick={() => { setIsEditing(false); setIsModalOpen(true); }}>
@@ -472,148 +447,44 @@ const Invoices = () => {
         <form onSubmit={handleSave}>
           {limitError && (
             <div style={{ padding: '1rem', background: '#FFF0F0', borderRadius: '8px', border: '1px solid #FFD0D0', marginBottom: '1rem', fontSize: '0.9rem', color: '#CC0000' }}>
-              <strong>Limit reached!</strong><br />
-              {limitError.message}
+              <strong>Limit reached!</strong><br />{limitError.message}
               <div style={{ marginTop: '0.5rem' }}>
-                <button type="button" onClick={() => navigate('/settings?tab=subscription')} style={{ padding: '0.5rem 1rem', background: '#6F240A', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>
-                  Upgrade Plan
-                </button>
-                <button type="button" onClick={() => setLimitError(null)} style={{ padding: '0.5rem 1rem', background: 'transparent', color: '#6F240A', border: '1px solid #6F240A', borderRadius: '6px', cursor: 'pointer', marginLeft: '0.5rem', fontWeight: 600 }}>
-                  Dismiss
-                </button>
+                <button type="button" onClick={() => navigate('/settings?tab=subscription')} style={{ padding: '0.5rem 1rem', background: '#6F240A', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>Upgrade Plan</button>
+                <button type="button" onClick={() => setLimitError(null)} style={{ padding: '0.5rem 1rem', background: 'transparent', color: '#6F240A', border: '1px solid #6F240A', borderRadius: '6px', cursor: 'pointer', marginLeft: '0.5rem', fontWeight: 600 }}>Dismiss</button>
               </div>
             </div>
           )}
           <FormGroup>
-            <label>Customer (Retail Store)</label>
-            {stores.length === 0 ? (
+            <label>Customer</label>
+            {customers.length === 0 ? (
               <div style={{ padding: '0.75rem', background: '#FFF8F0', borderRadius: '8px', border: '1px solid #F0EEE8', fontSize: '0.9rem', color: '#55423D' }}>
-                No retail stores saved yet.{' '}
-                <a href="/retail-stores" style={{ color: '#6F240A', fontWeight: 700 }}>Add a store first</a>.
+                No customers saved yet.{' '}
+                <a href="/customers" style={{ color: '#6F240A', fontWeight: 700 }}>Add a customer first</a>.
               </div>
             ) : (
-              <select 
-                required 
-                value={formData.customer}
-                onChange={e => setFormData({...formData, customer: e.target.value})}
-              >
-                <option value="">-- Select a store --</option>
-                {stores.map(store => (
-                  <option key={store.id} value={store.name}>{store.name}</option>
-                ))}
+              <select required value={formData.customer} onChange={e => setFormData({...formData, customer: e.target.value})}>
+                <option value="">-- Select a customer --</option>
+                {customers.map(c => <option key={c.id} value={c.name}>{c.name}{c.company ? ` (${c.company})` : ''}</option>)}
               </select>
             )}
           </FormGroup>
           <FormGroup>
             <label>Customer Location</label>
-            <input 
-              type="text" 
-              value={formData.customerLocation}
-              onChange={e => setFormData({...formData, customerLocation: e.target.value})}
-              placeholder="Location"
-            />
+            <input type="text" value={formData.customerLocation} onChange={e => setFormData({...formData, customerLocation: e.target.value})} placeholder="Location" />
           </FormGroup>
           <FormGroup>
-            <label>Due Date</label>
-            <input 
-              type="date" 
-              required 
-              value={formData.date}
-              onChange={e => setFormData({...formData, date: e.target.value})}
-            />
+            <label>Project (optional)</label>
+            <select value={formData.projectId} onChange={e => setFormData({...formData, projectId: e.target.value})}>
+              <option value="">-- No project --</option>
+              {projects.filter(p => p.status === 'active' || p.status === 'in_progress').map(p => (
+                <option key={p.id} value={p.id}>{p.name}{p.platformTag ? ` [${p.platformTag}]` : ''}</option>
+              ))}
+            </select>
           </FormGroup>
-
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <label style={{ fontWeight: 600, color: '#1C1C18' }}>Items</label>
-              <button type="button" onClick={addItem} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'none', border: '1px solid #D0C8C4', borderRadius: '6px', padding: '0.35rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: '#6F240A' }}>
-                <PlusCircle size={14} /> Add Item
-              </button>
-            </div>
-            <FormGridHeader>
-              <span>Item</span>
-              <span style={{ textAlign: 'right' }}>Qty</span>
-              <span style={{ textAlign: 'right' }}>Price</span>
-              <span style={{ textAlign: 'right' }}>Total</span>
-              <span></span>
-            </FormGridHeader>
-            {formData.items.map((item, idx) => (
-              <LineItemRow key={idx}>
-                {inventoryItems.length === 0 ? (
-                  <div style={{ padding: '0.5rem', background: '#FFF8F0', borderRadius: '6px', border: '1px solid #F0EEE8', fontSize: '0.8rem', color: '#55423D' }}>
-                    <a href="/inventory" style={{ color: '#6F240A', fontWeight: 700 }}>Add inventory first</a>.
-                  </div>
-                ) : (
-                  <FieldWrapper>
-                    <MobileLabel>Item</MobileLabel>
-                    <select 
-                      required={idx === 0}
-                      value={item.name}
-                      onChange={e => updateItem(idx, 'name', e.target.value)}
-                      style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit' }}
-                    >
-                      <option value="">-- Select --</option>
-                      {inventoryItems.map(inv => (
-                        <option key={inv.id} value={inv.name}>
-                          {inv.name} {inv.stock > 0 ? `(${inv.stock})` : '(0)'}
-                        </option>
-                      ))}
-                    </select>
-                  </FieldWrapper>
-                )}
-                <FieldWrapper>
-                  <MobileLabel>Qty</MobileLabel>
-                  <input 
-                    type="number" 
-                    min="1"
-                    required={idx === 0}
-                    value={item.quantity}
-                    onChange={e => updateItem(idx, 'quantity', e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', textAlign: 'right' }}
-                  />
-                </FieldWrapper>
-                <FieldWrapper>
-                  <MobileLabel>Price</MobileLabel>
-                  <input 
-                    type="number" 
-                    step="0.01"
-                    required={idx === 0}
-                    value={item.unitPrice}
-                    onChange={e => updateItem(idx, 'unitPrice', e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', textAlign: 'right' }}
-                    placeholder="0.00"
-                  />
-                </FieldWrapper>
-                <FieldWrapper>
-                  <MobileLabel>Total</MobileLabel>
-                  <div style={{ padding: '0.6rem 0', textAlign: 'right', fontWeight: 700, color: '#6F240A', fontSize: '0.85rem' }}>
-                    {formatCurrency(lineTotal(item), currency)}
-                  </div>
-                </FieldWrapper>
-                <button 
-                  type="button" 
-                  onClick={() => removeItem(idx)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BA1A1A', padding: '0.6rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  title="Remove item"
-                >
-                  <X size={16} />
-                </button>
-              </LineItemRow>
-            ))}
-          </div>
-
           <FormRow>
             <FormGroup>
-              <label>Discount (%)</label>
-              <input 
-                type="number" 
-                min="0" 
-                max="100" 
-                step="0.5" 
-                value={formData.discount}
-                onChange={e => setFormData({...formData, discount: e.target.value})}
-                placeholder="0" 
-              />
+              <label>Due Date</label>
+              <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
             </FormGroup>
             <FormGroup>
               <label>Status</label>
@@ -623,14 +494,57 @@ const Invoices = () => {
               </select>
             </FormGroup>
           </FormRow>
+
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <label style={{ fontWeight: 600, color: '#1C1C18' }}>Service Items</label>
+              <button type="button" onClick={addItem} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'none', border: '1px solid #D0C8C4', borderRadius: '6px', padding: '0.35rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: '#6F240A' }}>
+                <PlusCircle size={14} /> Add Item
+              </button>
+            </div>
+            <FormGridHeader>
+              <span>Service / Description</span>
+              <span style={{ textAlign: 'right' }}>Qty</span>
+              <span style={{ textAlign: 'right' }}>Rate</span>
+              <span style={{ textAlign: 'right' }}>Total</span>
+              <span></span>
+            </FormGridHeader>
+            {formData.items.map((item, idx) => (
+              <LineItemRow key={idx}>
+                <FieldWrapper>
+                  <MobileLabel>Service</MobileLabel>
+                  <input required={idx === 0} value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} placeholder="e.g. Web Design - Homepage" style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit' }} />
+                </FieldWrapper>
+                <FieldWrapper>
+                  <MobileLabel>Qty</MobileLabel>
+                  <input type="number" min="1" required={idx === 0} value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', textAlign: 'right' }} />
+                </FieldWrapper>
+                <FieldWrapper>
+                  <MobileLabel>Rate</MobileLabel>
+                  <input type="number" step="0.01" required={idx === 0} value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} style={{ width: '100%', padding: '0.6rem', border: '1px solid #D0C8C4', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', textAlign: 'right' }} placeholder="0.00" />
+                </FieldWrapper>
+                <FieldWrapper>
+                  <MobileLabel>Total</MobileLabel>
+                  <div style={{ padding: '0.6rem 0', textAlign: 'right', fontWeight: 700, color: '#6F240A', fontSize: '0.85rem' }}>{formatCurrency(lineTotal(item), currency)}</div>
+                </FieldWrapper>
+                <button type="button" onClick={() => removeItem(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BA1A1A', padding: '0.6rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
+              </LineItemRow>
+            ))}
+          </div>
+
+          <FormRow>
+            <FormGroup>
+              <label>Discount (%)</label>
+              <input type="number" min="0" max="100" step="0.5" value={formData.discount} onChange={e => setFormData({...formData, discount: e.target.value})} placeholder="0" />
+            </FormGroup>
+            <FormGroup>
+              <label>Total Amount ({getCurrencySymbol(currency)})</label>
+              <input type="text" readOnly value={formatCurrency(invoiceTotal, currency)} style={{ background: '#f5f5f5', cursor: 'not-allowed', fontWeight: 800, fontSize: '1.1rem', color: '#6F240A' }} />
+            </FormGroup>
+          </FormRow>
           <FormGroup>
-            <label>Total Amount ({getCurrencySymbol(currency)})</label>
-            <input 
-              type="text" 
-              readOnly 
-              value={formatCurrency(invoiceTotal, currency)}
-              style={{ background: '#f5f5f5', cursor: 'not-allowed', fontWeight: 800, fontSize: '1.1rem', color: '#6F240A' }}
-            />
+            <label>Notes (optional)</label>
+            <textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder="Payment terms, additional details..." />
           </FormGroup>
           <ModalActions>
             <button type="button" className="cancel" onClick={closeModal}>Cancel</button>
@@ -640,37 +554,17 @@ const Invoices = () => {
       </Modal>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
-        <div style={{ 
-          flex: 1, 
-          background: 'white', 
-          padding: '0.75rem 1.25rem', 
-          borderRadius: '8px', 
-          border: '1px solid #89726C',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          minWidth: '200px'
-        }}>
+        <div style={{ flex: 1, background: 'white', padding: '0.75rem 1.25rem', borderRadius: '8px', border: '1px solid #89726C', display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '200px' }}>
           <Search size={18} color="#89726C" />
           <input type="text" placeholder="Search invoices, customers..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%' }} />
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {['all', 'pending', 'paid'].map(status => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              style={{
-                padding: '0.6rem 1.25rem',
-                borderRadius: '8px',
-                border: `1px solid ${statusFilter === status ? '#6F240A' : '#D0C8C4'}`,
-                background: statusFilter === status ? '#6F240A' : 'white',
-                color: statusFilter === status ? 'white' : '#1C1C18',
-                fontWeight: 600,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                textTransform: 'capitalize'
-              }}
-            >
+            <button key={status} onClick={() => setStatusFilter(status)} style={{
+              padding: '0.6rem 1.25rem', borderRadius: '8px', border: `1px solid ${statusFilter === status ? '#6F240A' : '#D0C8C4'}`,
+              background: statusFilter === status ? '#6F240A' : 'white', color: statusFilter === status ? 'white' : '#1C1C18',
+              fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', textTransform: 'capitalize'
+            }}>
               {status === 'all' ? 'All' : status}
             </button>
           ))}
@@ -681,29 +575,33 @@ const Invoices = () => {
         {invoices
           .filter(inv => statusFilter === 'all' || inv.status === statusFilter)
           .filter(inv => !searchTerm || inv.id?.toLowerCase().includes(searchTerm.toLowerCase()) || inv.customer?.toLowerCase().includes(searchTerm.toLowerCase()))
-          .map(invoice => (
-          <InvoiceCard key={invoice.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <StatusBadge $status={invoice.status}>
-                {invoice.status === 'paid' ? <CheckCircle size={12} /> : <Clock size={12} />}
-                {invoice.status}
-              </StatusBadge>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(invoice)} />
-                <Trash2 size={16} color="#BA1A1A" cursor="pointer" onClick={() => setDeleteTarget(invoice)} />
-              </div>
-            </div>
-            
-            <div style={{ color: '#55423D', fontSize: '0.75rem', fontWeight: 600 }}>{invoice.id}</div>
-            <h3 style={{ fontSize: '1.25rem', margin: '0.25rem 0', color: '#1C1C18' }}>{invoice.customer}</h3>
-            <Amount className="data-tabular">{invoice.amount}</Amount>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #F0EEE8' }}>
-              <span style={{ fontSize: '0.875rem', color: '#55423D' }}>Due: {invoice.date}</span>
-              <Download size={18} color="#6F240A" cursor="pointer" onClick={() => setPreviewInvoice(invoice)} />
-            </div>
-          </InvoiceCard>
-        ))}
+          .map(invoice => {
+            const proj = projects.find(p => String(p.id) === String(invoice.project_id));
+            return (
+              <InvoiceCard key={invoice.id}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <StatusBadge $status={invoice.status}>
+                    {invoice.status === 'paid' ? <CheckCircle size={12} /> : <Clock size={12} />}
+                    {invoice.status}
+                  </StatusBadge>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(invoice)} />
+                    <Trash2 size={16} color="#BA1A1A" cursor="pointer" onClick={() => setDeleteTarget(invoice)} />
+                  </div>
+                </div>
+                <div style={{ color: '#55423D', fontSize: '0.75rem', fontWeight: 600 }}>{invoice.id}</div>
+                <h3 style={{ fontSize: '1.25rem', margin: '0.25rem 0', color: '#1C1C18' }}>
+                  {invoice.customer}
+                  {proj && <ProjectTag>{proj.name}</ProjectTag>}
+                </h3>
+                <Amount className="data-tabular">{invoice.amount}</Amount>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #F0EEE8' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#55423D' }}>Due: {invoice.date}</span>
+                  <Download size={18} color="#6F240A" cursor="pointer" onClick={() => setPreviewInvoice(invoice)} />
+                </div>
+              </InvoiceCard>
+            );
+          })}
       </InvoicesGrid>
 
       {previewInvoice && (
@@ -725,4 +623,4 @@ const Invoices = () => {
   );
 };
 
-export default Invoices;
+export default ServiceInvoices;

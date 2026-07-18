@@ -2,7 +2,6 @@ import { useState } from 'react';
 import styled from 'styled-components';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
-import { dbService } from '../../services/supabase';
 import { CURRENCY_OPTIONS } from '../../utils/currency';
 import { sanitizeInput } from '../../utils/sanitize';
 import { 
@@ -243,36 +242,6 @@ const OptionDescription = styled.div`
   }
 `;
 
-const SeedCard = styled.div`
-  border: 2px solid ${props => props.$selected ? props.theme.colors.primary : props.theme.colors.outlineVariant};
-  background: ${props => props.$selected ? 'rgba(111, 36, 10, 0.04)' : 'white'};
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
-  padding: 1.5rem;
-  cursor: pointer;
-  display: flex;
-  align-items: flex-start;
-  gap: 1.25rem;
-  transition: ${({ theme }) => theme.transitions.default};
-
-  &:hover {
-    border-color: ${({ theme }) => theme.colors.primary};
-  }
-`;
-
-const SeedCheckCircle = styled.div`
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid ${props => props.$selected ? props.theme.colors.primary : props.theme.colors.border};
-  background: ${props => props.$selected ? props.theme.colors.primary : 'transparent'};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  margin-top: 0.15rem;
-  flex-shrink: 0;
-`;
-
 const PlanGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -492,8 +461,7 @@ const OnboardingWizard = () => {
     category: 'Food & Beverage',
     avatarColor: '#6F240A',
     currency: 'GHS',
-    subscriptionPlan: 'free',
-    seedData: true
+    subscriptionPlan: 'free'
   });
 
   const handleChange = (e) => {
@@ -513,13 +481,9 @@ const OnboardingWizard = () => {
     setFormData(prev => ({ ...prev, subscriptionPlan: plan }));
   };
 
-  const toggleSeed = () => {
-    setFormData(prev => ({ ...prev, seedData: !prev.seedData }));
-  };
-
   const handleNext = (e) => {
     e.preventDefault();
-    if (step < 5) {
+    if (step < 4) {
       setStep(step + 1);
     } else {
       handleSubmit();
@@ -542,104 +506,6 @@ const OnboardingWizard = () => {
     return yearly ? '/year' : '/month';
   };
 
-  // Seeding helper to populate collection data for KaisySales exploration
-  const seedSampleDatabase = async (uid) => {
-    const promises = [];
-
-    // 1. Seed Categories
-    const categories = [
-      { name: 'General' },
-      { name: 'Premium' },
-      { name: 'Raw Materials' },
-      { name: 'Custom Orders' }
-    ];
-    for (const cat of categories) {
-      promises.push(dbService.createUserRecord(uid, 'categories', cat));
-    }
-
-    // 2. Seed Inventory items
-    const inventoryItems = [
-      {
-        name: 'Premium Product (Sika Futuro)',
-        quantity: 12,
-        unit: 'pcs',
-        status: 'In Stock',
-        category: 'General'
-      },
-      {
-        name: 'Royal Special (Lome Double Weave)',
-        quantity: 3,
-        unit: 'pcs',
-        status: 'In Stock',
-        category: 'Premium'
-      },
-      {
-        name: 'Organic Cotton Supply (Ochre Yellow)',
-        quantity: 45,
-        unit: 'yards',
-        status: 'In Stock',
-        category: 'Raw Materials'
-      }
-    ];
-    for (const item of inventoryItems) {
-      promises.push(dbService.createUserRecord(uid, 'inventory', item));
-    }
-
-    // 3. Seed Retail Stores
-    const stores = [
-      {
-        name: 'Main Street Market Stall A-12',
-        location: 'Central Accra',
-        phone: '+233 24 456 7890',
-        status: 'Active'
-      },
-      {
-        name: 'City Centre Boutique',
-        location: 'Kumasi, Ashanti',
-        phone: '+233 20 112 2334',
-        status: 'Active'
-      }
-    ];
-    for (const store of stores) {
-      promises.push(dbService.createUserRecord(uid, 'stores', store));
-    }
-
-    // 4. Seed a Sale
-    const sale = {
-      item: 'Premium Product (Sika Futuro)',
-      category: 'General',
-      quantity: 1,
-      unitPrice: 380,
-      amount: '380',
-      paymentMethod: 'Mobile Money (MTN)',
-      date: new Date().toISOString().split('T')[0]
-    };
-    promises.push(dbService.createUserRecord(uid, 'sales', sale));
-
-    // 5. Seed an Expense
-    const expense = {
-      title: 'Raw Materials Purchase',
-      category: 'Raw Materials',
-      amount: 250,
-      date: new Date().toISOString().split('T')[0],
-      trend: 'down'
-    };
-    promises.push(dbService.createUserRecord(uid, 'expenses', expense));
-
-    // 6. Seed an Invoice
-    const invoice = {
-      customer: 'Kofi Mensah',
-      status: 'Pending',
-      total: 1800,
-      date: new Date().toISOString().split('T')[0],
-      items: [{ name: 'Royal Special (Lome Double Weave)', price: 1800, quantity: 1 }]
-    };
-    promises.push(dbService.createUserRecord(uid, 'invoices', invoice));
-
-    // Run all seed queries concurrently
-    await Promise.all(promises);
-  };
-
   const handleSubmit = async () => {
     if (!user) return;
     setLoading(true);
@@ -650,17 +516,14 @@ const OnboardingWizard = () => {
         phone: sanitizeInput(formData.phone, 20),
         location: sanitizeInput(formData.location, 200),
         category: sanitizeInput(formData.category, 50),
+        businessType: formData.category === 'Services' ? 'services' : 'retail',
         avatarColor: formData.avatarColor,
         currency: formData.currency,
         email: user.email,
         isOnboarded: true
       };
 
-        // Seed database and save profile concurrently to eliminate finalization lag
-        await Promise.all([
-          formData.seedData ? seedSampleDatabase(user.uid) : Promise.resolve(),
-          updateSettings(user.uid, finalProfile)
-        ]);
+        await updateSettings(user.uid, finalProfile);
       } catch (error) {
         console.error('🔥 Onboarding submit failed:', error);
         alert('Could not save your profile details. Please try again.');
@@ -676,7 +539,7 @@ const OnboardingWizard = () => {
     return true;
   };
 
-  const avatarColors = ['#6F240A', '#875200', '#25432F', '#D4AF37', '#8E3A1F'];
+  const avatarColors = ['#6F240A', '#1E3A8A', '#25432F', '#D4AF37', '#8B5E7C'];
   const planKeys = ['free', 'silver', 'gold'];
 
   return (
@@ -704,7 +567,6 @@ const OnboardingWizard = () => {
           <ProgressSegment $active={step >= 2} />
           <ProgressSegment $active={step >= 3} />
           <ProgressSegment $active={step >= 4} />
-          <ProgressSegment $active={step >= 5} />
         </TopProgressBar>
 
         <Content>
@@ -907,49 +769,6 @@ const OnboardingWizard = () => {
             </div>
           )}
 
-          {step === 5 && (
-            <div>
-              <StepHeader>
-                <h2>A Fresh Start</h2>
-                <p>We are ready to build your financial workshop. Choose how you want to configure your database.</p>
-              </StepHeader>
-              <Form onSubmit={handleNext}>
-                <SeedCard 
-                  $selected={formData.seedData === false}
-                  onClick={toggleSeed}
-                >
-                  <SeedCheckCircle $selected={formData.seedData === false}>
-                    {formData.seedData === false && <Check size={14} />}
-                  </SeedCheckCircle>
-                  <OptionDescription>
-                    <span style={{ fontWeight: 'bold', fontSize: '1.05rem', color: '#6F240A' }}>
-                      Pristine Fresh Start (Recommended)
-                    </span>
-                    <span style={{ fontSize: '0.85rem', lineHeight: '1.5' }}>
-                      Start with a completely empty, secure ledger. Perfect for entering your actual business records, daily sales, and actual inventory right away.
-                    </span>
-                  </OptionDescription>
-                </SeedCard>
-
-                <SeedCard 
-                  $selected={formData.seedData === true}
-                  onClick={toggleSeed}
-                >
-                  <SeedCheckCircle $selected={formData.seedData === true}>
-                    {formData.seedData === true && <Check size={14} />}
-                  </SeedCheckCircle>
-                  <OptionDescription>
-                    <span style={{ fontWeight: 'bold', fontSize: '1.05rem', color: '#6F240A' }}>
-                      Pre-populate with Sample Data
-                    </span>
-                    <span style={{ fontSize: '0.85rem', lineHeight: '1.5' }}>
-                      Seed your account with sample products, store partners, and sample sales. Highly recommended for a quick demo!
-                    </span>
-                  </OptionDescription>
-                </SeedCard>
-              </Form>
-            </div>
-          )}
         </Content>
 
         <Footer>
@@ -969,7 +788,7 @@ const OnboardingWizard = () => {
           >
             {loading ? (
               'Setting up your workspace...'
-            ) : step === 5 ? (
+            ) : step === 4 ? (
               <>
                 Open KaisySales
                 <Sparkles size={16} />
