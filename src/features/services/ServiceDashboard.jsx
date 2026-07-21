@@ -184,10 +184,12 @@ const ServiceDashboard = () => {
     });
   }, []);
 
-  const totalGross = income.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
-  const totalFees = income.reduce((s, i) => s + (parseFloat(i.platformFee) || 0), 0);
-  const totalNet = income.reduce((s, i) => s + (parseFloat(i.netAmount) || 0), 0);
-  const totalExpenses = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const parseAmt = (v) => parseFloat(String(v).replace(/[^\d.-]/g, '')) || 0;
+
+  const totalGross = income.reduce((s, i) => s + parseAmt(i.amount), 0);
+  const totalFees = income.reduce((s, i) => s + parseAmt(i.platformFee), 0);
+  const totalNet = income.reduce((s, i) => s + parseAmt(i.netAmount), 0);
+  const totalExpenses = expenses.reduce((s, e) => s + parseAmt(e.amount), 0);
   const netProfit = totalNet - totalExpenses;
   const netMargin = totalNet > 0 ? ((netProfit / totalNet) * 100).toFixed(1) : '0.0';
   const activeProjects = projects.filter(p => p.status === 'active').length;
@@ -215,7 +217,7 @@ const ServiceDashboard = () => {
     if (i.paymentDate) {
       const d = new Date(i.paymentDate);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (monthlyData[key]) monthlyData[key].income += parseFloat(i.netAmount || i.amount || 0);
+      if (monthlyData[key]) monthlyData[key].income += parseAmt(i.netAmount || i.amount);
     }
   });
 
@@ -223,7 +225,7 @@ const ServiceDashboard = () => {
     if (e.date) {
       const d = new Date(e.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (monthlyData[key]) monthlyData[key].expenses += parseFloat(e.amount || 0);
+      if (monthlyData[key]) monthlyData[key].expenses += parseAmt(e.amount);
     }
   });
 
@@ -301,7 +303,7 @@ const ServiceDashboard = () => {
                   <span className="name">{i.clientName || 'Client'} {i.milestoneLabel ? `— ${i.milestoneLabel}` : ''}</span>
                   <span className="meta">{i.paymentDate || ''} {i.platformTag ? `• ${i.platformTag}` : ''}</span>
                 </RecentLeft>
-                <span style={{ fontWeight: 700, color: '#2E7D32' }}>{formatAmt(i.netAmount || i.amount)}</span>
+                <span style={{ fontWeight: 700, color: '#2E7D32' }}>{formatAmt(parseAmt(i.netAmount || i.amount))}</span>
               </RecentItem>
             ))}
           </RecentList>
