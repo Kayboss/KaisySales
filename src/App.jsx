@@ -35,7 +35,7 @@ import ServiceInvoices from './features/services/ServiceInvoices';
 import ServiceReporting from './features/services/ServiceReporting';
 
 // Icons
-import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, Leaf, FileText, Store, Settings, Receipt, Menu, X, Users, Briefcase, DollarSign, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, Leaf, FileText, Store, Settings, Receipt, Menu, X, Users, Briefcase, DollarSign, BarChart3, Shield } from 'lucide-react';
 
 const Layout = styled.div`
   display: flex;
@@ -158,7 +158,7 @@ const NavLink = styled(Link)`
 
 const App = () => {
   const { user, logout } = useAuthStore();
-  const { businessName, avatarColor, businessType } = useSettingsStore();
+  const { businessName, avatarColor, businessType, role } = useSettingsStore();
   const location = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -240,6 +240,12 @@ const App = () => {
                       {link.label}
                     </NavLink>
                   ))}
+                  {role === 'admin' && (
+                    <NavLink to="/admin" $active={location.pathname === '/admin'} onClick={closeMobileMenu} style={{ marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                      <Shield size={20} />
+                      Admin Dashboard
+                    </NavLink>
+                  )}
                   <div style={{ marginTop: 'auto' }}>
                     <button 
                       onClick={logout}
