@@ -91,9 +91,9 @@ CREATE POLICY "Users can insert own support notes" ON support_notes
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- 7. RLS policies for error_logs
-DROP POLICY IF EXISTS "Anyone can insert error logs" ON error_logs;
-CREATE POLICY "Anyone can insert error logs" ON error_logs
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Users can insert own error logs" ON error_logs;
+CREATE POLICY "Users can insert own error logs" ON error_logs
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "Admins can read error logs" ON error_logs;
 CREATE POLICY "Admins can read error logs" ON error_logs

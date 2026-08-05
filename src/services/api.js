@@ -207,17 +207,41 @@ export const deleteCategory = async (id) => {
 // 7. ADMIN
 // ====================================================
 
-const requireAdmin = () => {
+const requireAdmin = async () => {
   const { user } = useAuthStore.getState();
-  const { role } = useSettingsStore.getState();
-  if (role !== 'admin') {
-    throw new Error('Unauthorized. Admin access required.');
+  if (!user) {
+    throw new Error('Unauthorized. No active session.');
   }
-  return user?.uid;
+  const verifyUrl = import.meta.env.VITE_VERIFY_ADMIN_FUNCTION_URL;
+  if (!verifyUrl) {
+    throw new Error('Admin verification service not configured.');
+  }
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('No access token');
+    const res = await fetch(verifyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || 'Admin access required.');
+    }
+  } catch (error) {
+    if (error.message === 'Admin access required.' || error.message === 'No access token') {
+      throw new Error('Unauthorized. Admin access required.');
+    }
+    throw error;
+  }
+  return user.uid;
 };
 export const fetchAllProfiles = async () => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.fetchAllProfiles();
   } catch (error) {
     console.error('Failed to fetch all profiles', error);
@@ -227,7 +251,7 @@ export const fetchAllProfiles = async () => {
 
 export const fetchUsersWithStats = async () => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.fetchUsersWithStats();
   } catch (error) {
     console.error('Failed to fetch users with stats', error);
@@ -237,7 +261,7 @@ export const fetchUsersWithStats = async () => {
 
 export const fetchRecentActivity = async (limit = 20) => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.fetchRecentActivity(limit);
   } catch (error) {
     console.error('Failed to fetch recent activity', error);
@@ -247,7 +271,7 @@ export const fetchRecentActivity = async (limit = 20) => {
 
 export const createSupportNote = async (note) => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.createSupportNote(note);
   } catch (error) {
     console.error('Failed to create support note', error);
@@ -257,7 +281,7 @@ export const createSupportNote = async (note) => {
 
 export const fetchSupportNotes = async (userId) => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.fetchSupportNotes(userId);
   } catch (error) {
     console.error('Failed to fetch support notes', error);
@@ -267,7 +291,7 @@ export const fetchSupportNotes = async (userId) => {
 
 export const fetchErrorLogs = async (limit = 20) => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.fetchErrorLogs(limit);
   } catch (error) {
     console.error('Failed to fetch error logs', error);
@@ -277,7 +301,7 @@ export const fetchErrorLogs = async (limit = 20) => {
 
 export const updateUserStatus = async (userId, status) => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.updateUserStatus(userId, status);
   } catch (error) {
     console.error('Failed to update user status', error);
@@ -287,7 +311,7 @@ export const updateUserStatus = async (userId, status) => {
 
 export const updateUserBusinessType = async (userId, businessType) => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.updateUserBusinessType(userId, businessType);
   } catch (error) {
     console.error('Failed to update user business type', error);
@@ -309,7 +333,7 @@ export const fetchSubscriptionPlans = async () => {
 
 export const assignSubscription = async (userId, plan, durationDays) => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.assignSubscription(userId, plan, durationDays);
   } catch (error) {
     console.error('Failed to assign subscription', error);
@@ -319,7 +343,7 @@ export const assignSubscription = async (userId, plan, durationDays) => {
 
 export const cancelSubscription = async (userId) => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.cancelSubscription(userId);
   } catch (error) {
     console.error('Failed to cancel subscription', error);
@@ -338,7 +362,7 @@ export const recordPayment = async (paymentData) => {
 
 export const confirmPayment = async (paymentId, adminId) => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.confirmPayment(paymentId, adminId);
   } catch (error) {
     console.error('Failed to confirm payment', error);
@@ -348,7 +372,7 @@ export const confirmPayment = async (paymentId, adminId) => {
 
 export const fetchAllPayments = async (limit = 50) => {
   try {
-    requireAdmin();
+    await requireAdmin();
     return await dbService.fetchAllPayments(limit);
   } catch (error) {
     console.error('Failed to fetch payments', error);

@@ -202,10 +202,6 @@ CREATE POLICY "Allow anon to insert keep_alive"
   WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow anon to delete old keep_alive records" ON keep_alive;
-CREATE POLICY "Allow anon to delete old keep_alive records"
-  ON keep_alive FOR DELETE
-  TO anon
-  USING (true);
 
 -- Grant Data API access (tables must be accessible to roles for REST API to expose them)
 -- RLS policies still control row-level access per role
