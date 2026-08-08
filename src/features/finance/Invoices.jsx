@@ -495,7 +495,10 @@ const Invoices = () => {
               <select 
                 required 
                 value={formData.customer}
-                onChange={e => setFormData({...formData, customer: e.target.value})}
+                onChange={e => {
+                  const selected = stores.find(s => s.name === e.target.value);
+                  setFormData({...formData, customer: e.target.value, customerLocation: selected?.location || ''});
+                }}
               >
                 <option value="">-- Select a store --</option>
                 {stores.map(store => (

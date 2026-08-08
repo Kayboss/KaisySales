@@ -462,7 +462,10 @@ const ServiceInvoices = () => {
                 <a href="/customers" style={{ color: '#6F240A', fontWeight: 700 }}>Add a customer first</a>.
               </div>
             ) : (
-              <select required value={formData.customer} onChange={e => setFormData({...formData, customer: e.target.value})}>
+              <select required value={formData.customer} onChange={e => {
+                const selected = customers.find(c => c.name === e.target.value);
+                setFormData({...formData, customer: e.target.value, customerLocation: selected?.location || ''});
+              }}>
                 <option value="">-- Select a customer --</option>
                 {customers.map(c => <option key={c.id} value={c.name}>{c.name}{c.company ? ` (${c.company})` : ''}</option>)}
               </select>
