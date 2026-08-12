@@ -18,63 +18,12 @@ const getMonthRange = () => {
   return { start, end };
 };
 
-export const checkCreateLimit = async (supabase, uid, plan, type) => {
-  const limits = getPlanLimits(plan);
-  if (!supabase) return { allowed: true };
-
-  let limit, table, dateField, monthly = true;
-  if (type === 'sales') {
-    limit = limits.maxSalesMonth;
-    table = 'sales';
-    dateField = 'date';
-  } else if (type === 'invoices') {
-    limit = limits.maxInvoicesMonth;
-    table = 'invoices';
-    dateField = 'date';
-  } else if (type === 'products') {
-    limit = limits.maxProducts;
-    table = 'inventory';
-    monthly = false;
-  } else {
-    return { allowed: true };
-  }
-
-  if (limit === -1) return { allowed: true };
-
-  let query = supabase
-    .from(table)
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', uid);
-  if (monthly) {
-    const { start, end } = getMonthRange();
-    query = query.gte(dateField, start).lte(dateField, end);
-  }
-  const { count, error } = await query;
-
-  if (error) return { allowed: false, message: 'Unable to verify plan limits. Please try again.' };
-
-  if (count >= limit) {
-    const planName = plan === 'none' ? 'No plan' : plan.charAt(0).toUpperCase() + plan.slice(1);
-    return {
-      allowed: false,
-      message: `${planName} plan limit reached: you can only create ${limit} ${type} per month. Upgrade to continue.`,
-      current: count,
-      limit,
-    };
-  }
-
+export const checkCreateLimit = async () => {
+  // Subscriptions temporarily disabled: everything is unlimited.
   return { allowed: true };
 };
 
-export const isSubscriptionExpired = (plan, status, expiresAt) => {
-  if (plan === 'none' || !plan) return false;
-  if (plan === 'gold' || plan === 'silver') {
-    if (status === 'confirmed' || status === 'active') return false;
-    if (expiresAt && new Date(expiresAt) < new Date()) return true;
-    return true;
-  }
-  if (plan === 'free') {
-    if (expiresAt && new Date(expiresAt) < new Date()) return true;
-  }
+export const isSubscriptionExpired = () => {
+  // Subscriptions temporarily disabled: never block.
   return false;
 };
