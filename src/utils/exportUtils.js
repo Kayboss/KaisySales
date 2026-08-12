@@ -3,6 +3,18 @@
  * @param {Array} data - Array of objects to export
  * @param {Array} headers - Optional headers mapping { key: 'Display Name' }
  */
+const FORMULA_PREFIX = /^[=+@\t\r-]/;
+
+const isNegativeNumber = (value) => /^-\d+(\.\d+)?$/.test(value);
+
+const sanitizeCSVCell = (value) => {
+  if (typeof value !== 'string') return value;
+  if (FORMULA_PREFIX.test(value) && !isNegativeNumber(value)) {
+    return `'${value}`;
+  }
+  return value;
+};
+
 export const convertToCSV = (data, headers = null) => {
   if (!data || !data.length) return '';
 
@@ -12,6 +24,7 @@ export const convertToCSV = (data, headers = null) => {
   const rows = data.map(item => {
     return columns.map(col => {
       let val = item[col] === undefined || item[col] === null ? '' : item[col];
+      val = sanitizeCSVCell(val);
       // Escape commas and quotes
       val = val.toString().replace(/"/g, '""');
       if (val.includes(',') || val.includes('"') || val.includes('\n')) {

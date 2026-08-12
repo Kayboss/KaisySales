@@ -22,7 +22,7 @@ export const checkCreateLimit = async (supabase, uid, plan, type) => {
   const limits = getPlanLimits(plan);
   if (!supabase) return { allowed: true };
 
-  let limit, table, dateField;
+  let limit, table, dateField, monthly = true;
   if (type === 'sales') {
     limit = limits.maxSalesMonth;
     table = 'sales';
@@ -34,20 +34,22 @@ export const checkCreateLimit = async (supabase, uid, plan, type) => {
   } else if (type === 'products') {
     limit = limits.maxProducts;
     table = 'inventory';
-    dateField = 'created_at';
+    monthly = false;
   } else {
     return { allowed: true };
   }
 
   if (limit === -1) return { allowed: true };
 
-  const { start, end } = getMonthRange();
-  const { count, error } = await supabase
+  let query = supabase
     .from(table)
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', uid)
-    .gte(dateField, start)
-    .lte(dateField, end);
+    .eq('user_id', uid);
+  if (monthly) {
+    const { start, end } = getMonthRange();
+    query = query.gte(dateField, start).lte(dateField, end);
+  }
+  const { count, error } = await query;
 
   if (error) return { allowed: false, message: 'Unable to verify plan limits. Please try again.' };
 
