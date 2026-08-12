@@ -98,8 +98,12 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS is_asset BOOLEAN DEFAULT false;
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS asset_lifetime_years INTEGER DEFAULT NULL;
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS transaction_fee DECIMAL(10,2) DEFAULT 0;
 
--- 7. Extend invoices with project link
+-- 7. Extend invoices with project link and notes
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
+
+-- 7b. Extend customers with company name
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS company TEXT DEFAULT '';
 
 -- Grant permissions
 GRANT ALL ON customers TO authenticated;

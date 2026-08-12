@@ -12,7 +12,7 @@ serve(async (req) => {
 
   const token = authHeader.replace("Bearer ", "");
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_KEY")!;
+  const supabaseServiceKey = Deno.env.get("SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
