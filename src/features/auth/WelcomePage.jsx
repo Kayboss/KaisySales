@@ -174,6 +174,59 @@ const EyeButton = styled.button`
   }
 `;
 
+const PasswordChecklist = styled.div`
+  margin: -0.5rem 0 1.25rem;
+  padding: 0.9rem 1rem;
+  background: ${({ theme }) => theme.colors.background.main};
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+`;
+
+const CheckItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: ${({ $ok }) => ($ok ? '#2E7D32' : '#8A817C')};
+  margin-bottom: 0.4rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const StrengthMeter = styled.div`
+  margin-top: 0.75rem;
+`;
+
+const StrengthBarTrack = styled.div`
+  height: 6px;
+  border-radius: 3px;
+  background: #E8E0DC;
+  overflow: hidden;
+`;
+
+const StrengthBarFill = styled.div`
+  height: 100%;
+  width: ${({ $pct }) => $pct}%;
+  background: ${({ $color }) => $color};
+  border-radius: 3px;
+  transition: width 0.3s ease, background 0.3s ease;
+`;
+
+const StrengthLabel = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: ${({ $color }) => $color};
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+`;
+
 const ToggleText = styled.p`
   margin-top: 1.5rem;
   font-size: 0.875rem;
@@ -363,6 +416,19 @@ const WelcomePage = () => {
     setShowConfirmPassword(false);
   };
 
+  const passwordChecks = [
+    { label: 'At least 8 characters', ok: password.length >= 8 },
+    { label: 'At least one uppercase letter (A-Z)', ok: /[A-Z]/.test(password) },
+    { label: 'At least one number (0-9)', ok: /[0-9]/.test(password) },
+  ];
+  const metCount = passwordChecks.filter((c) => c.ok).length;
+  const strength = [
+    { label: 'Too weak', color: '#BA1A1A', pct: 20 },
+    { label: 'Weak', color: '#E65100', pct: 40 },
+    { label: 'Fair', color: '#F9A825', pct: 70 },
+    { label: 'Strong', color: '#2E7D32', pct: 100 },
+  ][metCount];
+
   return (
     <Container>
       <HeroSection>
@@ -447,6 +513,28 @@ const WelcomePage = () => {
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </EyeButton>
           </PasswordWrapper>
+
+          {isSignUp && (
+            <PasswordChecklist>
+              {passwordChecks.map((check) => (
+                <CheckItem key={check.label} $ok={check.ok}>
+                  {check.ok ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                  {check.label}
+                </CheckItem>
+              ))}
+              {password.length > 0 && (
+                <StrengthMeter>
+                  <StrengthBarTrack>
+                    <StrengthBarFill $pct={strength.pct} $color={strength.color} />
+                  </StrengthBarTrack>
+                  <StrengthLabel $color={strength.color}>
+                    <span>Passphrase strength</span>
+                    <span>{strength.label}</span>
+                  </StrengthLabel>
+                </StrengthMeter>
+              )}
+            </PasswordChecklist>
+          )}
 
           {isSignUp && (
             <>
