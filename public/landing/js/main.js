@@ -95,31 +95,6 @@
 
   document.querySelectorAll('.trust-number').forEach((el) => counterObserver.observe(el));
 
-  // --- Pricing Toggle (Monthly / Yearly) ---
-  const billingToggle = document.getElementById('billingToggle');
-  const silverPrice = document.getElementById('silverPrice');
-  const silverPeriod = document.getElementById('silverPeriod');
-  const goldPrice = document.getElementById('goldPrice');
-  const goldPeriod = document.getElementById('goldPeriod');
-  const toggleMonthlyLabel = document.getElementById('toggleMonthlyLabel');
-  const toggleYearlyLabel = document.getElementById('toggleYearlyLabel');
-  const toggleBadge = document.getElementById('toggleBadge');
-
-  if (billingToggle) {
-    billingToggle.addEventListener('change', function () {
-      const isYearly = this.checked;
-
-      silverPrice.textContent = isYearly ? 'GH₵ 350' : 'GH₵ 35';
-      silverPeriod.textContent = isYearly ? '/ year' : '/ month';
-      goldPrice.textContent = isYearly ? 'GH₵ 750' : 'GH₵ 75';
-      goldPeriod.textContent = isYearly ? '/ year' : '/ month';
-
-      toggleMonthlyLabel.style.color = isYearly ? 'var(--color-text-muted)' : 'var(--color-primary)';
-      toggleYearlyLabel.style.color = isYearly ? 'var(--color-primary)' : 'var(--color-text-muted)';
-      toggleBadge.style.display = isYearly ? 'inline-block' : 'none';
-    });
-  }
-
   // --- Smooth anchor scroll ---
   document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
     anchor.addEventListener('click', function (e) {
