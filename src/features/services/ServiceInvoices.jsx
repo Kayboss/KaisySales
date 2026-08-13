@@ -5,7 +5,7 @@ import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircl
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
-import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchCustomers, fetchProjects, createSale, deleteSale } from '../../services/api';
+import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchCustomers, createSale, deleteSale } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../services/supabase';
@@ -204,16 +204,6 @@ const ModalActions = styled.div`
   }
 `;
 
-const ProjectTag = styled.span`
-  font-size: 0.75rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  background: #E8F5E9;
-  color: #2E7D32;
-  font-weight: 600;
-  margin-left: 0.35rem;
-`;
-
 const ServiceInvoices = () => {
   const { currency, subscriptionPlan } = useSettingsStore();
   const { businessName, phone: businessPhone, location: businessLocation } = useSettingsStore();
@@ -221,7 +211,6 @@ const ServiceInvoices = () => {
   const user = useAuthStore(s => s.user);
   const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [projects, setProjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -234,7 +223,7 @@ const ServiceInvoices = () => {
 
   const [formData, setFormData] = useState({
     customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }],
-    status: 'pending', discount: 0, projectId: '', notes: '',
+    status: 'pending', discount: 0, notes: '',
   });
 
   const [statusFilter, setStatusFilter] = useState('all');
@@ -268,10 +257,9 @@ const ServiceInvoices = () => {
 
   const loadData = async () => {
     try {
-      const [data, cust, proj] = await Promise.all([fetchInvoices(), fetchCustomers(), fetchProjects()]);
+      const [data, cust] = await Promise.all([fetchInvoices(), fetchCustomers()]);
       setInvoices(data);
       setCustomers(cust);
-      setProjects(proj);
     } catch (error) {
       console.error('Failed to load invoices', error);
     }
@@ -308,7 +296,6 @@ const ServiceInvoices = () => {
       unitPrice: items[0]?.unitPrice || '',
       status: formData.status,
       amount: `GH₵${totalAmount.toFixed(2)}`,
-      project_id: formData.projectId || null,
       notes: sanitizeInput(formData.notes, 500),
       items: [
         ...items.map(i => ({ name: sanitizeInput(i.name, 100), quantity: sanitizeNumber(i.quantity), unitPrice: sanitizeNumber(i.unitPrice) })),
@@ -379,7 +366,6 @@ const ServiceInvoices = () => {
       items: finalItems,
       status: invoice.status,
       discount,
-      projectId: invoice.project_id || '',
       notes: invoice.notes || '',
     });
     setEditId(invoice.id);
@@ -416,17 +402,15 @@ const ServiceInvoices = () => {
     setIsEditing(false);
     setEditId(null);
     prevStatus.current = 'pending';
-    setFormData({ customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0, projectId: '', notes: '' });
+    setFormData({ customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0, notes: '' });
   };
-
-  const selectedProject = projects.find(p => String(p.id) === String(formData.projectId));
 
   return (
     <div>
       <Header>
         <div>
           <h1 style={{ fontSize: '2rem' }}>Service Invoices</h1>
-          <p style={{ color: '#55423D' }}>Invoice clients for projects and services.</p>
+          <p style={{ color: '#55423D' }}>Invoice clients for your services.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <ActionButton onClick={() => {
@@ -474,15 +458,6 @@ const ServiceInvoices = () => {
           <FormGroup>
             <label>Customer Location</label>
             <input type="text" value={formData.customerLocation} onChange={e => setFormData({...formData, customerLocation: e.target.value})} placeholder="Location" />
-          </FormGroup>
-          <FormGroup>
-            <label>Project (optional)</label>
-            <select value={formData.projectId} onChange={e => setFormData({...formData, projectId: e.target.value})}>
-              <option value="">-- No project --</option>
-              {projects.filter(p => p.status === 'active' || p.status === 'in_progress').map(p => (
-                <option key={p.id} value={p.id}>{p.name}{p.platformTag ? ` [${p.platformTag}]` : ''}</option>
-              ))}
-            </select>
           </FormGroup>
           <FormRow>
             <FormGroup>
@@ -579,7 +554,6 @@ const ServiceInvoices = () => {
           .filter(inv => statusFilter === 'all' || inv.status === statusFilter)
           .filter(inv => !searchTerm || inv.id?.toLowerCase().includes(searchTerm.toLowerCase()) || inv.customer?.toLowerCase().includes(searchTerm.toLowerCase()))
           .map(invoice => {
-            const proj = projects.find(p => String(p.id) === String(invoice.project_id));
             return (
               <InvoiceCard key={invoice.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -595,7 +569,6 @@ const ServiceInvoices = () => {
                 <div style={{ color: '#55423D', fontSize: '0.75rem', fontWeight: 600 }}>{invoice.id}</div>
                 <h3 style={{ fontSize: '1.25rem', margin: '0.25rem 0', color: '#1C1C18' }}>
                   {invoice.customer}
-                  {proj && <ProjectTag>{proj.name}</ProjectTag>}
                 </h3>
                 <Amount className="data-tabular">{invoice.amount}</Amount>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #F0EEE8' }}>

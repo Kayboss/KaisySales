@@ -26,16 +26,14 @@ import SettingsPage from './features/settings/SettingsPage';
 import AdminDashboard from './features/admin/AdminDashboard';
 
 // Service business features
-import ServiceDashboard from './features/services/ServiceDashboard';
 import Customers from './features/services/Customers';
-import Projects from './features/services/Projects';
 import IncomeTracking from './features/services/IncomeTracking';
 import ServiceExpenses from './features/services/ServiceExpenses';
 import ServiceInvoices from './features/services/ServiceInvoices';
 import ServiceReporting from './features/services/ServiceReporting';
 
 // Icons
-import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, Leaf, FileText, Store, Settings, Receipt, Menu, X, Users, Briefcase, DollarSign, BarChart3, Shield } from 'lucide-react';
+import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, Leaf, FileText, Store, Settings, Receipt, Menu, X, Users, DollarSign, BarChart3, Shield } from 'lucide-react';
 
 const Layout = styled.div`
   display: flex;
@@ -178,10 +176,8 @@ const App = () => {
   }, [user, location.pathname]);
 
   const serviceNavLinks = [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/', icon: DollarSign, label: 'Income' },
     { to: '/customers', icon: Users, label: 'Customers' },
-    { to: '/projects', icon: Briefcase, label: 'Projects' },
-    { to: '/income', icon: DollarSign, label: 'Income' },
     { to: '/service-expenses', icon: CreditCard, label: 'Expenses' },
     { to: '/service-invoices', icon: Receipt, label: 'Invoices' },
     { to: '/service-reporting', icon: BarChart3, label: 'Reports' },
@@ -276,15 +272,14 @@ const App = () => {
                   <Routes>
                     {isServices ? (
                       <>
-                        <Route index element={<ServiceDashboard />} />
-                        <Route path="customers" element={<Customers />} />
-                        <Route path="projects" element={<Projects />} />
+                        <Route index element={<IncomeTracking />} />
                         <Route path="income" element={<IncomeTracking />} />
+                        <Route path="customers" element={<Customers />} />
                         <Route path="service-expenses" element={<ServiceExpenses />} />
                         <Route path="service-invoices" element={<ServiceInvoices />} />
                         <Route path="service-reporting" element={<ServiceReporting />} />
                         <Route path="settings" element={<SettingsPage />} />
-                        <Route path="*" element={<ServiceDashboard />} />
+                        <Route path="*" element={<IncomeTracking />} />
                       </>
                     ) : (
                       <>

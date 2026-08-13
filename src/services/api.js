@@ -423,34 +423,6 @@ export const deleteCustomer = async (id) => {
 };
 
 // ====================================================
-// 10. PROJECTS (Services)
-// ====================================================
-export const fetchProjects = async () => {
-  try {
-    const uid = getUid();
-    return await dbService.fetchUserRecords(uid, 'projects');
-  } catch (error) {
-    console.error('Error fetching projects:', error);
-    return [];
-  }
-};
-
-export const createProject = async (project) => {
-  const uid = getUid();
-  return await dbService.createUserRecord(uid, 'projects', project);
-};
-
-export const updateProject = async (id, project) => {
-  const uid = getUid();
-  return await dbService.updateUserRecord(uid, 'projects', id, project);
-};
-
-export const deleteProject = async (id) => {
-  const uid = getUid();
-  await dbService.deleteUserRecord(uid, 'projects', id);
-};
-
-// ====================================================
 // 11. SERVICE INCOME (Services)
 // ====================================================
 export const fetchServiceIncome = async () => {

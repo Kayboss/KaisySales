@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Download, DollarSign, TrendingUp, TrendingDown, PieChart, Briefcase, Users, Calendar } from 'lucide-react';
-import { fetchServiceIncome, fetchRecurringIncome, fetchExpenses, fetchProjects, fetchCustomers } from '../../services/api';
+import { Download, DollarSign, TrendingUp, TrendingDown, PieChart, Users, Calendar } from 'lucide-react';
+import { fetchServiceIncome, fetchRecurringIncome, fetchExpenses, fetchCustomers } from '../../services/api';
 import { formatCurrency } from '../../utils/currency';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
@@ -240,7 +240,6 @@ const ServiceReporting = () => {
   const [income, setIncome] = useState([]);
   const [recurring, setRecurring] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [projects, setProjects] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [startDate, setStartDate] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() - 3);
@@ -251,9 +250,9 @@ const ServiceReporting = () => {
   useEffect(() => {
     Promise.all([
       fetchServiceIncome(), fetchRecurringIncome(), fetchExpenses(),
-      fetchProjects(), fetchCustomers(),
-    ]).then(([i, r, e, p, c]) => {
-      setIncome(i); setRecurring(r); setExpenses(e); setProjects(p); setCustomers(c);
+      fetchCustomers(),
+    ]).then(([i, r, e, c]) => {
+      setIncome(i); setRecurring(r); setExpenses(e); setCustomers(c);
     });
   }, []);
 
@@ -313,11 +312,10 @@ const ServiceReporting = () => {
   const formatAmt = (v) => `GH₵${(v || 0).toFixed(2)}`;
 
   const exportReport = () => {
-    const headers = { date: 'Date', client: 'Client', project: 'Project', service: 'Service', gross: 'Gross Amount', fee: 'Platform Fee', net: 'Net Amount' };
+    const headers = { date: 'Date', client: 'Client', service: 'Service', gross: 'Gross Amount', fee: 'Platform Fee', net: 'Net Amount' };
     const rows = filteredIncome.map(i => ({
       date: i.paymentDate || '',
       client: i.clientName || '',
-      project: i.projectName || '',
       service: i.milestoneLabel || i.description || '',
       gross: formatAmt(i.amount),
       fee: formatAmt(i.platformFee),
@@ -457,62 +455,6 @@ const ServiceReporting = () => {
     </>
   );
 
-  const renderProjects = () => {
-    const projectMetrics = projects.map(p => {
-      const projectIncome = income.filter(i => i.projectName === p.name || String(i.project_id) === String(p.id));
-      const totalBillings = projectIncome.reduce((s, i) => s + (parseFloat(i.netAmount || i.amount) || 0), 0);
-      return { ...p, totalBillings };
-    });
-
-    return (
-      <>
-        <StatGrid>
-          <StatCard $accent="#6F240A">
-            <StatIcon $bg="#F5E6D3" $color="#6F240A"><Briefcase size={18} /></StatIcon>
-            <StatLabel>Total Projects</StatLabel>
-            <StatValue>{projects.length}</StatValue>
-          </StatCard>
-          <StatCard $accent="#2E7D32">
-            <StatIcon $bg="#E8F5E9" $color="#2E7D32"><TrendingUp size={18} /></StatIcon>
-            <StatLabel>Active</StatLabel>
-            <StatValue>{projects.filter(p => p.status === 'active' || p.status === 'in_progress').length}</StatValue>
-          </StatCard>
-          <StatCard $accent="#1565C0">
-            <StatIcon $bg="#E3F2FD" $color="#1565C0"><DollarSign size={18} /></StatIcon>
-            <StatLabel>Total Billings</StatLabel>
-            <StatValue>{formatAmt(projectMetrics.reduce((s, p) => s + p.totalBillings, 0))}</StatValue>
-          </StatCard>
-        </StatGrid>
-        <ReportSection>
-          <ReportTitle>Project Performance</ReportTitle>
-          {projectMetrics.length > 0 ? (
-            <Table>
-              <thead>
-                <tr><Th>Project</Th><Th>Status</Th><Th>Platform</Th><Th style={{ textAlign: 'right' }}>Budget</Th><Th style={{ textAlign: 'right' }}>Billed</Th><Th style={{ textAlign: 'right' }}>Remaining</Th></tr>
-              </thead>
-              <tbody>
-                {projectMetrics.sort((a, b) => b.totalBillings - a.totalBillings).map(p => {
-                  const budget = parseFloat(p.budget) || 0;
-                  const remaining = budget - p.totalBillings;
-                  return (
-                    <tr key={p.id}>
-                      <Td><strong>{p.name}</strong></Td>
-                      <Td><span style={{ textTransform: 'capitalize' }}>{p.status}</span></Td>
-                      <Td>{p.platformTag || '-'}</Td>
-                      <Td style={{ textAlign: 'right' }}>{budget > 0 ? formatAmt(budget) : '-'}</Td>
-                      <Td style={{ textAlign: 'right', fontWeight: 700, color: '#2E7D32' }}>{formatAmt(p.totalBillings)}</Td>
-                      <Td style={{ textAlign: 'right' }}>{budget > 0 ? formatAmt(Math.max(0, remaining)) : '-'}</Td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          ) : <EmptyState>No projects yet.</EmptyState>}
-        </ReportSection>
-      </>
-    );
-  };
-
   const renderCustomers = () => (
     <>
       <StatGrid>
@@ -558,7 +500,6 @@ const ServiceReporting = () => {
 
       <Tabs>
         <Tab $active={tab === 'overview'} onClick={() => setTab('overview')}>P&L Overview</Tab>
-        <Tab $active={tab === 'projects'} onClick={() => setTab('projects')}>Projects</Tab>
         <Tab $active={tab === 'customers'} onClick={() => setTab('customers')}>Customers</Tab>
       </Tabs>
 
@@ -570,7 +511,6 @@ const ServiceReporting = () => {
       </DateRange>
 
       {tab === 'overview' && renderOverview()}
-      {tab === 'projects' && renderProjects()}
       {tab === 'customers' && renderCustomers()}
     </Container>
   );

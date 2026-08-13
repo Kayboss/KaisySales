@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { ShoppingCart, Receipt, CreditCard, Clock, User, Briefcase, Users, FolderOpen } from 'lucide-react';
+import { ShoppingCart, Receipt, CreditCard, Clock, User, Briefcase, Users } from 'lucide-react';
 import { fetchRecentActivity } from '../../services/api';
 
 const Feed = styled.div`
@@ -36,16 +36,14 @@ const IconBox = styled.div`
     props.$type === 'expenses' ? '#FFF0E0' :
     props.$type === 'service_income' ? '#E8F0EC' :
     props.$type === 'recurring_income' ? '#E8F0EC' :
-    props.$type === 'customers' ? '#F5EFEB' :
-    props.$type === 'projects' ? '#F0EEE8' : '#FFF0E0'};
+    props.$type === 'customers' ? '#F5EFEB' : '#FFF0E0'};
   color: ${props =>
     props.$type === 'sales' ? '#6F240A' :
     props.$type === 'invoices' ? '#25432F' :
     props.$type === 'expenses' ? '#875200' :
     props.$type === 'service_income' ? '#25432F' :
     props.$type === 'recurring_income' ? '#25432F' :
-    props.$type === 'customers' ? '#6F240A' :
-    props.$type === 'projects' ? '#55423D' : '#875200'};
+    props.$type === 'customers' ? '#6F240A' : '#875200'};
 `;
 
 const ActivityInfo = styled.div`
@@ -88,16 +86,14 @@ const TypeTag = styled.span`
     props.$type === 'expenses' ? '#FFF0E0' :
     props.$type === 'service_income' ? '#E8F0EC' :
     props.$type === 'recurring_income' ? '#E8F0EC' :
-    props.$type === 'customers' ? '#F5EFEB' :
-    props.$type === 'projects' ? '#F0EEE8' : '#FFF0E0'};
+    props.$type === 'customers' ? '#F5EFEB' : '#FFF0E0'};
   color: ${props =>
     props.$type === 'sales' ? '#6F240A' :
     props.$type === 'invoices' ? '#25432F' :
     props.$type === 'expenses' ? '#875200' :
     props.$type === 'service_income' ? '#25432F' :
     props.$type === 'recurring_income' ? '#25432F' :
-    props.$type === 'customers' ? '#6F240A' :
-    props.$type === 'projects' ? '#55423D' : '#875200'};
+    props.$type === 'customers' ? '#6F240A' : '#875200'};
 `;
 
 const Empty = styled.div`
@@ -168,7 +164,6 @@ const AdminActivity = () => {
       case 'service_income':
       case 'recurring_income': return <Briefcase size={18} />;
       case 'customers': return <Users size={18} />;
-      case 'projects': return <FolderOpen size={18} />;
       default: return <Clock size={18} />;
     }
   };

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Search, Mail, Calendar, ShoppingCart, CreditCard, ToggleLeft, ToggleRight, Briefcase, Store, Users, FolderOpen, Package, DollarSign, LayoutGrid, List } from 'lucide-react';
+import { Search, Mail, Calendar, ShoppingCart, CreditCard, ToggleLeft, ToggleRight, Briefcase, Store, Users, Package, DollarSign, LayoutGrid, List } from 'lucide-react';
 import { fetchUsersWithStats, updateUserStatus, updateUserBusinessType } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { formatCurrencyShort } from '../../utils/currency';
@@ -393,7 +393,6 @@ const AdminUsers = () => {
                 <Th>Revenue</Th>
                 <Th>Expenses</Th>
                 <Th>Customers</Th>
-                <Th>Projects</Th>
                 <Th>Service Inc.</Th>
                 <Th>Last Active</Th>
                 <Th>Actions</Th>
@@ -416,7 +415,6 @@ const AdminUsers = () => {
                     <Td style={{ fontWeight: 700 }}>{formatCurrencyShort(u.salesRevenue || 0, currency)}</Td>
                     <Td>{formatCurrencyShort(u.expenseTotal || 0, currency)}</Td>
                     <Td>{u.customerCount || 0}</Td>
-                    <Td>{u.projectCount || 0}</Td>
                     <Td>{formatCurrencyShort(u.serviceIncomeTotal || 0, currency)}</Td>
                     <Td style={{ fontSize: '0.75rem', color: '#55423D' }}>
                       {u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleDateString() : '—'}
@@ -493,10 +491,6 @@ const AdminUsers = () => {
                 <CardRow>
                   <CardLabel><Users size={13} /> Customers</CardLabel>
                   <CardValue>{u.customerCount || 0}</CardValue>
-                </CardRow>
-                <CardRow>
-                  <CardLabel><FolderOpen size={13} /> Projects</CardLabel>
-                  <CardValue>{u.projectCount || 0}</CardValue>
                 </CardRow>
                 <CardRow>
                   <CardLabel><Briefcase size={13} /> Service Inc.</CardLabel>

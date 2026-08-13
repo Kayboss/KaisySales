@@ -77,7 +77,7 @@ function mockSet(collection, data) {
  * Called automatically after sign-in/sign-up when Supabase is active.
  */
 async function migrateLocalData(newUid) {
-  const collections = ['sales', 'invoices', 'expenses', 'inventory', 'stores', 'categories', 'customers', 'projects', 'service_income', 'recurring_income'];
+  const collections = ['sales', 'invoices', 'expenses', 'inventory', 'stores', 'categories', 'customers', 'service_income', 'recurring_income'];
   let migrated = false;
 
   for (const col of collections) {
@@ -298,13 +298,12 @@ export const dbService = {
     if (!supabase) return [];
     const profiles = await this.fetchAllProfiles();
 
-    const [allSales, allInvoices, allExpenses, allInventory, allCustomers, allProjects, allServiceIncome, allRecurringIncome] = await Promise.all([
+    const [allSales, allInvoices, allExpenses, allInventory, allCustomers, allServiceIncome, allRecurringIncome] = await Promise.all([
       supabase.from('sales').select('user_id, amount'),
       supabase.from('invoices').select('user_id, total'),
       supabase.from('expenses').select('user_id, amount'),
       supabase.from('inventory').select('user_id'),
       supabase.from('customers').select('user_id'),
-      supabase.from('projects').select('user_id'),
       supabase.from('service_income').select('user_id, amount'),
       supabase.from('recurring_income').select('user_id, amount'),
     ]);
@@ -324,7 +323,6 @@ export const dbService = {
     const expensesMap = groupByUser(allExpenses.data, 'amount');
     const inventoryMap = groupByUser(allInventory.data, null);
     const customersMap = groupByUser(allCustomers.data, null);
-    const projectsMap = groupByUser(allProjects.data, null);
     const serviceIncomeMap = groupByUser(allServiceIncome.data, 'amount');
     const recurringIncomeMap = groupByUser(allRecurringIncome.data, 'amount');
 
@@ -338,7 +336,6 @@ export const dbService = {
       expenseTotal: expensesMap[p.id]?.total || 0,
       inventoryCount: inventoryMap[p.id]?.count || 0,
       customerCount: customersMap[p.id]?.count || 0,
-      projectCount: projectsMap[p.id]?.count || 0,
       serviceIncomeTotal: serviceIncomeMap[p.id]?.total || 0,
       recurringIncomeTotal: recurringIncomeMap[p.id]?.total || 0,
     }));
@@ -346,7 +343,7 @@ export const dbService = {
 
   async fetchRecentActivity(limit = 20) {
     if (!supabase) return [];
-    const collections = ['sales', 'invoices', 'expenses', 'customers', 'projects', 'service_income', 'recurring_income'];
+    const collections = ['sales', 'invoices', 'expenses', 'customers', 'service_income', 'recurring_income'];
     const results = [];
     for (const col of collections) {
       const { data, error } = await supabase
@@ -361,7 +358,6 @@ export const dbService = {
         else if (col === 'invoices') label = `Invoice #${r.id}`;
         else if (col === 'expenses') label = r.title;
         else if (col === 'customers') label = r.name || r.company || 'New Customer';
-        else if (col === 'projects') label = r.name || 'New Project';
         else if (col === 'service_income') label = r.title || r.description || 'Service Income';
         else if (col === 'recurring_income') label = r.title || r.description || 'Recurring Income';
         results.push({

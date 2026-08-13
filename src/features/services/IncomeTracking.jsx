@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Plus, Search, Edit2, Trash2, RefreshCw, DollarSign, TrendingUp } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchProjects, fetchCustomers } from '../../services/api';
+import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -230,7 +230,6 @@ const IncomeTracking = () => {
   const [tab, setTab] = useState('income');
   const [income, setIncome] = useState([]);
   const [recurring, setRecurring] = useState([]);
-  const [projects, setProjects] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -238,7 +237,7 @@ const IncomeTracking = () => {
   const [editId, setEditId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [incomeForm, setIncomeForm] = useState({
-    clientName: '', projectId: '', amount: '', platformFee: '', netAmount: '',
+    clientName: '', amount: '', platformFee: '', netAmount: '',
     platformTag: 'direct', milestoneLabel: '', paymentDate: '', notes: '',
   });
   const [recurForm, setRecurForm] = useState({
@@ -254,10 +253,9 @@ const IncomeTracking = () => {
   useEffect(() => { load(); }, []);
 
   const load = async () => {
-    const [i, r, p, c] = await Promise.all([fetchServiceIncome(), fetchRecurringIncome(), fetchProjects(), fetchCustomers()]);
+    const [i, r, c] = await Promise.all([fetchServiceIncome(), fetchRecurringIncome(), fetchCustomers()]);
     setIncome(i);
     setRecurring(r);
-    setProjects(p);
     setCustomers(c);
   };
 
@@ -270,14 +268,14 @@ const IncomeTracking = () => {
 
   const openAddIncome = () => {
     setEditId(null);
-    setIncomeForm({ clientName: '', projectId: '', amount: '', platformFee: '', netAmount: '', platformTag: 'direct', milestoneLabel: '', paymentDate: '', notes: '' });
+    setIncomeForm({ clientName: '', amount: '', platformFee: '', netAmount: '', platformTag: 'direct', milestoneLabel: '', paymentDate: '', notes: '' });
     setModalOpen(true);
   };
 
   const openEditIncome = (item) => {
     setEditId(item.id);
     setIncomeForm({
-      clientName: item.clientName || '', projectId: item.projectId || '', amount: item.amount || '',
+      clientName: item.clientName || '', amount: item.amount || '',
       platformFee: item.platformFee || '', netAmount: item.netAmount || '', platformTag: item.platformTag || 'direct',
       milestoneLabel: item.milestoneLabel || '', paymentDate: item.paymentDate || '', notes: item.notes || '',
     });
@@ -291,7 +289,6 @@ const IncomeTracking = () => {
     const platformFee = sanitizeNumber(incomeForm.platformFee);
     const payload = {
       client_name: sanitizeInput(incomeForm.clientName, 100),
-      project_id: incomeForm.projectId ? parseInt(incomeForm.projectId) : null,
       amount,
       platform_fee: platformFee,
       net_amount: parseFloat(calcNet(amount, platformFee)),
@@ -491,11 +488,6 @@ const IncomeTracking = () => {
               ) : (
                 <Input value={incomeForm.clientName} onChange={e => setIncomeForm(f => ({ ...f, clientName: e.target.value }))} placeholder="Client name" autoFocus />
               )}
-              <Label>Project (optional)</Label>
-              <Select value={incomeForm.projectId} onChange={e => setIncomeForm(f => ({ ...f, projectId: e.target.value }))}>
-                <option value="">-- No project --</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </Select>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <Label>Gross Amount (GH₵)</Label>
