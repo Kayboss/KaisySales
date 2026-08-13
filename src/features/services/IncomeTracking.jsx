@@ -373,7 +373,7 @@ const IncomeTracking = () => {
   return (
     <div>
       <Header>
-        <Title>Income Tracking</Title>
+        <Title>Dashboard</Title>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <SearchInput placeholder="Search..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
           {tab === 'income' && <AddButton onClick={openAddIncome}><Plus size={18} /> Add Income</AddButton>}

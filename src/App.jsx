@@ -33,7 +33,7 @@ import ServiceInvoices from './features/services/ServiceInvoices';
 import ServiceReporting from './features/services/ServiceReporting';
 
 // Icons
-import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, Leaf, FileText, Store, Settings, Receipt, Menu, X, Users, DollarSign, BarChart3, Shield } from 'lucide-react';
+import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, Leaf, FileText, Store, Settings, Receipt, Menu, X, Users, BarChart3, Shield } from 'lucide-react';
 
 const Layout = styled.div`
   display: flex;
@@ -176,7 +176,7 @@ const App = () => {
   }, [user, location.pathname]);
 
   const serviceNavLinks = [
-    { to: '/', icon: DollarSign, label: 'Income' },
+    { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/customers', icon: Users, label: 'Customers' },
     { to: '/service-expenses', icon: CreditCard, label: 'Expenses' },
     { to: '/service-invoices', icon: Receipt, label: 'Invoices' },
