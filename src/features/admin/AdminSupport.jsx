@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { MessageSquare, Send, Mail, User, Clock } from 'lucide-react';
+import { MessageSquare, Send, Mail, Clock } from 'lucide-react';
 import { fetchAllProfiles, fetchSupportNotes, createSupportNote } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 

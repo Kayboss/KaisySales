@@ -10,7 +10,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
-import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
+import { formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -405,6 +405,7 @@ const DailySales = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, []);
 

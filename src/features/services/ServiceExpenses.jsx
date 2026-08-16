@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
-import { Plus, Search, Edit2, Trash2, Tag, Calendar, Repeat, Monitor, HardDrive, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, Calendar } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchExpenses, createExpense, updateExpense, deleteExpense } from '../../services/api';
@@ -235,12 +235,13 @@ const ServiceExpenses = () => {
     subcategory: 'general', vendor: '', renewalDate: '', isAsset: false, assetLifetime: '', transactionFee: '',
   });
 
-  useEffect(() => { load(); }, []);
-
   const load = async () => {
     const data = await fetchExpenses();
     setExpenses(data);
   };
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, []);
 
   const openAdd = () => {
     setEditId(null);
@@ -313,7 +314,9 @@ const ServiceExpenses = () => {
 
   const totalAmt = expenses.reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
   const saasTotal = expenses.filter(e => e.subcategory === 'saas').reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
-  const upcomingRenewals = expenses.filter(e => e.renewalDate && new Date(e.renewalDate) >= new Date() && new Date(e.renewalDate) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+  // eslint-disable-next-line react-hooks/purity
+  const now = useMemo(() => Date.now(), []);
+  const upcomingRenewals = expenses.filter(e => e.renewalDate && new Date(e.renewalDate) >= new Date() && new Date(e.renewalDate) <= new Date(now + 30 * 24 * 60 * 60 * 1000));
 
   return (
     <div>

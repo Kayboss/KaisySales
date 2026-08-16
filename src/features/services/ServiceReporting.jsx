@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Download, DollarSign, TrendingUp, TrendingDown, PieChart, Users, Calendar } from 'lucide-react';
 import { fetchServiceIncome, fetchRecurringIncome, fetchExpenses, fetchCustomers } from '../../services/api';
-import { formatCurrency } from '../../utils/currency';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
 const Container = styled.div`
@@ -238,7 +237,6 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const ServiceReporting = () => {
   const [tab, setTab] = useState('overview');
   const [income, setIncome] = useState([]);
-  const [recurring, setRecurring] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [startDate, setStartDate] = useState(() => {
@@ -251,8 +249,8 @@ const ServiceReporting = () => {
     Promise.all([
       fetchServiceIncome(), fetchRecurringIncome(), fetchExpenses(),
       fetchCustomers(),
-    ]).then(([i, r, e, c]) => {
-      setIncome(i); setRecurring(r); setExpenses(e); setCustomers(c);
+    ]).then(([i, , e, c]) => {
+      setIncome(i); setExpenses(e); setCustomers(c);
     });
   }, []);
 
@@ -265,8 +263,6 @@ const ServiceReporting = () => {
   const filteredIncome = filterByDate(income, 'paymentDate');
   const filteredExpenses = filterByDate(expenses, 'date');
 
-  const totalGross = filteredIncome.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
-  const totalFees = filteredIncome.reduce((s, i) => s + (parseFloat(i.platformFee) || 0), 0);
   const totalNet = filteredIncome.reduce((s, i) => s + (parseFloat(i.netAmount || i.amount) || 0), 0);
   const totalExpenses = filteredExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
   const netProfit = totalNet - totalExpenses;
@@ -377,24 +373,9 @@ const ServiceReporting = () => {
         {platformEntries.length > 0 && (
           <PieWrap>
             <svg width="140" height="140" viewBox="0 0 32 32">
-              {platformEntries.reduce((acc, [platform, amt], i) => {
+              {platformEntries.reduce((acc, [, amt]) => {
                 const pct = pieTotal > 0 ? amt / pieTotal : 0;
-                const offset = acc;
                 const angle = pct * 360;
-                const rad = (offset - 90) * Math.PI / 180;
-                const rad2 = (offset + angle - 90) * Math.PI / 180;
-                const x1 = 16 + 14 * Math.cos(rad);
-                const y1 = 16 + 14 * Math.sin(rad);
-                const x2 = 16 + 14 * Math.cos(rad2);
-                const y2 = 16 + 14 * Math.sin(rad2);
-                const large = angle > 180 ? 1 : 0;
-                const el = (
-                  <path key={platform}
-                    d={`M 16 16 L ${x1.toFixed(2)} ${y1.toFixed(2)} A 14 14 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`}
-                    fill={PIE_COLORS[i % PIE_COLORS.length]}
-                    stroke="white" strokeWidth="0.5"
-                  />
-                );
                 return acc + angle;
               }, 0)}
             </svg>

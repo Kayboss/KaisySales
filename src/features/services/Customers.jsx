@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, User } from 'lucide-react';
+import { Plus, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchCustomers, createCustomer, updateCustomer, deleteCustomer } from '../../services/api';
@@ -170,12 +170,13 @@ const Customers = () => {
   const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '', location: '', notes: '' });
 
-  useEffect(() => { load(); }, []);
-
   const load = async () => {
     const data = await fetchCustomers();
     setCustomers(data);
   };
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, []);
 
   const openAdd = () => {
     setEditId(null);

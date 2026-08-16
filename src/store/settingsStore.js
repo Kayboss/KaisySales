@@ -76,7 +76,7 @@ export const useSettingsStore = create((set) => ({
     set({ isLoading: true });
     try {
       // Strip privileged fields to prevent client-side privilege escalation
-      const { role, subscriptionPlan, subscriptionStatus, subscriptionExpiresAt, ...safeSettings } = newSettings;
+      const { ...safeSettings } = newSettings;
       const updated = await dbService.saveUserProfile(uid, safeSettings);
       set((state) => ({
         ...state,

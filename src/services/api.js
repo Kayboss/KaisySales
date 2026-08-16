@@ -1,4 +1,4 @@
-import { dbService, authService, supabase } from './supabase';
+import { dbService, supabase } from './supabase';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 
@@ -233,7 +233,7 @@ const requireAdmin = async () => {
     }
   } catch (error) {
     if (error.message === 'Admin access required.' || error.message === 'No access token') {
-      throw new Error('Unauthorized. Admin access required.');
+      throw new Error('Unauthorized. Admin access required.', { cause: error });
     }
     throw error;
   }

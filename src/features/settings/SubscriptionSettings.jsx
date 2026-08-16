@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Crown, CheckCircle, Clock, AlertCircle, CreditCard } from 'lucide-react';
-import { fetchSubscriptionPlans, recordPayment, fetchUserPayments } from '../../services/api';
+import { recordPayment, fetchUserPayments } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrency } from '../../utils/currency';
@@ -302,19 +302,13 @@ const FEATURES = {
 const SubscriptionSettings = () => {
   const { user } = useAuthStore();
   const { subscriptionPlan, subscriptionStatus, subscriptionExpiresAt, currency } = useSettingsStore();
-  const [plans, setPlans] = useState([]);
   const [payments, setPayments] = useState([]);
   const [showPayment, setShowPayment] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('mobile_money');
   const [reference, setReference] = useState('');
   const [yearly, setYearly] = useState(false);
 
-  const getPrice = (basePrice) => yearly ? basePrice * 10 : basePrice;
-  const getPeriod = () => yearly ? '/year' : '/month';
-  const getDurationDays = () => yearly ? 365 : 30;
-
   useEffect(() => {
-    fetchSubscriptionPlans().then(setPlans);
     if (user?.uid) fetchUserPayments(user.uid).then(setPayments);
   }, [user?.uid]);
 

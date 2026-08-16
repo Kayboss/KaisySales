@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import { Leaf, Download, Share2, X } from 'lucide-react';
-import { formatCurrency, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrency } from '../../utils/currency';
 import { useSettingsStore } from '../../store/settingsStore';
 
 const Overlay = styled.div`
@@ -316,8 +316,8 @@ const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, busines
           discountPct: meta?.discount || 0
         };
       }
-    } catch {}
-    return { lineItems: [{ name: `${invoice.customer} - Order`, quantity, unitPrice, amount: totalAmount }], discountPct: 0 };
+    } catch { // intentionally empty
+    }return { lineItems: [{ name: `${invoice.customer} - Order`, quantity, unitPrice, amount: totalAmount }], discountPct: 0 };
   })();
 
   const handlePrint = () => {

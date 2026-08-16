@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Plus, Filter, Download, ArrowUpRight, ArrowDownRight, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Filter, ArrowUpRight, ArrowDownRight, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchCategories, createCategory, fetchInvoices, fetchLargestExpenseCategory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
-import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
+import { formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -243,16 +243,6 @@ const PageBtn = styled.button`
   }
 `;
 
-const CategoryBadge = styled.span`
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  background: rgba(135, 82, 0, 0.1);
-  color: ${({ theme }) => theme.colors.secondary};
-  text-transform: uppercase;
-`;
-
 const ActionButton = styled.button`
   background: ${({ theme, $variant }) => $variant === 'secondary' ? 'white' : theme.colors.primary};
   color: ${({ theme, $variant }) => $variant === 'secondary' ? theme.colors.primary : 'white'};
@@ -364,6 +354,7 @@ const ExpenseTracking = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, []);
 

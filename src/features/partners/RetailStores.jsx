@@ -209,7 +209,6 @@ const RetailStores = () => {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [historyInvoices, setHistoryInvoices] = useState([]);
   const [selectedStore, setSelectedStore] = useState(null);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [storeInvoiceCounts, setStoreInvoiceCounts] = useState({});
 
   const loadData = async () => {
@@ -229,6 +228,7 @@ const RetailStores = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, []);
 
@@ -311,7 +311,6 @@ const RetailStores = () => {
     setIsHistoryModalOpen(false);
     setHistoryInvoices([]);
     setSelectedStore(null);
-    setSelectedInvoice(null);
   };
 
   const filteredStores = stores.filter(store => 

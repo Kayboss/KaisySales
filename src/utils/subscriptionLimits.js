@@ -11,13 +11,6 @@ export const getPlanLimits = (plan) => {
   return PLAN_LIMITS[plan] || NONE_LIMITS;
 };
 
-const getMonthRange = () => {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
-  return { start, end };
-};
-
 export const checkCreateLimit = async () => {
   // Subscriptions temporarily disabled: everything is unlimited.
   return { allowed: true };

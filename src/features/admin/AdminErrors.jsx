@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Bug, Clock } from 'lucide-react';
+import { Bug } from 'lucide-react';
 import { fetchErrorLogs } from '../../services/api';
 
 const ErrorFeed = styled.div`

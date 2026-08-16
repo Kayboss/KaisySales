@@ -34,58 +34,38 @@ export const useAuthStore = create((set) => {
      * Supabase signup wrapper
      */
     signup: async (email, password) => {
-      try {
-        const user = await authService.signUp(email, password);
-        return user;
-      } catch (error) {
-        throw error;
-      }
+      const user = await authService.signUp(email, password);
+      return user;
     },
 
     /**
      * Supabase signin wrapper
      */
     login: async (email, password) => {
-      try {
-        const user = await authService.signIn(email, password);
-        return user;
-      } catch (error) {
-        throw error;
-      }
+      const user = await authService.signIn(email, password);
+      return user;
     },
 
     /**
      * Supabase signout wrapper
      */
     logout: async () => {
-      try {
-        await authService.signOut();
-      } catch (error) {
-        throw error;
-      }
+      await authService.signOut();
     },
 
     /**
      * Google Sign-in action
      */
     signInWithGoogle: async () => {
-      try {
-        const user = await authService.signInWithGoogle();
-        return user;
-      } catch (error) {
-        throw error;
-      }
+      const user = await authService.signInWithGoogle();
+      return user;
     },
 
     /**
      * Passphrase reset action
      */
     resetPassword: async (email) => {
-      try {
-        await authService.resetPassword(email);
-      } catch (error) {
-        throw error;
-      }
+      await authService.resetPassword(email);
     },
 
     // Exposed for teardowns in testing if needed

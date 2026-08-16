@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Users, TrendingUp, ShoppingCart, Clock, AlertCircle, DollarSign } from 'lucide-react';
+import { Users, TrendingUp, ShoppingCart, Clock, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { fetchAllProfiles, fetchRecentActivity, fetchUsersWithStats, fetchVisitStats } from '../../services/api';
 import { formatCurrencyShort } from '../../utils/currency';
@@ -75,13 +75,6 @@ const ChartTitle = styled.h3`
   font-weight: 800;
   color: #1C1C18;
   margin-bottom: 1rem;
-`;
-
-const SectionTitle = styled.h3`
-  font-size: 1rem;
-  font-weight: 800;
-  color: #1C1C18;
-  margin: 1.5rem 0 0.75rem;
 `;
 
 const StatusRow = styled.div`

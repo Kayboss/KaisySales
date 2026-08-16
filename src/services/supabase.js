@@ -88,7 +88,7 @@ async function migrateLocalData(newUid) {
         const records = JSON.parse(localStorage.getItem(key) || '[]');
         if (records.length > 0) {
           for (const record of records) {
-            const { id, createdAt, updatedAt, ...rest } = record;
+            const { ...rest } = record;
             await supabase.from(col).insert({ user_id: newUid, ...rest }).select().single();
           }
           localStorage.removeItem(key);

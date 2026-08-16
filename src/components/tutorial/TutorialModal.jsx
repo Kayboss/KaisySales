@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Package, ShoppingBag, Store, FileText, ChevronRight, ChevronLeft, X } from 'lucide-react';
 
@@ -192,6 +192,7 @@ const TutorialModal = ({ isOpen, onClose, autoShow }) => {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep(0);
     } else {
       document.body.style.overflow = 'unset';

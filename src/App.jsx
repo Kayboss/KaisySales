@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { themeTokens } from './styles/themeTokens';

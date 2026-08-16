@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import styled from 'styled-components';
 import { useAuthStore } from '../../store/authStore';
 import { Leaf, ArrowRight, AlertCircle, CheckCircle2, Loader, Eye, EyeOff } from 'lucide-react';
@@ -287,8 +287,7 @@ const WelcomePage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [attempts, setAttempts] = useState(0);
-  const [blockedUntil, setBlockedUntil] = useState(null);
+  const [blockedUntil] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -352,13 +351,6 @@ const WelcomePage = () => {
       }
       
       setError(msg);
-      setAttempts(prev => {
-        const next = prev + 1;
-        if (next >= 5) {
-          setBlockedUntil(Date.now() + Math.min(60000 * Math.pow(2, next - 5), 1800000));
-        }
-        return next;
-      });
     } finally {
       setLoading(false);
     }

@@ -265,6 +265,7 @@ const ServiceInvoices = () => {
     }
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadData(); }, []);
 
   const handleSave = async (e) => {

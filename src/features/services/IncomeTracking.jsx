@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Plus, Search, Edit2, Trash2, RefreshCw, DollarSign, TrendingUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, RefreshCw, DollarSign } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers } from '../../services/api';
@@ -250,14 +250,15 @@ const IncomeTracking = () => {
   const [savingRecur, setSavingRecur] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => { load(); }, []);
-
   const load = async () => {
     const [i, r, c] = await Promise.all([fetchServiceIncome(), fetchRecurringIncome(), fetchCustomers()]);
     setIncome(i);
     setRecurring(r);
     setCustomers(c);
   };
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, []);
 
   // Income
   const calcNet = (amount, fee) => {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Package, Search, Plus, Minus, Edit2, Trash2, Download } from 'lucide-react';
+import { Search, Plus, Minus, Edit2, Trash2, Download } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchInventory, createInventoryItem, updateInventoryItem, deleteInventoryItem, fetchCategories, createCategory } from '../../services/api';
@@ -10,7 +10,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
-import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrency, getCurrencySymbol } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const PAGE_SIZE = 20;
@@ -388,11 +388,12 @@ const InventoryManagement = () => {
       setCategories(cats);
     } catch (error) {
       console.error('Failed to load inventory', error);
-      setInventory(inventoryData);
+      setInventory([]);
     }
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, []);
 

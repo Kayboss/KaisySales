@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -321,6 +321,7 @@ const SettingsPage = () => {
     const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab');
     if (tabParam === 'subscription') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTab('subscription');
     }
   }, [location.search]);
@@ -356,6 +357,7 @@ const SettingsPage = () => {
     }
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadCategories(); }, []);
 
   const handleEditCategory = (cat) => {

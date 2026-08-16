@@ -29,6 +29,7 @@ const IdleTimer = () => {
         window.removeEventListener(evt, resetTimer);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logout]);
 
   return null;

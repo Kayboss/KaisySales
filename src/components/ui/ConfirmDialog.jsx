@@ -109,11 +109,12 @@ const DeleteBtn = styled.button`
 `;
 
 const ConfirmDialog = ({ isOpen, title, message, confirmLabel, onConfirm, onCancel, confirmLoading }) => {
-  if (!isOpen) return null;
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
+
+  if (!isOpen) return null;
 
   return (
     <Overlay onClick={onCancel}>

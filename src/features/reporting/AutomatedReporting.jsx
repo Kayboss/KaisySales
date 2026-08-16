@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart as 
 import { fetchSales, fetchExpenses, fetchInvoices } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
-import { formatCurrency, formatCurrencyShort, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrency, formatCurrencyShort } from '../../utils/currency';
 
 const Header = styled.div`
   display: flex;
@@ -227,6 +227,7 @@ const AutomatedReporting = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, []);
 

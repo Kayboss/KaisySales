@@ -161,31 +161,6 @@ const SubCard = styled.div`
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 `;
 
-const CardRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.35rem 0;
-  font-size: 0.82rem;
-  border-bottom: 1px solid #F5F3F0;
-
-  &:last-child { border-bottom: none; }
-`;
-
-const CardLabel = styled.span`
-  color: #89726C;
-  font-weight: 600;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-`;
-
-const CardValue = styled.span`
-  font-weight: 700;
-  color: #1C1C18;
-  text-align: right;
-`;
-
 const Overlay = styled.div`
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -409,6 +384,7 @@ const AdminSubscriptions = () => {
     setPlans(pl);
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadData(); }, []);
 
   const handleAssign = async () => {

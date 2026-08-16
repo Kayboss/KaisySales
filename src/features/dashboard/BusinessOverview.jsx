@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriangle, ArrowRight, BookOpen, Clock } from 'lucide-react';
@@ -422,6 +422,7 @@ const BusinessOverview = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadStats();
 
     if (!localStorage.getItem(STORAGE_KEY) && businessType !== 'services') {
@@ -437,6 +438,7 @@ const BusinessOverview = () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (stats.loading) {
