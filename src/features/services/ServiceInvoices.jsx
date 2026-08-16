@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircle } from 'lucide-react';
+import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircle, DollarSign } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
-import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchCustomers, createSale, deleteSale } from '../../services/api';
+import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchCustomers, createSale, deleteSale, createServiceIncome, deleteServiceIncome } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../services/supabase';
@@ -338,6 +338,30 @@ const ServiceInvoices = () => {
         } catch (saleErr) {
           console.warn('Sale creation from invoice skipped:', saleErr);
         }
+
+        try {
+          const incomeResult = await createServiceIncome({
+            client_name: sanitizeInput(formData.customer, 100),
+            amount: totalAmount,
+            platform_fee: 0,
+            net_amount: totalAmount,
+            platform_tag: 'invoice',
+            milestone_label: items[0]?.name || `Invoice #${invoiceId || ''}`,
+            payment_date: formData.date || new Date().toISOString().split('T')[0],
+            notes: `Auto from invoice #${invoiceId || ''}`,
+          });
+          if (invoiceId && incomeResult?.id) {
+            const allInvs = await fetchInvoices();
+            const current = allInvs.find(i => String(i.id) === String(invoiceId));
+            if (current) {
+              const rawItems = Array.isArray(current.items) ? current.items : [];
+              const updatedItems = [...rawItems.filter(i => i.type !== '_incomeId'), { type: '_incomeId', incomeId: incomeResult.id }];
+              await updateInvoice(invoiceId, { items: updatedItems });
+            }
+          }
+        } catch (incomeErr) {
+          console.warn('Service income creation from invoice skipped:', incomeErr);
+        }
       }
 
       await loadData();
@@ -383,9 +407,11 @@ const ServiceInvoices = () => {
           const rawItems = Array.isArray(target.items) ? target.items : [];
           const saleRef = rawItems.find(i => i.type === '_saleId');
           if (saleRef?.saleId) await deleteSale(saleRef.saleId);
+          const incomeRef = rawItems.find(i => i.type === '_incomeId');
+          if (incomeRef?.incomeId) await deleteServiceIncome(incomeRef.incomeId);
         }
       } catch (saleErr) {
-        console.warn('Associated sale delete skipped:', saleErr);
+        console.warn('Associated sale/income delete skipped:', saleErr);
       }
       await deleteInvoice(id);
       await loadData();
@@ -394,6 +420,63 @@ const ServiceInvoices = () => {
     } finally {
       setDeleteTarget(null);
       setDeleting(false);
+    }
+  };
+
+  const handleMarkPaid = async (invoice) => {
+    const rawItems = Array.isArray(invoice.items) ? invoice.items : [];
+    const amountNum = parseFloat(invoice.amount?.replace(/[^\d.-]/g, '')) || 0;
+    const firstItem = rawItems.find(i => !i.type) || {};
+    try {
+      await updateInvoice(invoice.id, { status: 'paid' });
+
+      try {
+        const saleResult = await createSale({
+          item: firstItem.name || 'Service Invoice',
+          category: 'Services',
+          quantity: firstItem.quantity || 1,
+          unitPrice: firstItem.unitPrice || '',
+          paymentMethod: 'Invoice',
+          date: invoice.date || new Date().toISOString().split('T')[0],
+          time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
+          amount: invoice.amount,
+        });
+        if (saleResult?.id) {
+          const updatedItems = [...rawItems.filter(i => i.type !== '_saleId'), { type: '_saleId', saleId: saleResult.id }];
+          await updateInvoice(invoice.id, { items: updatedItems });
+        }
+      } catch (e) {
+        console.warn('Quick mark paid: sale creation skipped', e);
+      }
+
+      try {
+        const incomeResult = await createServiceIncome({
+          client_name: invoice.customer || '',
+          amount: amountNum,
+          platform_fee: 0,
+          net_amount: amountNum,
+          platform_tag: 'invoice',
+          milestone_label: firstItem.name || `Invoice #${invoice.id}`,
+          payment_date: invoice.date || new Date().toISOString().split('T')[0],
+          notes: `Auto from invoice #${invoice.id}`,
+        });
+        if (incomeResult?.id) {
+          const allInvs = await fetchInvoices();
+          const current = allInvs.find(i => String(i.id) === String(invoice.id));
+          if (current) {
+            const curRaw = Array.isArray(current.items) ? current.items : [];
+            const updatedItems = [...curRaw.filter(i => i.type !== '_incomeId'), { type: '_incomeId', incomeId: incomeResult.id }];
+            await updateInvoice(invoice.id, { items: updatedItems });
+          }
+        }
+      } catch (e) {
+        console.warn('Quick mark paid: income creation skipped', e);
+      }
+
+      await loadData();
+    } catch (error) {
+      console.error('Failed to mark invoice as paid', error);
+      alert('Failed to update invoice. Please try again.');
     }
   };
 
@@ -573,7 +656,15 @@ const ServiceInvoices = () => {
                 <Amount className="data-tabular">{invoice.amount}</Amount>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #F0EEE8' }}>
                   <span style={{ fontSize: '0.875rem', color: '#55423D' }}>Due: {invoice.date}</span>
-                  <Download size={18} color="#6F240A" cursor="pointer" onClick={() => setPreviewInvoice(invoice)} />
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    {invoice.status !== 'paid' && (
+                      <button onClick={() => handleMarkPaid(invoice)} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#25432F', color: 'white', border: 'none', borderRadius: '6px', padding: '0.4rem 0.8rem', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, transition: 'filter 0.2s' }} onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.1)'} onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
+                        <DollarSign size={14} />
+                        Mark Paid
+                      </button>
+                    )}
+                    <Download size={18} color="#6F240A" cursor="pointer" onClick={() => setPreviewInvoice(invoice)} />
+                  </div>
                 </div>
               </InvoiceCard>
             );
