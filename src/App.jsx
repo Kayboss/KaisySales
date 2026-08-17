@@ -37,7 +37,8 @@ import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, Leaf, FileT
 
 const Layout = styled.div`
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background-color: ${({ theme }) => theme.colors.background.main};
   position: relative;
 `;
