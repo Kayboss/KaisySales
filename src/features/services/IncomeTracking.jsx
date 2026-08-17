@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Plus, Edit2, Trash2, RefreshCw, DollarSign } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers, fetchExpenses } from '../../services/api';
@@ -410,7 +411,11 @@ const IncomeTracking = () => {
     if (monthlyData[key]) monthlyData[key].expenses += parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0;
   });
   const chartMonths = Object.keys(monthlyData);
-  const maxVal = Math.max(...chartMonths.map(k => Math.max(monthlyData[k].income, monthlyData[k].expenses)), 1);
+  const chartData = chartMonths.map(key => ({
+    name: monthlyData[key].label,
+    Income: monthlyData[key].income,
+    Expenses: monthlyData[key].expenses,
+  }));
 
   return (
     <div>
@@ -448,52 +453,30 @@ const IncomeTracking = () => {
 
       <ChartBox>
         <ChartTitle>Monthly Revenue (Last 6 Months)</ChartTitle>
-        <svg viewBox="0 0 600 200" style={{ width: '100%', height: 200 }}>
-          {[0, 0.25, 0.5, 0.75, 1].map((frac, gi) => {
-            const y = 20 + (1 - frac) * 150;
-            return <line key={gi} x1="40" y1={y} x2="580" y2={y} stroke="#F0EEE8" strokeWidth="1" />;
-          })}
-          {chartMonths.map((key, i) => {
-            const x = 40 + (i / (chartMonths.length - 1 || 1)) * 540;
-            return <text key={key} x={x} y="192" textAnchor="middle" fontSize="10" fill="#89726C">{monthlyData[key].label}</text>;
-          })}
-          {[0, 0.25, 0.5, 0.75, 1].map((frac, gi) => {
-            const y = 20 + (1 - frac) * 150;
-            const val = maxVal * frac;
-            return <text key={gi} x="36" y={y + 3} textAnchor="end" fontSize="9" fill="#89726C">{val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val.toFixed(0)}</text>;
-          })}
-          {(() => {
-            const toPath = (field) => {
-              const pts = chartMonths.map((key, i) => {
-                const x = 40 + (i / (chartMonths.length - 1 || 1)) * 540;
-                const val = monthlyData[key][field];
-                const y = 20 + (1 - (maxVal > 0 ? val / maxVal : 0)) * 150;
-                return `${x},${y}`;
-              });
-              return `M${pts.join(' L')}`;
-            };
-            const toDots = (field, color) => {
-              return chartMonths.map((key, i) => {
-                const x = 40 + (i / (chartMonths.length - 1 || 1)) * 540;
-                const val = monthlyData[key][field];
-                const y = 20 + (1 - (maxVal > 0 ? val / maxVal : 0)) * 150;
-                return <circle key={i} cx={x} cy={y} r="4" fill={color} stroke="white" strokeWidth="2" title={`${monthlyData[key].label}: GH₵${val.toFixed(2)}`} style={{ cursor: 'default' }} />;
-              });
-            };
-            return (
-              <>
-                <path d={toPath('income')} fill="none" stroke="#25432F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                {toDots('income', '#25432F')}
-                <path d={toPath('expenses')} fill="none" stroke="#C62828" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 3" />
-                {toDots('expenses', '#C62828')}
-              </>
-            );
-          })()}
-        </svg>
-        <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.75rem', color: '#89726C' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}><span style={{ width: 18, height: 2, background: '#25432F', borderRadius: 1, display: 'inline-block' }}></span>Income</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}><span style={{ width: 18, height: 2, background: '#C62828', borderRadius: 1, display: 'inline-block', borderTop: '2px dashed #C62828' }}></span>Expenses</span>
-        </div>
+        <ResponsiveContainer width="100%" height={260}>
+          <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <defs>
+              <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#25432F" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#25432F" stopOpacity={0.02} />
+              </linearGradient>
+              <linearGradient id="gradExpense" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#C62828" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#C62828" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#F0EEE8" />
+            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#89726C' }} tickLine={false} axisLine={{ stroke: '#E8E5DF' }} />
+            <YAxis tick={{ fontSize: 11, fill: '#89726C' }} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+            <Tooltip
+              contentStyle={{ borderRadius: 8, border: '1px solid #E8E5DF', fontSize: 13 }}
+              formatter={(value, name) => [`GH₵${Number(value).toFixed(2)}`, name]}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Area type="monotone" dataKey="Income" stroke="#25432F" strokeWidth={2.5} fill="url(#gradIncome)" dot={{ r: 4, fill: '#25432F', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+            <Area type="monotone" dataKey="Expenses" stroke="#C62828" strokeWidth={2.5} fill="url(#gradExpense)" strokeDasharray="6 3" dot={{ r: 4, fill: '#C62828', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+          </AreaChart>
+        </ResponsiveContainer>
       </ChartBox>
 
       <TabBar>
