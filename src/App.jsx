@@ -66,6 +66,7 @@ const Main = styled.main`
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  overflow-y: auto;
 
   @media (max-width: 768px) {
     padding: 1.5rem;
