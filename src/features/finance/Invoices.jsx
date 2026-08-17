@@ -408,7 +408,7 @@ const Invoices = () => {
     const rawItems = Array.isArray(invoice.items) && invoice.items.length > 0 ? invoice.items : [];
     const metaItem = rawItems.find(i => i.type === '_meta');
     const discount = metaItem?.discount || 0;
-    const savedItems = rawItems.filter(i => i.type !== '_meta');
+    const savedItems = rawItems.filter(i => i.type !== '_meta' && i.type !== '_saleId' && i.type !== '_incomeId');
     const finalItems = savedItems.length > 0
       ? savedItems.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice }))
       : [{ name: '', quantity: invoice.quantity || 1, unitPrice: invoice.unitPrice || parseFloat(invoice.amount.replace(/[^\d.-]/g, '')) }];
