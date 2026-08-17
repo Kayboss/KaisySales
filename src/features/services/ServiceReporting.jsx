@@ -264,7 +264,7 @@ const ServiceReporting = () => {
   const filteredExpenses = filterByDate(expenses, 'date');
 
   const totalNet = filteredIncome.reduce((s, i) => s + (parseFloat(i.netAmount || i.amount) || 0), 0);
-  const totalExpenses = filteredExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const totalExpenses = filteredExpenses.reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
   const netProfit = totalNet - totalExpenses;
   const netMargin = totalNet > 0 ? ((netProfit / totalNet) * 100).toFixed(1) : '0.0';
 
@@ -294,7 +294,7 @@ const ServiceReporting = () => {
     if (e.date) {
       const d = new Date(e.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (monthlyData[key]) monthlyData[key].expenses += parseFloat(e.amount || 0);
+      if (monthlyData[key]) monthlyData[key].expenses += parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0;
     }
   });
 
