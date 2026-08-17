@@ -451,34 +451,6 @@ const IncomeTracking = () => {
         </StatCard>
       </StatRow>
 
-      <ChartBox>
-        <ChartTitle>Monthly Revenue (Last 6 Months)</ChartTitle>
-        <ResponsiveContainer width="100%" height={260}>
-          <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <defs>
-              <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#25432F" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#25432F" stopOpacity={0.02} />
-              </linearGradient>
-              <linearGradient id="gradExpense" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#C62828" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#C62828" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#F0EEE8" />
-            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#89726C' }} tickLine={false} axisLine={{ stroke: '#E8E5DF' }} />
-            <YAxis tick={{ fontSize: 11, fill: '#89726C' }} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
-            <Tooltip
-              contentStyle={{ borderRadius: 8, border: '1px solid #E8E5DF', fontSize: 13 }}
-              formatter={(value, name) => [`GH₵${Number(value).toFixed(2)}`, name]}
-            />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Area type="monotone" dataKey="Income" stroke="#25432F" strokeWidth={2.5} fill="url(#gradIncome)" dot={{ r: 4, fill: '#25432F', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
-            <Area type="monotone" dataKey="Expenses" stroke="#C62828" strokeWidth={2.5} fill="url(#gradExpense)" strokeDasharray="6 3" dot={{ r: 4, fill: '#C62828', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </ChartBox>
-
       <TabBar>
         <Tab $active={tab === 'income'} onClick={() => setTab('income')}>
           <DollarSign size={16} /> One-Time Payments
@@ -705,6 +677,34 @@ const IncomeTracking = () => {
           </Modal>
         </>
       )}
+
+      <ChartBox>
+        <ChartTitle>Monthly Revenue (Last 6 Months)</ChartTitle>
+        <ResponsiveContainer width="100%" height={260}>
+          <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <defs>
+              <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#25432F" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#25432F" stopOpacity={0.02} />
+              </linearGradient>
+              <linearGradient id="gradExpense" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#C62828" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#C62828" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#F0EEE8" />
+            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#89726C' }} tickLine={false} axisLine={{ stroke: '#E8E5DF' }} />
+            <YAxis tick={{ fontSize: 11, fill: '#89726C' }} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+            <Tooltip
+              contentStyle={{ borderRadius: 8, border: '1px solid #E8E5DF', fontSize: 13 }}
+              formatter={(value, name) => [`GH₵${Number(value).toFixed(2)}`, name]}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Area type="monotone" dataKey="Income" stroke="#25432F" strokeWidth={2.5} fill="url(#gradIncome)" dot={{ r: 4, fill: '#25432F', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+            <Area type="monotone" dataKey="Expenses" stroke="#C62828" strokeWidth={2.5} fill="url(#gradExpense)" strokeDasharray="6 3" dot={{ r: 4, fill: '#C62828', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </ChartBox>
 
       <ConfirmDialog isOpen={!!deleteTarget} onConfirm={async () => { setDeleting(true); try { await deleteServiceIncome(deleteTarget); setDeleteTarget(null); await load(); } catch (e) { console.error(e); } finally { setDeleting(false); } }} onCancel={() => setDeleteTarget(null)} title="Delete Income" message="Are you sure?" confirmLoading={deleting} />
       <ConfirmDialog isOpen={!!recurDeleteTarget} onConfirm={async () => { setDeleting(true); try { await deleteRecurringIncome(recurDeleteTarget); setRecurDeleteTarget(null); await load(); } catch (e) { console.error(e); } finally { setDeleting(false); } }} onCancel={() => setRecurDeleteTarget(null)} title="Delete Recurring" message="Are you sure?" confirmLoading={deleting} />
