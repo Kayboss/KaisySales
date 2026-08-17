@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Plus, Edit2, Trash2, Calendar } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchExpenses, createExpense, updateExpense, deleteExpense } from '../../services/api';
+import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchServiceIncome } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -80,11 +80,13 @@ const SubCategoryTag = styled.span`
   background: ${({ $type, theme }) =>
     $type === 'saas' ? '#E3F2FD' :
     $type === 'subcontractor' ? '#FFF3E0' :
-    $type === 'hardware' ? '#F3E5F5' : theme.colors.background.surfaceVariant};
+    $type === 'hardware' ? '#F3E5F5' :
+    $type === 'platform_fee' ? '#FFEBEE' : theme.colors.background.surfaceVariant};
   color: ${({ $type }) =>
     $type === 'saas' ? '#1565C0' :
     $type === 'subcontractor' ? '#E65100' :
-    $type === 'hardware' ? '#7B1FA2' : '#555'};
+    $type === 'hardware' ? '#7B1FA2' :
+    $type === 'platform_fee' ? '#C62828' : '#555'};
 `;
 
 const RenewalBadge = styled.span`
@@ -124,7 +126,8 @@ const MobileCard = styled.div`
   border-left: 4px solid ${({ $type }) =>
     $type === 'saas' ? '#1565C0' :
     $type === 'subcontractor' ? '#E65100' :
-    $type === 'hardware' ? '#7B1FA2' : '#D4AF37'};
+    $type === 'hardware' ? '#7B1FA2' :
+    $type === 'platform_fee' ? '#C62828' : '#D4AF37'};
 `;
 
 const MobileRow = styled.div`
@@ -219,10 +222,12 @@ const SUBCATEGORIES = [
   { value: 'saas', label: 'SaaS & Subscriptions', icon: '☁️' },
   { value: 'subcontractor', label: 'Subcontractor', icon: '👥' },
   { value: 'hardware', label: 'Hardware & Assets', icon: '💻' },
+  { value: 'platform_fee', label: 'Platform Fees', icon: '💸' },
 ];
 
 const ServiceExpenses = () => {
   const [expenses, setExpenses] = useState([]);
+  const [serviceIncome, setServiceIncome] = useState([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
@@ -236,8 +241,9 @@ const ServiceExpenses = () => {
   });
 
   const load = async () => {
-    const data = await fetchExpenses();
+    const [data, incomeData] = await Promise.all([fetchExpenses(), fetchServiceIncome()]);
     setExpenses(data);
+    setServiceIncome(incomeData);
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -309,11 +315,35 @@ const ServiceExpenses = () => {
     (e.category || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const platformFeeItems = serviceIncome
+    .filter(i => (parseFloat(i.platformFee) || 0) > 0)
+    .map(i => ({
+      id: `fee-${i.id}`,
+      title: `Platform fee — ${i.clientName || 'Client'}`,
+      amount: `GH₵${parseFloat(i.platformFee).toFixed(2)}`,
+      category: 'Platform Fees',
+      subcategory: 'platform_fee',
+      vendor: i.platformTag || '',
+      date: i.paymentDate || '',
+      renewalDate: null,
+      isAsset: false,
+      _isFee: true,
+    }));
+
+  const allItems = [...filtered, ...platformFeeItems.filter(f =>
+    !search || f.title.toLowerCase().includes(search.toLowerCase()) || f.category.toLowerCase().includes(search.toLowerCase())
+  )].sort((a, b) => {
+    const da = a.date || '';
+    const db = b.date || '';
+    return db.localeCompare(da);
+  });
+
+  const totalPages = Math.ceil(allItems.length / PAGE_SIZE);
+  const paginated = allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const totalAmt = expenses.reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
   const saasTotal = expenses.filter(e => e.subcategory === 'saas').reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
+  const totalFees = serviceIncome.reduce((s, i) => s + (parseFloat(i.platformFee) || 0), 0);
   // eslint-disable-next-line react-hooks/purity
   const now = useMemo(() => Date.now(), []);
   const upcomingRenewals = expenses.filter(e => e.renewalDate && new Date(e.renewalDate) >= new Date() && new Date(e.renewalDate) <= new Date(now + 30 * 24 * 60 * 60 * 1000));
@@ -333,6 +363,11 @@ const ServiceExpenses = () => {
           <h3>Total Expenses</h3>
           <div className="value">GH₵{totalAmt.toFixed(2)}</div>
           <div className="sub">{expenses.length} entries</div>
+        </StatCard>
+        <StatCard>
+          <h3>Platform Fees</h3>
+          <div className="value" style={{ color: '#C62828' }}>GH₵{totalFees.toFixed(2)}</div>
+          <div className="sub">{serviceIncome.filter(i => (parseFloat(i.platformFee) || 0) > 0).length} transactions with fees</div>
         </StatCard>
         <StatCard>
           <h3>SaaS & Subscriptions</h3>
@@ -380,10 +415,12 @@ const ServiceExpenses = () => {
                   ) : '-'}
                 </Td>
                 <Td>
-                  <div style={{ display: 'flex', gap: '0.25rem' }}>
-                    <ActionBtn onClick={() => openEdit(e)}><Edit2 size={16} /></ActionBtn>
-                    <ActionBtn onClick={() => setDeleteTarget(e.id)}><Trash2 size={16} /></ActionBtn>
-                  </div>
+                  {!e._isFee && (
+                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                      <ActionBtn onClick={() => openEdit(e)}><Edit2 size={16} /></ActionBtn>
+                      <ActionBtn onClick={() => setDeleteTarget(e.id)}><Trash2 size={16} /></ActionBtn>
+                    </div>
+                  )}
                 </Td>
               </tr>
             );
@@ -406,8 +443,12 @@ const ServiceExpenses = () => {
               <MobileRow><span>Date</span><span>{e.date || '-'}</span></MobileRow>
               {e.renewalDate && <MobileRow><span>Renewal</span><span>{e.renewalDate}</span></MobileRow>}
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', justifyContent: 'flex-end' }}>
-                <ActionBtn onClick={() => openEdit(e)}><Edit2 size={16} /></ActionBtn>
-                <ActionBtn onClick={() => setDeleteTarget(e.id)}><Trash2 size={16} /></ActionBtn>
+                {!e._isFee && (
+                  <>
+                    <ActionBtn onClick={() => openEdit(e)}><Edit2 size={16} /></ActionBtn>
+                    <ActionBtn onClick={() => setDeleteTarget(e.id)}><Trash2 size={16} /></ActionBtn>
+                  </>
+                )}
               </div>
             </MobileCard>
           );
