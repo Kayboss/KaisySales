@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Plus, Edit2, Trash2, RefreshCw, DollarSign } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers } from '../../services/api';
+import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers, fetchExpenses } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -231,6 +231,7 @@ const IncomeTracking = () => {
   const [income, setIncome] = useState([]);
   const [recurring, setRecurring] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [expenses, setExpenses] = useState([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
@@ -251,10 +252,11 @@ const IncomeTracking = () => {
   const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
-    const [i, r, c] = await Promise.all([fetchServiceIncome(), fetchRecurringIncome(), fetchCustomers()]);
+    const [i, r, c, ex] = await Promise.all([fetchServiceIncome(), fetchRecurringIncome(), fetchCustomers(), fetchExpenses()]);
     setIncome(i);
     setRecurring(r);
     setCustomers(c);
+    setExpenses(ex);
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -361,7 +363,7 @@ const IncomeTracking = () => {
   const paginated = filteredIncome.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const totalGross = income.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
-  const totalFees = income.reduce((s, i) => s + (parseFloat(i.platformFee) || 0), 0);
+  const totalExpenses = expenses.reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
   const totalNet = income.reduce((s, i) => s + (parseFloat(i.netAmount) || 0), 0);
   const activeRecurring = recurring.filter(r => r.active !== false);
   const monthlyRecurring = activeRecurring.reduce((s, r) => {
@@ -389,9 +391,9 @@ const IncomeTracking = () => {
           <div className="sub">Before fees</div>
         </StatCard>
         <StatCard>
-          <h3>Platform Fees</h3>
-          <div className="value" style={{ color: '#C62828' }}>-GH₵{totalFees.toFixed(2)}</div>
-          <div className="sub">Total deductions</div>
+          <h3>Total Expenses</h3>
+          <div className="value" style={{ color: '#C62828' }}>GH₵{totalExpenses.toFixed(2)}</div>
+          <div className="sub">{expenses.length} expense entries</div>
         </StatCard>
         <StatCard>
           <h3>Net Income</h3>
