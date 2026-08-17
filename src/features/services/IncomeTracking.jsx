@@ -234,6 +234,7 @@ const ChartBox = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   border-radius: 12px;
   padding: 1.5rem;
+  margin-bottom: 1.5rem;
 `;
 
 const ChartTitle = styled.h3`
