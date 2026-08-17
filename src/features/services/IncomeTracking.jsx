@@ -226,6 +226,53 @@ const FeeCalcBox = styled.div`
 
 const PAGE_SIZE = 20;
 
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const ChartBox = styled.div`
+  background: white;
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  border-radius: 12px;
+  padding: 1.5rem;
+`;
+
+const ChartTitle = styled.h3`
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  color: ${({ theme }) => theme.colors.primary};
+`;
+
+const BarChart = styled.div`
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  height: 180px;
+  padding-top: 1rem;
+`;
+
+const Bar = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+`;
+
+const BarFill = styled.div`
+  width: 100%;
+  background: ${({ $color }) => $color || '#6F240A'};
+  border-radius: 4px 4px 0 0;
+  height: ${({ $height }) => $height}%;
+  min-height: ${({ $height }) => $height > 0 ? '4px' : '0'};
+  transition: height 0.3s ease;
+`;
+
+const BarLabel = styled.span`
+  font-size: 0.6rem;
+  color: ${({ theme }) => theme.colors.text.muted};
+  text-align: center;
+  white-space: nowrap;
+`;
+
 const IncomeTracking = () => {
   const [tab, setTab] = useState('income');
   const [income, setIncome] = useState([]);
@@ -373,6 +420,30 @@ const IncomeTracking = () => {
     return s;
   }, 0);
 
+  const monthlyData = {};
+  const now = new Date();
+  for (let m = 5; m >= 0; m--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    monthlyData[key] = { label: MONTHS[d.getMonth()], income: 0, expenses: 0 };
+  }
+  income.forEach(i => {
+    const pd = i.paymentDate;
+    if (!pd) return;
+    const d = new Date(pd);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (monthlyData[key]) monthlyData[key].income += parseFloat(i.amount) || 0;
+  });
+  expenses.forEach(e => {
+    const ed = e.date;
+    if (!ed) return;
+    const d = new Date(ed);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (monthlyData[key]) monthlyData[key].expenses += parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0;
+  });
+  const chartMonths = Object.keys(monthlyData);
+  const maxVal = Math.max(...chartMonths.map(k => Math.max(monthlyData[k].income, monthlyData[k].expenses)), 1);
+
   return (
     <div>
       <Header>
@@ -406,6 +477,30 @@ const IncomeTracking = () => {
           <div className="sub">From {activeRecurring.length} active item(s)</div>
         </StatCard>
       </StatRow>
+
+      <ChartBox>
+        <ChartTitle>Monthly Revenue (Last 6 Months)</ChartTitle>
+        <BarChart>
+          {chartMonths.map(key => {
+            const d = monthlyData[key];
+            const incH = maxVal > 0 ? (d.income / maxVal) * 100 : 0;
+            const expH = maxVal > 0 ? (d.expenses / maxVal) * 100 : 0;
+            return (
+              <Bar key={key}>
+                <div style={{ display: 'flex', gap: '3px', alignItems: 'flex-end', width: '100%', height: '100%' }}>
+                  <BarFill $color="#25432F" $height={incH} title={`Income: GH₵${d.income.toFixed(2)}`} style={{ flex: 1 }} />
+                  <BarFill $color="#C62828" $height={expH} title={`Expenses: GH₵${d.expenses.toFixed(2)}`} style={{ flex: 1 }} />
+                </div>
+                <BarLabel>{d.label}</BarLabel>
+              </Bar>
+            );
+          })}
+        </BarChart>
+        <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.75rem', fontSize: '0.75rem', color: '#89726C' }}>
+          <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#25432F', marginRight: 4 }}></span>Income</span>
+          <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#C62828', marginRight: 4 }}></span>Expenses</span>
+        </div>
+      </ChartBox>
 
       <TabBar>
         <Tab $active={tab === 'income'} onClick={() => setTab('income')}>
