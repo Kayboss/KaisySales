@@ -5,7 +5,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { fetchCategories, updateCategory, deleteCategory } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, Crown, DollarSign } from 'lucide-react';
+import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, Crown, DollarSign, Upload } from 'lucide-react';
 import SubscriptionSettings from './SubscriptionSettings';
 import { CURRENCY_OPTIONS } from '../../utils/currency';
 import { sanitizeInput } from '../../utils/sanitize';
@@ -335,7 +335,8 @@ const SettingsPage = () => {
     location: settings.location,
     category: settings.category,
     avatarColor: settings.avatarColor || '#6F240A',
-    currency: settings.currency || 'GHS'
+    currency: settings.currency || 'GHS',
+    logoUrl: settings.logoUrl || '',
   });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -405,6 +406,37 @@ const SettingsPage = () => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setSaved(false);
+  };
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Logo must be under 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxW = 400;
+        const scale = img.width > maxW ? maxW / img.width : 1;
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL(file.type, 0.85);
+        setFormData(prev => ({ ...prev, logoUrl: dataUrl }));
+        setSaved(false);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = async (e) => {
@@ -570,6 +602,27 @@ const SettingsPage = () => {
                 ))}
               </Select>
             </InputWrapper>
+          </FormGroup>
+
+          <FormGroup>
+            <Label>Business Logo</Label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginLeft: '2.75rem' }}>
+              {formData.logoUrl ? (
+                <div style={{ position: 'relative' }}>
+                  <img src={formData.logoUrl} alt="Business logo" style={{ height: 64, maxWidth: 180, objectFit: 'contain', border: '1px solid #D0C8C4', borderRadius: 8, padding: 4, background: '#FAFAFA' }} />
+                  <button type="button" onClick={() => { setFormData(prev => ({ ...prev, logoUrl: '' })); setSaved(false); }} style={{ position: 'absolute', top: -8, right: -8, background: '#BA1A1A', color: 'white', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.75rem' }}>
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', border: '1px dashed #D0C8C4', borderRadius: 8, cursor: 'pointer', color: '#89726C', fontSize: '0.85rem', fontWeight: 600 }}>
+                  <Upload size={16} />
+                  Upload logo (max 2MB)
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                </label>
+              )}
+            </div>
+            <p style={{ marginLeft: '2.75rem', marginTop: '0.5rem', fontSize: '0.75rem', color: '#89726C' }}>Displayed on invoices. Recommended: 400×100px transparent PNG.</p>
           </FormGroup>
 
           <FormGroup>

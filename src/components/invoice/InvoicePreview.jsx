@@ -263,7 +263,7 @@ const CloseButton = styled.button`
 const PRINT_STYLE_ID = 'invoice-print-styles';
 
 const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, businessLocation }) => {
-  const { currency } = useSettingsStore();
+  const { currency, logoUrl } = useSettingsStore();
   const contentRef = useRef(null);
 
   useEffect(() => {
@@ -361,8 +361,14 @@ const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, busines
         <InvoiceBody>
           <Header>
               <Brand>
-                <Leaf size={24} />
-                {businessName || 'KaisySales'}
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" style={{ height: 40, maxWidth: 160, objectFit: 'contain' }} />
+                ) : (
+                  <>
+                    <Leaf size={24} />
+                    {businessName || 'KaisySales'}
+                  </>
+                )}
               </Brand>
             <InvoiceMeta>
               <InvoiceTitle>INVOICE</InvoiceTitle>
