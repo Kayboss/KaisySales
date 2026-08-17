@@ -364,7 +364,7 @@ const IncomeTracking = () => {
 
   const totalGross = income.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
   const totalExpenses = expenses.reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
-  const totalNet = income.reduce((s, i) => s + (parseFloat(i.netAmount) || 0), 0);
+  const totalNet = totalGross - totalExpenses;
   const activeRecurring = recurring.filter(r => r.active !== false);
   const monthlyRecurring = activeRecurring.reduce((s, r) => {
     if (r.frequency === 'monthly') return s + (parseFloat(r.amount) || 0);
@@ -398,7 +398,7 @@ const IncomeTracking = () => {
         <StatCard>
           <h3>Net Income</h3>
           <div className="value" style={{ color: '#2E7D32' }}>GH₵{totalNet.toFixed(2)}</div>
-          <div className="sub">Actual take-home</div>
+          <div className="sub">Gross income minus expenses</div>
         </StatCard>
         <StatCard>
           <h3>Monthly Recurring</h3>
