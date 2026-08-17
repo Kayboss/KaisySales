@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
-import { fetchCategories, updateCategory, deleteCategory } from '../../services/api';
+import { fetchCategories, updateCategory, deleteCategory, uploadBusinessLogo, deleteBusinessLogo } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, Crown, DollarSign, Upload } from 'lucide-react';
 import SubscriptionSettings from './SubscriptionSettings';
@@ -340,6 +340,7 @@ const SettingsPage = () => {
   });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [categories, setCategories] = useState([]);
   const [editingCatId, setEditingCatId] = useState(null);
@@ -408,7 +409,7 @@ const SettingsPage = () => {
     setSaved(false);
   };
 
-  const handleLogoUpload = (e) => {
+  const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
@@ -419,24 +420,30 @@ const SettingsPage = () => {
       alert('Logo must be under 2MB.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new window.Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxW = 400;
-        const scale = img.width > maxW ? maxW / img.width : 1;
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL(file.type, 0.85);
-        setFormData(prev => ({ ...prev, logoUrl: dataUrl }));
-        setSaved(false);
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
+    setUploadingLogo(true);
+    try {
+      const url = await uploadBusinessLogo(file);
+      setFormData(prev => ({ ...prev, logoUrl: url }));
+      setSaved(false);
+    } catch (err) {
+      console.error('Logo upload failed:', err);
+      alert('Failed to upload logo. Please try again.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleLogoRemove = async () => {
+    setUploadingLogo(true);
+    try {
+      await deleteBusinessLogo();
+      setFormData(prev => ({ ...prev, logoUrl: '' }));
+      setSaved(false);
+    } catch (err) {
+      console.error('Logo delete failed:', err);
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleSave = async (e) => {
@@ -610,15 +617,14 @@ const SettingsPage = () => {
               {formData.logoUrl ? (
                 <div style={{ position: 'relative' }}>
                   <img src={formData.logoUrl} alt="Business logo" style={{ height: 64, maxWidth: 180, objectFit: 'contain', border: '1px solid #D0C8C4', borderRadius: 8, padding: 4, background: '#FAFAFA' }} />
-                  <button type="button" onClick={() => { setFormData(prev => ({ ...prev, logoUrl: '' })); setSaved(false); }} style={{ position: 'absolute', top: -8, right: -8, background: '#BA1A1A', color: 'white', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.75rem' }}>
+                  <button type="button" disabled={uploadingLogo} onClick={handleLogoRemove} style={{ position: 'absolute', top: -8, right: -8, background: '#BA1A1A', color: 'white', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uploadingLogo ? 'not-allowed' : 'pointer', fontSize: '0.75rem', opacity: uploadingLogo ? 0.5 : 1 }}>
                     <X size={12} />
                   </button>
                 </div>
               ) : (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', border: '1px dashed #D0C8C4', borderRadius: 8, cursor: 'pointer', color: '#89726C', fontSize: '0.85rem', fontWeight: 600 }}>
-                  <Upload size={16} />
-                  Upload logo (max 2MB)
-                  <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem', border: '1px dashed #D0C8C4', borderRadius: 8, cursor: uploadingLogo ? 'not-allowed' : 'pointer', color: '#89726C', fontSize: '0.85rem', fontWeight: 600, opacity: uploadingLogo ? 0.5 : 1 }}>
+                  {uploadingLogo ? 'Uploading...' : <><Upload size={16} /> Upload logo (max 2MB)</>}
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={uploadingLogo} style={{ display: 'none' }} />
                 </label>
               )}
             </div>

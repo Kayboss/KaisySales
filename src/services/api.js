@@ -486,3 +486,30 @@ export const fetchVisitStats = async () => {
     return { deviceData: [], locationData: [], dailyVisits: [] };
   }
 };
+
+// ====================================================
+// 15. LOGO UPLOAD (Supabase Storage)
+// ====================================================
+
+export const uploadBusinessLogo = async (file) => {
+  const uid = getUid();
+  const ext = file.name.split('.').pop() || 'png';
+  const path = `${uid}/logo.${ext}`;
+
+  const { error: upErr } = await supabase.storage
+    .from('business-logos')
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (upErr) throw upErr;
+
+  const { data } = supabase.storage.from('business-logos').getPublicUrl(path);
+  return data.publicUrl;
+};
+
+export const deleteBusinessLogo = async () => {
+  const uid = getUid();
+  const { data: files } = await supabase.storage.from('business-logos').list(uid);
+  if (files && files.length > 0) {
+    const paths = files.map(f => `${uid}/${f.name}`);
+    await supabase.storage.from('business-logos').remove(paths);
+  }
+};
