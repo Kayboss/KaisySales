@@ -72,6 +72,7 @@ const CheckAuth = () => {
         <Spinner />
 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, letterSpacing: '1px' }}>
   <img src="/logo.svg" alt="KaisySales" style={{ height: 28, width: 'auto' }} />
+  <span style={{ fontFamily: "'Tango Sans', sans-serif" }}>KaisySales</span>
 </div>
         <p style={{ fontSize: '0.9rem', color: '#55423D', fontWeight: 600 }}>
           Weaving your digital workshop...

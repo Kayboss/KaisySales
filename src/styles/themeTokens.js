@@ -34,8 +34,8 @@ export const themeTokens = {
 
   fonts: {
     main: "'Work Sans', system-ui, sans-serif",
-    display: "'Manrope', sans-serif",
-    data: "'Work Sans', monospace", // Tabular figures
+    display: "'Tango Sans', 'Manrope', sans-serif",
+    data: "'Work Sans', monospace",
   },
 
   fontSizes: {
