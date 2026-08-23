@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaisySales — Brand Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800;900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --terracotta:#6F240A; --deep-terracotta:#8E3A1F; --ochre:#875200;
+    --forest:#25432F; --cream:#FCF9F3; --surface-variant:#F0EEE8;
+    --charcoal:#1C1C18; --muted:#55423D; --border:#89726C; --outline:#DCC1B9;
+    --gold:#D4AF37; --error:#BA1A1A;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Work Sans',sans-serif;background:var(--cream);color:var(--charcoal);line-height:1.65;}
+  .page{max-width:900px;margin:0 auto;padding:48px 40px;}
+
+  /* Cover */
+  .cover{background:var(--terracotta);color:#fff;border-radius:16px;padding:64px 56px;margin-bottom:40px;position:relative;overflow:hidden;}
+  .cover::after{content:"";position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;background:rgba(212,175,55,.15);}
+  .cover::before{content:"";position:absolute;right:40px;bottom:-90px;width:220px;height:220px;border-radius:50%;background:rgba(37,67,47,.35);}
+  .cover h1{font-family:'Manrope',sans-serif;font-weight:900;font-size:52px;line-height:1.1;letter-spacing:-1px;position:relative;z-index:1;}
+  .cover .tagline{font-size:20px;font-weight:600;color:#F5E6D3;margin-top:12px;position:relative;z-index:1;}
+  .cover .meta{margin-top:36px;display:flex;gap:28px;font-size:13px;color:rgba(255,255,255,.85);position:relative;z-index:1;flex-wrap:wrap;}
+  .leaf{display:inline-flex;width:56px;height:56px;border-radius:14px;background:#fff;color:var(--terracotta);align-items:center;justify-content:center;margin-bottom:24px;position:relative;z-index:1;}
+
+  /* Sections */
+  section{background:#fff;border:1px solid var(--outline);border-radius:16px;padding:40px 44px;margin-bottom:28px;}
+  .sec-num{font-family:'Manrope',sans-serif;font-weight:800;font-size:12px;letter-spacing:2px;color:var(--ochre);text-transform:uppercase;}
+  h2{font-family:'Manrope',sans-serif;font-weight:800;font-size:26px;color:var(--terracotta);margin:4px 0 18px;}
+  h3{font-family:'Manrope',sans-serif;font-weight:700;font-size:15px;color:var(--forest);margin:22px 0 8px;text-transform:uppercase;letter-spacing:.6px;}
+  p{font-size:15px;color:var(--muted);}
+  ul{padding-left:22px;color:var(--muted);font-size:15px;}
+  li{margin-bottom:7px;}
+  strong{color:var(--charcoal);}
+
+  /* Color grid */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:10px;}
+  .swatch{border:1px solid var(--outline);border-radius:12px;overflow:hidden;}
+  .swatch .chip{height:74px;}
+  .swatch .info{padding:10px 12px;font-size:11.5px;line-height:1.5;}
+  .swatch .name{font-weight:700;color:var(--charcoal);display:block;font-size:12.5px;}
+  code{background:var(--surface-variant);border-radius:4px;padding:1px 5px;font-size:11px;color:var(--muted);}
+
+  /* Type specimens */
+  .specimen{border:1px solid var(--outline);border-radius:12px;padding:22px 24px;margin-top:10px;}
+  .specimen .label{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--ochre);font-weight:700;margin-bottom:8px;}
+  .spec-display{font-family:'Manrope',sans-serif;font-weight:900;font-size:38px;letter-spacing:-.5px;}
+  .spec-body{font-family:'Work Sans',sans-serif;font-size:17px;}
+  .spec-data{font-family:'Work Sans',sans-serif;font-variant-numeric:tabular-nums;font-size:26px;font-weight:600;color:var(--forest);}
+
+  /* Logo row */
+  .logo-row{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;}
+  .logo-tile{flex:1;min-width:180px;border:1px solid var(--outline);border-radius:12px;padding:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+  .logo-tile small{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-weight:600;}
+  .mark{width:54px;height:54px;border-radius:13px;display:flex;align-items:center;justify-content:center;}
+  .wordmark{font-family:'Manrope',sans-serif;font-weight:900;font-size:24px;}
+
+  /* Do / Don't */
+  .dd{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;}
+  .dd-col{border-radius:12px;padding:20px 22px;font-size:14px;}
+  .dd-do{background:#EEF3EE;border:1px solid #C8DACB;}
+  .dd-dont{background:#FBEEEE;border:1px solid #EBC8C8;}
+  .dd-col h3{margin:0 0 10px;}
+  .dd-do h3{color:var(--forest);} .dd-dont h3{color:var(--error);}
+  .dd-col ul{padding-left:18px;}
+  @media(max-width:720px){.dd{grid-template-columns:1fr;}}
+
+  table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13.5px;}
+  th{text-align:left;font-family:'Manrope',sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);border-bottom:2px solid var(--outline);padding:8px 10px;}
+  td{border-bottom:1px solid var(--surface-variant);padding:9px 10px;color:var(--muted);vertical-align:top;}
+  td:first-child{font-weight:700;color:var(--charcoal);white-space:nowrap;}
+
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:26px 0 10px;}
+  @media print{
+    body{background:#fff;}
+    .page{max-width:none;padding:0;}
+    section,.cover{break-inside:avoid;border-color:#ddd;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- COVER -->
+  <div class="cover">
+    <div class="leaf">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+    </div>
+    <h1>KaisySales<br>Brand Guide</h1>
+    <div class="tagline">Know your Business, Stay in Control.</div>
+    <div class="meta">
+      <span>Version 1.0</span>
+      <span>August 2026</span>
+      <span>Official brand reference for design, marketing &amp; product</span>
+    </div>
+  </div>
+
+  <!-- 1 LOGO -->
+  <section>
+    <div class="sec-num">01 — Logo</div>
+    <h2>The Leaf Mark &amp; Wordmark</h2>
+    <p>Our symbol is a <strong>sprouting leaf</strong>: growth rooted in nature. It reflects organic business growth and our earthy African heritage palette. The wordmark uses <strong>Manrope ExtraBold (900)</strong>, sentence case — never all-caps.</p>
+
+    <h3>Primary lockups</h3>
+    <div class="logo-row">
+      <div class="logo-tile" style="background:#fff;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="mark" style="background:var(--terracotta);color:#fff;">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+          </div>
+          <span class="wordmark">KaisySales</span>
+        </div>
+        <small>Horizontal · Light background</small>
+      </div>
+      <div class="logo-tile" style="background:var(--terracotta);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="mark" style="background:#fff;color:var(--terracotta);">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+          </div>
+          <span class="wordmark" style="color:#fff;">KaisySales</span>
+        </div>
+        <small style="color:#F5E6D3;">Reversed · Terracotta background</small>
+      </div>
+      <div class="logo-tile" style="background:var(--forest);">
+        <div class="mark" style="background:#fff;color:var(--forest);">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+        </div>
+        <small style="color:#DCC1B9;">Mark only · Forest background</small>
+      </div>
+    </div>
+
+    <h3>Rules of use</h3>
+    <ul>
+      <li><strong>Clear space:</strong> keep empty space around the mark equal to at least the height of the letter “K” in the wordmark.</li>
+      <li><strong>Minimum size:</strong> mark-only 20 px / 6 mm; lockup 110 px wide on screen.</li>
+      <li><strong>App icon / favicon:</strong> leaf mark centered on Terracotta rounded square (radius ≈ 22% of size), white glyph.</li>
+      <li><strong>Stroke weight:</strong> always 2 px stroke at 24 px viewBox — do not thin or bold the glyph.</li>
+    </ul>
+
+    <div class="dd">
+      <div class="dd-col dd-do">
+        <h3>Do</h3>
+        <ul>
+          <li>Use white or Terracotta for the glyph</li>
+          <li>Place on cream, white, terracotta, or forest backgrounds</li>
+          <li>Keep the leaf upright and unmodified</li>
+        </ul>
+      </div>
+      <div class="dd-col dd-dont">
+        <h3>Don't</h3>
+        <ul>
+          <li>Stretch, rotate, add shadows, or recolor to gradients</li>
+          <li>Place on busy photos without a scrim</li>
+          <li>Rearrange the lockup or change the font of the wordmark</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 COLOR -->
+  <section>
+    <div class="sec-num">02 — Color</div>
+    <h2>Earth &amp; Harvest Palette</h2>
+    <p>Inspired by traditional African heritage — terracotta pottery, ochre earth, forest canopy — balanced by warm cream paper tones. Colors are defined in <code>src/styles/themeTokens.js</code>; these values are canonical.</p>
+
+    <h3>Core brand colors</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#6F240A;"></div><div class="info"><span class="name">Terracotta</span>Primary<br><code>#6F240A</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#8E3A1F;"></div><div class="info"><span class="name">Deep Terracotta</span>Primary container<br><code>#8E3A1F</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#25432F;"></div><div class="info"><span class="name">Forest Green</span>Tertiary · Success<br><code>#25432F</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#875200;"></div><div class="info"><span class="name">Ochre</span>Secondary · Warning<br><code>#875200</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#D4AF37;"></div><div class="info"><span class="name">Harvest Gold</span>Accent · Marketing<br><code>#D4AF37</code></div></div>
+    </div>
+
+    <h3>Neutrals &amp; surfaces</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#FCF9F3;"></div><div class="info"><span class="name">Warm Cream</span>App background<br><code>#FCF9F3</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFFFFF;border-bottom:1px solid #eee;"></div><div class="info"><span class="name">White</span>Cards &amp; surfaces<br><code>#FFFFFF</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#F0EEE8;"></div><div class="info"><span class="name">Surface Variant</span>Zebra rows, chips<br><code>#F0EEE8</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#1C1C18;"></div><div class="info"><span class="name">Deep Charcoal</span>Primary text<br><code>#1C1C18</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#55423D;"></div><div class="info"><span class="name">Warm Muted Gray</span>Secondary text<br><code>#55423D</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#DCC1B9;"></div><div class="info"><span class="name">Clay Outline</span>Borders, dividers<br><code>#DCC1B9</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#BA1A1A;"></div><div class="info"><span class="name">Error Red</span>Destructive states<br><code>#BA1A1A</code></div></div>
+    </div>
+
+    <h3>Usage ratio &amp; pairing</h3>
+    <table>
+      <tr><th>Role</th><th>Color</th><th>Where</th></tr>
+      <tr><td>Dominant (~60%)</td><td>Warm Cream + White</td><td>Backgrounds, cards — keeps the UI calm and readable</td></tr>
+      <tr><td>Primary action (~30%)</td><td>Terracotta</td><td>Buttons, active tabs, links, key highlights</td></tr>
+      <tr><td>Supporting (~10%)</td><td>Forest Green / Ochre / Gold</td><td>Success states, charts, badges, accents</td></tr>
+    </table>
+    <ul style="margin-top:12px;">
+      <li><strong>Semantics:</strong> green = money in / success (<code>#25432F</code>), red = money out / danger (<code>#BA1A1A</code> or chart red <code>#C62828</code>). Never swap these meanings.</li>
+      <li><strong>Charts:</strong> income lines/bars use Forest Green <code>#25432F</code>; expenses use red <code>#C62828</code>; category series cycle through Terracotta → Gold → Forest → Blue <code>#1E3A8A</code> → Mauve <code>#8B5E7C</code> → Ochre.</li>
+      <li><strong>Contrast:</strong> white text passes AA on Terracotta, Forest, Ochre and Charcoal. Charcoal text passes on Cream/White/Surface Variant.</li>
+    </ul>
+  </section>
+
+  <!-- 3 TYPOGRAPHY -->
+  <section>
+    <div class="sec-num">03 — Typography</div>
+    <h2>Manrope + Work Sans</h2>
+    <p>Two Google Fonts, free and self-hostable. Manrope leads; Work Sans carries everything else.</p>
+
+    <div class="specimen">
+      <div class="label">Display / Headings — Manrope 700–900</div>
+      <div class="spec-display">Know your Business.</div>
+      <p style="margin-top:6px;">Weights: 400 · 600 · 700 · 800 · 900 — use 800–900 for page titles, 700 for card headings. Slight negative letter-spacing (-0.02em) at large sizes.</p>
+    </div>
+
+    <div class="specimen">
+      <div class="label">Body / UI — Work Sans 400–600</div>
+      <div class="spec-body">Record every transaction with ease. Track revenue, view daily summaries, and stay on top of your cash flow.</div>
+      <p style="margin-top:6px;">Weights: 400 body · 500 labels · 600 buttons/emphasis · 700 strong data. Line-height 1.6 for paragraphs.</p>
+    </div>
+
+    <div class="specimen">
+      <div class="label">Data / Figures — Work Sans, tabular numerals</div>
+      <div class="spec-data">GH₵ 12,480.50</div>
+      <p style="margin-top:6px;">Always render currency and metrics with tabular figures (<code>font-variant-numeric: tabular-nums</code>) so columns align.</p>
+    </div>
+
+    <h3>Type scale</h3>
+    <table>
+      <tr><th>Token</th><th>Size</th><th>Use</th></tr>
+      <tr><td>xs</td><td>12px</td><td>Captions, tags, chart labels</td></tr>
+      <tr><td>sm</td><td>14px</td><td>Table cells, secondary copy</td></tr>
+      <tr><td>base</td><td>16px</td><td>Body text, inputs</td></tr>
+      <tr><td>lg</td><td>18px</td><td>Emphasized lead-ins</td></tr>
+      <tr><td>xl / 2xl</td><td>20 / 24px</td><td>Section headings, modal titles</td></tr>
+      <tr><td>3xl</td><td>32px</td><td>Dashboard stats, landing subheads</td></tr>
+      <tr><td>4xl</td><td>48px</td><td>Hero headlines</td></tr>
+    </table>
+  </section>
+
+  <!-- 4 VOICE -->
+  <section>
+    <div class="sec-num">04 — Voice &amp; Tone</div>
+    <h2>A Mentor, Not a Bank</h2>
+    <p>KaisySales speaks like the smart, dependable friend who knows your numbers and tells you the truth — encouraging, direct, jargon-free.</p>
+    <table>
+      <tr><th>Trait</th><th>It sounds like</th><th>Never like</th></tr>
+      <tr><td>Simple</td><td>“Add your first sale in under two minutes.”</td><td>“Initialize your ledger configuration.”</td></tr>
+      <tr><td>Encouraging</td><td>“Nice — you're 3 sales ahead of last week.”</td><td>“Performance remains suboptimal.”</td></tr>
+      <tr><td>Honest</td><td>“GH₵230 went to platform fees this month.”</td><td>Hiding costs or inflating numbers</td></tr>
+      <tr><td>Human</td><td>“We'll remind you before anything changes.”</td><td>Legalese in product UI</td></tr>
+    </table>
+    <ul style="margin-top:14px;">
+      <li>Sentence case everywhere — headlines, buttons, labels.</li>
+      <li>Money talks straight: show GH₵ amounts with two decimals.</li>
+      <li>Errors own the fix: say what happened and what to do next (“That password needs one number — try again”).</li>
+      <li>Celebrate the user's wins, never the software (“Your invoice is out!” not “KaisySales has generated invoice #204”).</li>
+    </ul>
+  </section>
+
+  <!-- 5 DESIGN LANGUAGE -->
+  <section>
+    <div class="sec-num">05 — Design Language</div>
+    <h2>Shape, Depth &amp; Motion</h2>
+    <table>
+      <tr><th>Element</th><th>Spec</th><th>Notes</th></tr>
+      <tr><td>Corner radius</td><td>sm 4px · md 8px · lg 16px · full 9999px</td><td>8px default for cards/buttons; 16px hero cards; full for pills &amp; avatars</td></tr>
+      <tr><td>Spacing unit</td><td>4px base — 4 / 8 / 16 / 24 / 40</td><td>Everything snaps to the 4px grid</td></tr>
+      <tr><td>Elevation</td><td>soft <code>0 4px 6px rgba(142,58,31,.08)</code> · ambient <code>0 10px 15px -3px rgba(142,58,31,.1)</code></td><td>Shadows are warm-tinted terracotta, never pure black</td></tr>
+      <tr><td>Borders</td><td>1px Clay Outline <code>#DCC1B9</code></td><td>Prefer borders over heavy shadows for structure</td></tr>
+      <tr><td>Icons</td><td>Lucide — 2px stroke, round caps/joins, 16–28px</td><td>One consistent icon family app-wide; no filled icons except brand moments</td></tr>
+      <tr><td>Motion</td><td>fast 0.15s ease-in-out · default 0.3s cubic-bezier(0.4,0,0.2,1)</td><td>Hover lifts, chart transitions, modals fade+rise; nothing bounces</td></tr>
+      <tr><td>Buttons</td><td>Filled terracotta primary; outlined neutral secondary</td><td>Radius 8px, Work Sans 600, hover brightens ~15%</td></tr>
+      <tr><td>Imagery</td><td>Real entrepreneurs, warm light, market/workshop settings</td><td>No sterile stock-office photography</td></tr>
+    </table>
+  </section>
+
+  <!-- 6 APPLICATIONS -->
+  <section>
+    <div class="sec-num">06 — Applications</div>
+    <h2>Where the Brand Lives</h2>
+    <ul>
+      <li><strong>Product UI:</strong> cream canvas, white cards, terracotta actions, forest/red semantics, Recharts visualizations in the brand series.</li>
+      <li><strong>Landing page:</strong> dark terracotta hero sections, gold accent underlines, laptop mockups framed in forest green.</li>
+      <li><strong>Invoices (user-facing output):</strong> clean white sheet, terracotta header band optional, business logo slot, tabular totals.</li>
+      <li><strong>Social &amp; marketing:</strong> terracotta or forest backgrounds, gold quote marks for testimonials, leaf mark top-left, tagline bottom.</li>
+      <li><strong>Email:</strong> single-column, white body on cream frame, terracotta CTA button, plain-text fallback friendly.</li>
+    </ul>
+  </section>
+
+  <!-- 7 CHECKLIST -->
+  <section>
+    <div class="sec-num">07 — Quick Reference</div>
+    <h2>Brand Checklist</h2>
+    <ul>
+      <li>✓ Leaf mark present, unmodified, correct clear space</li>
+      <li>✓ Manrope for headings, Work Sans for body — nothing else</li>
+      <li>✓ 60/30/10 color balance respected</li>
+      <li>✓ Green = in, Red = out — semantics intact</li>
+      <li>✓ Sentence case, jargon-free copy</li>
+      <li>✓ 4px spacing grid, 8px radius defaults, warm shadows</li>
+      <li>✓ Currency shown with tabular figures: GH₵0.00</li>
+      <li>✓ Tagline when space allows: “Know your Business, Stay in Control.”</li>
+    </ul>
+  </section>
+
+  <footer>KaisySales Brand Guide · v1.0 · August 2026 · Values sourced from src/styles/themeTokens.js</footer>
+</div>
+</body>
+</html>

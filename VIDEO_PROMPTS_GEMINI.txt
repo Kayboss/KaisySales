@@ -1,0 +1,185 @@
+===============================================================================
+        KAISYSALES - AI VIDEO GENERATION PROMPTS (Google Gemini / Veo)
+              Short clips for editing into a promotional video
+===============================================================================
+
+HOW TO USE THIS FILE
+-------------------------------------------------------------------------------
+1. Open Google Gemini (gemini.google.com) and start a new chat.
+2. Copy one prompt below at a time and paste it in. Veo generates ~8-second
+   clips per generation.
+3. Generate 2-3 variations of each scene and pick the best takes.
+4. Download the clips, then edit them together in CapCut / Premiere /
+   DaVinci Resolve. Add your own text overlays, logo, voiceover, and music.
+
+TIPS BEFORE YOU START
+-------------------------------------------------------------------------------
+- All prompts are written for CINEMATIC, REALISTIC footage with NO TEXT in
+  the shot. Add "KaisySales" text overlays yourself during editing so the
+  AI doesn't garble the spelling.
+- Keep the brand look: warm golden light, earthy tones (terracotta red-
+  brown, forest green, cream), real African entrepreneurs, modern + hopeful
+  mood.
+- If a clip looks too dark or too fast, add: "soft natural lighting,
+  slow smooth motion" to the end of the prompt.
+
+
+===============================================================================
+PART 1 - SCENE PROMPTS (copy-paste each one into Gemini)
+===============================================================================
+
+--- SCENE 1: THE HERO SHOT (opening clip) -------------------------------------
+A confident young Ghanaian entrepreneur standing on a rooftop overlooking
+Accra at golden hour, holding a smartphone, smiling as she looks at the
+screen. Warm sunset light, cinematic depth of field, slow push-in camera
+movement from wide shot to medium close-up. She wears smart casual clothing
+with terracotta and earth tones. Background city softly blurred. Hopeful,
+inspiring mood. Photorealistic, shallow depth of field, 4K quality.
+
+--- SCENE 2: THE OLD WAY (the problem) ----------------------------------------
+Close-up of a frustrated small business owner sitting at a cluttered desk in
+a small shop, flipping through a worn paper notebook full of messy numbers,
+shaking his head slightly. Dim warm indoor lighting, realistic textures of
+paper and wood desk. Slow lateral tracking shot. Moody but not depressing -
+this is the "before" moment. Photorealistic, cinematic color grading.
+
+--- SCENE 3: THE SWITCH (light bulb moment) -----------------------------------
+The same small business owner picks up his smartphone and his face softens
+into relief and a smile as he sees something clear and organized on screen.
+Screen light gently illuminating his face, warm interior lighting, slow
+zoom-in on his face from over-the-shoulder angle. Transition from confusion
+to confidence. Photorealistic, warm cinematic tones, emotional and uplifting.
+
+--- SCENE 4: THE APP IN HAND (product moment) ---------------------------------
+Extreme close-up over-the-shoulder shot of hands scrolling smoothly through
+a clean business dashboard app on a smartphone. The screen shows simple
+charts and numbers glowing softly (abstract UI, no readable text). Cream and
+terracotta colored interface hints. Soft window light, blurred cozy shop
+background, macro lens feel, shallow depth of field, smooth slow scroll
+motion. Premium tech commercial aesthetic, photorealistic.
+
+--- SCENE 5: THE FREELANCER (gig economy) -------------------------------------
+A young freelance designer working on a laptop in a bright modern home
+office with plants, wearing headphones around her neck. She finishes typing,
+leans back and smiles while checking her phone showing a payment
+notification style glow. Golden afternoon light through window, gentle
+camera dolly from left to right, creative workspace with sketches and
+laptop. Upbeat, modern, aspirational energy. Photorealistic, cinematic.
+
+--- SCENE 6: THE MARKET VENDOR (retail life) ----------------------------------
+A cheerful middle-aged woman selling colorful fabrics in a vibrant African
+market stall, serving a customer, then quickly tapping her phone to record
+the sale and giving a satisfied nod. Bustling market background slightly
+blurred with rich colors, natural daylight, handheld documentary-style
+camera with subtle movement. Authentic, energetic, joyful atmosphere.
+Photorealistic, vivid but natural colors.
+
+--- SCENE 7: THE INVOICE MOMENT ------------------------------------------------
+Close-up of a professional invoice document sliding across a wooden table
+toward the camera, clean white paper with subtle terracotta design elements
+at the top edge, then a hand stamps it gently with approval gesture in the
+background bokeh. Studio-quality product lighting, slow elegant camera
+push-in, crisp details, premium minimalist commercial style. Satisfying and
+professional mood.
+
+--- SCENE 8: GROWTH VISUAL (abstract) ------------------------------------------
+Cinematic abstract animation of a green plant sprout growing in fast
+timelapse from rich terracotta-brown soil, transforming into rising glowing
+green bar chart shapes made of light particles ascending upward against a
+warm cream background. Smooth camera tilt-up following the growth. Elegant
+motion graphics style mixed with photorealistic soil and leaf textures,
+soft studio lighting, inspiring and premium fintech brand aesthetic.
+
+--- SCENE 9: TEAM / CUSTOMER LOVE (testimonial b-roll) --------------------------
+Portrait-style shot of three different happy African business owners (a
+shopkeeper, a barber, an online seller) each briefly looking at camera and
+smiling warmly in their workplaces, quick elegant cuts between them, each
+in their authentic environment with warm natural light. Gentle handheld
+camera, genuine candid laughter, documentary realism, heartwarming
+community feeling. Photorealistic.
+
+--- SCENE 10: THE END CARD BACKGROUND (for your logo/text overlay) -------------
+Slow elegant cinematic shot of a calm minimal desk scene at dusk: a
+smartphone lying flat next to a small potted green plant and a notebook,
+soft warm lamplight with gentle bokeh lights in background, terracotta and
+cream color palette, very slow drifting camera movement, lots of empty
+space in upper half of frame for text overlay. Peaceful premium closing
+shot, photorealistic, shallow depth of field.
+
+
+===============================================================================
+PART 2 - ALTERNATE STYLE PROMPTS (if you want variety)
+===============================================================================
+
+--- A. FAST-PACED SOCIAL MEDIA CUT ---------------------------------------------
+High-energy dynamic montage: quick cuts of African entrepreneurs succeeding
+- a tailor measuring fabric, a delivery rider checking phone and grinning,
+a chef counting earnings, a student freelancer high-fiving a client.
+Vibrant saturated colors, rhythmic camera whip-pans between subjects,
+energetic handheld movement, upbeat commercial advertising style, golden
+hour lighting throughout, photorealistic.
+
+--- B. CLEAN CORPORATE VERSION --------------------------------------------------
+Minimalist studio shot of a smartphone floating at slight angle against a
+smooth warm cream background, soft terracotta gradient light sweeping
+across the scene, abstract dashboard interface with simple charts animating
+gently on screen (no readable text), slow rotation, premium product
+commercial lighting, extremely clean composition, 4K studio quality.
+
+--- C. EMOTIONAL STORYTELLING ----------------------------------------------------
+Intimate close-up portrait of an older experienced businesswoman in her
+shop after closing hours, reviewing her day on her phone with a peaceful
+satisfied expression, warm tungsten light, rain visible on the window
+behind her, slow gentle zoom, reflective and proud mood, cinematic film
+grain, photorealistic, deeply human storytelling moment.
+
+
+===============================================================================
+PART 3 - NEGATIVE PROMPT (add this to any generation that misbehaves)
+===============================================================================
+If Gemini/Veo lets you set a negative prompt, paste:
+"blurry, distorted faces, extra fingers, warped hands, text, watermarks,
+logos, subtitles, cartoon, low quality, oversaturated, glitch"
+
+Note: Scene 3 and 4 show screens - some garbled UI is normal and fine,
+you will replace or blur screens in editing anyway.
+
+
+===============================================================================
+PART 4 - EDITING GUIDE (putting it all together)
+===============================================================================
+
+SUGGESTED 30-SECOND PROMO STRUCTURE:
+  0:00-0:04   Scene 1  Hero shot          Text: "Know your Business."
+  0:04-0:08   Scene 2  The old way         Text: "Still guessing your numbers?"
+  0:08-0:12   Scene 3  The switch          Text: "There's a better way."
+  0:12-0:18   Scene 4+5 App + Freelancer    Text: "Sales. Expenses. Invoices."
+                                                "True income after fees."
+  0:18-0:23   Scene 6+7  Vendor + Invoice    Text: "Built for YOUR business."
+  0:23-0:26   Scene 8  Growth animation     Text: "Watch it grow."
+  0:26-0:30   Scene 10 End card            Text: "KaisySales"
+                                                "Start free today"
+                                                + website URL
+
+TEXT OVERLAY STYLE (match the brand guide):
+  - Font: Manrope ExtraBold (headings), Work Sans (body)
+  - Colors: cream #FCF9F3 text on dark scenes, charcoal #1C1C18 on light
+  - Accent underline or highlight: harvest gold #D4AF37
+  - Keep text on screen minimum 1.5 seconds
+
+MUSIC DIRECTION:
+  - Afrobeat-inspired, optimistic, building percussion
+  - Start soft (problem scenes), build energy after Scene 3
+  - Peak at Scene 8 growth moment, resolve warmly at end card
+
+VOICEOVER SCRIPT (optional, ~30 sec):
+  "You work hard for every cedi. But do you know exactly where it goes?
+   Meet KaisySales - the app that tracks your sales, expenses, stock and
+   invoices... all in one place. Freelancers: see what you REALLY earn,
+   after platform fees. Simple. Clear. Free to start.
+   KaisySales. Know your Business. Stay in Control."
+
+
+===============================================================================
+                            END OF DOCUMENT
+===============================================================================

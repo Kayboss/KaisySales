@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import OnboardingWizard from '../features/auth/OnboardingWizard';
 import styled from 'styled-components';
-import { Leaf, Ban, Crown } from 'lucide-react';
+import { Ban, Crown } from 'lucide-react';
 import { isSubscriptionExpired } from '../utils/subscriptionLimits';
 
 const LoaderContainer = styled.div`
@@ -71,7 +71,7 @@ const CheckAuth = () => {
       <LoaderContainer>
         <Spinner />
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, letterSpacing: '1px' }}>
-          <Leaf size={20} /> KaisySales
+          <svg width={20} height={20} viewBox="0 0 24 24" fill="none"><path d="M5 11 Q 12 4 19 12" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/></svg> KaisySales
         </div>
         <p style={{ fontSize: '0.9rem', color: '#55423D', fontWeight: 600 }}>
           Weaving your digital workshop...

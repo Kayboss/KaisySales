@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import styled from 'styled-components';
 import { useAuthStore } from '../../store/authStore';
-import { Leaf, ArrowRight, AlertCircle, CheckCircle2, Loader, Eye, EyeOff } from 'lucide-react';
+import { ArrowRight, AlertCircle, CheckCircle2, Loader, Eye, EyeOff } from 'lucide-react';
 
 const Container = styled.div`
   min-height: 100vh;
@@ -425,7 +425,7 @@ const WelcomePage = () => {
     <Container>
       <HeroSection>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
-          <Leaf size={32} />
+          <svg width={32} height={32} viewBox="0 0 24 24" fill="none"><path d="M5 11 Q 12 4 19 12" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/></svg>
           <span style={{ fontWeight: 900, letterSpacing: '2px', fontFamily: "'Manrope', sans-serif", textTransform: 'uppercase' }}>KaisySales</span>
         </div>
         <Title>Know your Business</Title>

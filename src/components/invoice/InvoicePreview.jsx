@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
-import { Leaf, Download, Share2, X } from 'lucide-react';
+import { Download, Share2, X } from 'lucide-react';
 import { formatCurrency } from '../../utils/currency';
 import { useSettingsStore } from '../../store/settingsStore';
 
@@ -365,7 +365,7 @@ const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, busines
                   <img src={logoUrl} alt="Logo" style={{ height: 40, maxWidth: 160, objectFit: 'contain' }} />
                 ) : (
                   <>
-                    <Leaf size={24} />
+                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none"><path d="M5 11 Q 12 4 19 12" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/></svg>
                     {businessName || 'KaisySales'}
                   </>
                 )}

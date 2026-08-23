@@ -33,7 +33,7 @@ import ServiceInvoices from './features/services/ServiceInvoices';
 import ServiceReporting from './features/services/ServiceReporting';
 
 // Icons
-import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, Leaf, FileText, Store, Settings, Receipt, Menu, X, Users, BarChart3, Shield } from 'lucide-react';
+import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, FileText, Store, Settings, Receipt, Menu, X, Users, BarChart3, Shield } from 'lucide-react';
 
 const Layout = styled.div`
   display: flex;
@@ -211,7 +211,7 @@ const App = () => {
               <Layout>
                 <MobileHeader>
                   <Logo style={{ marginBottom: 0 }}>
-                    <Leaf size={24} />
+                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none"><path d="M5 11 Q 12 4 19 12" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/></svg>
                     <span style={{ fontWeight: 900, textTransform: 'uppercase' }}>{businessName || 'KaisySales'}</span>
                   </Logo>
                   <button onClick={toggleMobileMenu} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FFFFFF' }}>
@@ -224,7 +224,7 @@ const App = () => {
                 <Sidebar $isOpen={isMobileOpen}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
                     <Logo style={{ marginBottom: 0 }}>
-                      <Leaf size={24} />
+                      <svg width={24} height={24} viewBox="0 0 24 24" fill="none"><path d="M5 11 Q 12 4 19 12" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/></svg>
                       <span style={{ fontWeight: 900, textTransform: 'uppercase' }}>{businessName || 'KaisySales'}</span>
                     </Logo>
                     <CloseButton onClick={closeMobileMenu}>
