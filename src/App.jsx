@@ -211,7 +211,7 @@ const App = () => {
               <Layout>
                 <MobileHeader>
 <Logo style={{ marginBottom: 0 }}>
-  <img src="/logo.svg" alt="KaisySales" style={{ height: 40, width: 'auto' }} />
+  <span style={{ fontWeight: 900 }}>{businessName || 'KaisySales'}</span>
 </Logo>
                   <button onClick={toggleMobileMenu} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FFFFFF' }}>
                     <Menu size={24} />
