@@ -223,7 +223,6 @@ const App = () => {
                 <Sidebar $isOpen={isMobileOpen}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
                     <Logo style={{ marginBottom: 0 }}>
-                      <svg width={24} height={24} viewBox="0 0 24 24" fill="none"><path d="M5 11 Q 12 4 19 12" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/></svg>
                       <span style={{ fontWeight: 900 }}>{businessName || 'KaisySales'}</span>
                     </Logo>
                     <CloseButton onClick={closeMobileMenu}>

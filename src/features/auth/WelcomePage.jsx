@@ -425,7 +425,8 @@ const WelcomePage = () => {
     <Container>
       <HeroSection>
 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
-  <span style={{ fontWeight: 700, letterSpacing: '1px', fontFamily: "'Tango Sans', sans-serif", fontSize: '1.5rem', color: '#6F240A' }}>KaisySales</span>
+  <img src="/logo.svg" alt="KaisySales" style={{ height: 40, width: 'auto' }} />
+  <span style={{ fontWeight: 700, letterSpacing: '1px', fontFamily: "'Tango Sans', sans-serif", fontSize: '1.5rem', color: '#FFFFFF' }}>KaisySales</span>
 </div>
         <Title style={{ fontFamily: "'Tango Sans', sans-serif" }}>Know your Business</Title>
         <Subtitle>
