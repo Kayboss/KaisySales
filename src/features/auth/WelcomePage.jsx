@@ -426,9 +426,9 @@ const WelcomePage = () => {
       <HeroSection>
 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
   <img src="/logo.svg" alt="KaisySales" style={{ height: 48, width: 'auto' }} />
-  <span style={{ fontWeight: 900, letterSpacing: '1px', fontFamily: "'Tango Sans', sans-serif", fontSize: '1.5rem' }}>KaisySales</span>
+  <span style={{ fontWeight: 700, letterSpacing: '1px', fontFamily: "'Tango Sans', sans-serif", fontSize: '1.5rem', color: '#6F240A' }}>KaisySales</span>
 </div>
-        <Title>Know your Business</Title>
+        <Title style={{ fontFamily: "'Tango Sans', sans-serif" }}>Know your Business</Title>
         <Subtitle>
           Every true business owner knows that keeping track of every Cedi is the secret 
           to moving from a small shop to a big enterprise. KaisySales is the digital 
