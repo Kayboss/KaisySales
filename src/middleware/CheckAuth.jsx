@@ -70,9 +70,9 @@ const CheckAuth = () => {
     return (
       <LoaderContainer>
         <Spinner />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, letterSpacing: '1px' }}>
-          <svg width={20} height={20} viewBox="0 0 24 24" fill="none"><path d="M5 11 Q 12 4 19 12" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/></svg> KaisySales
-        </div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, letterSpacing: '1px' }}>
+  <img src="/logo.svg" alt="KaisySales" style={{ height: 28, width: 'auto' }} />
+</div>
         <p style={{ fontSize: '0.9rem', color: '#55423D', fontWeight: 600 }}>
           Weaving your digital workshop...
         </p>

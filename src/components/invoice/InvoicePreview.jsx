@@ -364,10 +364,9 @@ const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, busines
                 {logoUrl ? (
                   <img src={logoUrl} alt="Logo" style={{ height: 40, maxWidth: 160, objectFit: 'contain' }} />
                 ) : (
-                  <>
-                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none"><path d="M5 11 Q 12 4 19 12" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/></svg>
-                    {businessName || 'KaisySales'}
-                  </>
+  <>
+    <img src="/logo.svg" alt="KaisySales" style={{ height: 40, maxWidth: 160, objectFit: 'contain' }} />
+  </>
                 )}
               </Brand>
             <InvoiceMeta>

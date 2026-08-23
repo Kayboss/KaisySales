@@ -424,10 +424,9 @@ const WelcomePage = () => {
   return (
     <Container>
       <HeroSection>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
-          <svg width={32} height={32} viewBox="0 0 24 24" fill="none"><path d="M5 11 Q 12 4 19 12" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/></svg>
-          <span style={{ fontWeight: 900, letterSpacing: '2px', fontFamily: "'Manrope', sans-serif", textTransform: 'uppercase' }}>KaisySales</span>
-        </div>
+<div style={{ marginBottom: '2rem' }}>
+  <img src="/logo.svg" alt="KaisySales" style={{ height: 48, width: 'auto' }} />
+</div>
         <Title>Know your Business</Title>
         <Subtitle>
           Every true business owner knows that keeping track of every Cedi is the secret 

@@ -210,10 +210,9 @@ const App = () => {
             <Route path="/*" element={
               <Layout>
                 <MobileHeader>
-                  <Logo style={{ marginBottom: 0 }}>
-                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none"><path d="M5 11 Q 12 4 19 12" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/></svg>
-                    <span style={{ fontWeight: 900, textTransform: 'uppercase' }}>{businessName || 'KaisySales'}</span>
-                  </Logo>
+<Logo style={{ marginBottom: 0 }}>
+  <img src="/logo.svg" alt="KaisySales" style={{ height: 40, width: 'auto' }} />
+</Logo>
                   <button onClick={toggleMobileMenu} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FFFFFF' }}>
                     <Menu size={24} />
                   </button>
