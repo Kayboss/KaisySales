@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
-import { fetchCategories, updateCategory, deleteCategory, uploadBusinessLogo, deleteBusinessLogo } from '../../services/api';
+import { fetchCategories, createCategory, updateCategory, deleteCategory, uploadBusinessLogo, deleteBusinessLogo } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, Crown, DollarSign, Upload } from 'lucide-react';
 import SubscriptionSettings from './SubscriptionSettings';
@@ -202,39 +202,11 @@ const EditInput = styled.input`
   min-width: 0;
 `;
 
-const TypeSelect = styled.select`
-  padding: 0.5rem;
-  border: 1px solid ${({ theme }) => theme.colors.primary};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  font-family: inherit;
-  font-size: 0.85rem;
-  outline: none;
-  background: white;
-  cursor: pointer;
-`;
-
 const EmptyState = styled.p`
   color: ${({ theme }) => theme.colors.text.muted};
   font-size: 0.9rem;
   text-align: center;
   padding: 2rem;
-`;
-
-const TypeBadge = styled.span`
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  background: ${props =>
-    props.$type === 'expense' ? 'rgba(186, 26, 26, 0.1)' :
-    props.$type === 'inventory' ? 'rgba(37, 67, 47, 0.1)' :
-    'rgba(111, 36, 10, 0.1)'};
-  color: ${props =>
-    props.$type === 'expense' ? '#BA1A1A' :
-    props.$type === 'inventory' ? '#25432F' :
-    '#6F240A'};
 `;
 
 const ColorGrid = styled.div`
@@ -296,17 +268,6 @@ const TabBtn = styled.button`
 
 const avatarColors = ['#6F240A', '#1E3A8A', '#25432F', '#D4AF37', '#8B5E7C'];
 
-const GroupLabel = styled.div`
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: ${({ theme }) => theme.colors.text.muted};
-  padding: 0.75rem 0 0.25rem;
-
-  &:first-child { padding-top: 0; }
-`;
-
 const SETTINGS_TABS = [
   { id: 'profile', label: 'Business Profile', icon: Building },
   { id: 'subscription', label: 'Subscription', icon: Crown },
@@ -343,12 +304,14 @@ const SettingsPage = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [categories, setCategories] = useState([]);
+  const [catTab, setCatTab] = useState('income');
+  const [newCatName, setNewCatName] = useState('');
   const [editingCatId, setEditingCatId] = useState(null);
   const [editingCatName, setEditingCatName] = useState('');
-  const [editingCatType, setEditingCatType] = useState('sales');
   const [deleteCatTarget, setDeleteCatTarget] = useState(null);
   const [savingCat, setSavingCat] = useState(false);
   const [deletingCat, setDeletingCat] = useState(false);
+  const [addingCat, setAddingCat] = useState(false);
 
   const loadCategories = async () => {
     try {
@@ -362,20 +325,34 @@ const SettingsPage = () => {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadCategories(); }, []);
 
+  const filteredCategories = categories.filter(c => (c.type || 'income') === catTab);
+
+  const handleAddCategory = async () => {
+    if (!newCatName.trim()) return;
+    setAddingCat(true);
+    try {
+      await createCategory({ name: newCatName.trim(), type: catTab });
+      setNewCatName('');
+      await loadCategories();
+    } catch (error) {
+      console.error('Failed to create category', error);
+    } finally {
+      setAddingCat(false);
+    }
+  };
+
   const handleEditCategory = (cat) => {
     setEditingCatId(cat.id);
     setEditingCatName(cat.name);
-    setEditingCatType(cat.type || 'sales');
   };
 
   const handleSaveCategory = async (id) => {
     if (!editingCatName.trim()) return;
     setSavingCat(true);
     try {
-      await updateCategory(id, { name: sanitizeInput(editingCatName.trim(), 50), type: editingCatType });
+      await updateCategory(id, { name: sanitizeInput(editingCatName.trim(), 50) });
       setEditingCatId(null);
       setEditingCatName('');
-      setEditingCatType('sales');
       await loadCategories();
     } catch (error) {
       console.error('Failed to update category', error);
@@ -387,7 +364,6 @@ const SettingsPage = () => {
   const handleCancelEdit = () => {
     setEditingCatId(null);
     setEditingCatName('');
-    setEditingCatType('sales');
   };
 
   const handleDeleteCategory = async (id) => {
@@ -668,62 +644,85 @@ const SettingsPage = () => {
           <div>
             <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Manage Categories</h2>
             <p style={{ color: '#55423D', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-              Edit or remove categories used across sales, expenses, and inventory.
+              Add or remove income and expense categories.
             </p>
           </div>
         </CatHeader>
 
-        {categories.length === 0 ? (
-          <EmptyState>No categories yet. Create one from a sales, expense, or inventory form.</EmptyState>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid #F0EEE8', paddingBottom: 0 }}>
+          <button
+            onClick={() => setCatTab('income')}
+            style={{
+              padding: '0.6rem 1.25rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.85rem',
+              color: catTab === 'income' ? '#6F240A' : '#89726C',
+              borderBottom: catTab === 'income' ? '2px solid #6F240A' : '2px solid transparent',
+              cursor: 'pointer', transition: 'all 0.15s ease',
+            }}
+          >Income</button>
+          <button
+            onClick={() => setCatTab('expense')}
+            style={{
+              padding: '0.6rem 1.25rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.85rem',
+              color: catTab === 'expense' ? '#BA1A1A' : '#89726C',
+              borderBottom: catTab === 'expense' ? '2px solid #BA1A1A' : '2px solid transparent',
+              cursor: 'pointer', transition: 'all 0.15s ease',
+            }}
+          >Expense</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <input
+            type="text"
+            value={newCatName}
+            onChange={e => setNewCatName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleAddCategory(); }}
+            placeholder={`New ${catTab} category...`}
+            style={{ flex: 1, padding: '0.6rem 0.85rem', border: '1px solid #D0C8C4', borderRadius: 8, fontSize: '0.9rem', outline: 'none' }}
+          />
+          <button
+            onClick={handleAddCategory}
+            disabled={addingCat || !newCatName.trim()}
+            style={{
+              padding: '0.6rem 1.25rem', border: 'none', borderRadius: 8, background: addingCat || !newCatName.trim() ? '#997A6F' : '#6F240A',
+              color: 'white', fontWeight: 600, cursor: addingCat || !newCatName.trim() ? 'not-allowed' : 'pointer', fontSize: '0.85rem', whiteSpace: 'nowrap',
+            }}
+          >{addingCat ? 'Adding...' : '+ Add'}</button>
+        </div>
+
+        {filteredCategories.length === 0 ? (
+          <EmptyState>No {catTab} categories yet. Add one above.</EmptyState>
         ) : (
           <CatList>
-            {['sales', 'expense', 'inventory'].map(group => {
-              const grouped = categories.filter(c => (c.type || 'sales') === group);
-              if (grouped.length === 0) return null;
-              return (
-                <div key={group}>
-                  <GroupLabel>{group} categories</GroupLabel>
-                  {grouped.map(cat => (
-                    <CatRow key={cat.id}>
-                      {editingCatId === cat.id ? (
-                        <>
-                          <EditInput
-                            type="text"
-                            value={editingCatName}
-                            onChange={e => setEditingCatName(e.target.value)}
-                            autoFocus
-                            onKeyDown={e => { if (e.key === 'Enter') handleSaveCategory(cat.id); if (e.key === 'Escape') handleCancelEdit(); }}
-                          />
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <TypeSelect value={editingCatType} onChange={e => setEditingCatType(e.target.value)}>
-                              <option value="sales">Sales</option>
-                              <option value="expense">Expense</option>
-                              <option value="inventory">Inventory</option>
-                            </TypeSelect>
-                            <CatActions>
-                              <IconBtn disabled={savingCat} onClick={() => handleSaveCategory(cat.id)} style={{ opacity: savingCat ? 0.5 : 1 }}><Check size={16} /></IconBtn>
-                              <IconBtn onClick={handleCancelEdit}><X size={16} /></IconBtn>
-                            </CatActions>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Tag size={16} color="#89726C" />
-                            <CatName>{cat.name}</CatName>
-                            <TypeBadge $type={cat.type || 'sales'}>{cat.type || 'sales'}</TypeBadge>
-                          </div>
-                          <CatActions>
-                            <IconBtn onClick={() => handleEditCategory(cat)}><Edit2 size={16} /></IconBtn>
-                            <IconBtn $danger onClick={() => setDeleteCatTarget(cat)}><Trash2 size={16} /></IconBtn>
-                          </CatActions>
-                        </>
-                      )}
-                    </CatRow>
-                  ))}
-                </div>
-              );
-            })}
+            {filteredCategories.map(cat => (
+              <CatRow key={cat.id}>
+                {editingCatId === cat.id ? (
+                  <>
+                    <EditInput
+                      type="text"
+                      value={editingCatName}
+                      onChange={e => setEditingCatName(e.target.value)}
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveCategory(cat.id); if (e.key === 'Escape') handleCancelEdit(); }}
+                    />
+                    <CatActions>
+                      <IconBtn disabled={savingCat} onClick={() => handleSaveCategory(cat.id)} style={{ opacity: savingCat ? 0.5 : 1 }}><Check size={16} /></IconBtn>
+                      <IconBtn onClick={handleCancelEdit}><X size={16} /></IconBtn>
+                    </CatActions>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Tag size={16} color="#89726C" />
+                      <CatName>{cat.name}</CatName>
+                    </div>
+                    <CatActions>
+                      <IconBtn onClick={() => handleEditCategory(cat)}><Edit2 size={16} /></IconBtn>
+                      <IconBtn $danger onClick={() => setDeleteCatTarget(cat)}><Trash2 size={16} /></IconBtn>
+                    </CatActions>
+                  </>
+                )}
+              </CatRow>
+            ))}
           </CatList>
         )}
       </CatCard>

@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, RefreshCw, DollarSign } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers, fetchExpenses } from '../../services/api';
+import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers, fetchExpenses, fetchCategories } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -249,6 +249,7 @@ const IncomeTracking = () => {
   const [recurring, setRecurring] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [incomeCategories, setIncomeCategories] = useState([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
@@ -256,7 +257,7 @@ const IncomeTracking = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [incomeForm, setIncomeForm] = useState({
     clientName: '', amount: '', platformFee: '', netAmount: '',
-    platformTag: 'direct', milestoneLabel: '', paymentDate: '', notes: '',
+    platformTag: 'direct', milestoneLabel: '', paymentDate: '', notes: '', category: '',
   });
   const [recurForm, setRecurForm] = useState({
     clientName: '', amount: '', frequency: 'monthly', nextDueDate: '', category: '',
@@ -269,11 +270,12 @@ const IncomeTracking = () => {
   const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
-    const [i, r, c, ex] = await Promise.all([fetchServiceIncome(), fetchRecurringIncome(), fetchCustomers(), fetchExpenses()]);
+    const [i, r, c, ex, cats] = await Promise.all([fetchServiceIncome(), fetchRecurringIncome(), fetchCustomers(), fetchExpenses(), fetchCategories('income')]);
     setIncome(i);
     setRecurring(r);
     setCustomers(c);
     setExpenses(ex);
+    setIncomeCategories(cats);
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -288,7 +290,7 @@ const IncomeTracking = () => {
 
   const openAddIncome = () => {
     setEditId(null);
-    setIncomeForm({ clientName: '', amount: '', platformFee: '', netAmount: '', platformTag: 'direct', milestoneLabel: '', paymentDate: '', notes: '' });
+    setIncomeForm({ clientName: '', amount: '', platformFee: '', netAmount: '', platformTag: 'direct', milestoneLabel: '', paymentDate: '', notes: '', category: '' });
     setModalOpen(true);
   };
 
@@ -297,7 +299,7 @@ const IncomeTracking = () => {
     setIncomeForm({
       clientName: item.clientName || '', amount: item.amount || '',
       platformFee: item.platformFee || '', netAmount: item.netAmount || '', platformTag: item.platformTag || 'direct',
-      milestoneLabel: item.milestoneLabel || '', paymentDate: item.paymentDate || '', notes: item.notes || '',
+      milestoneLabel: item.milestoneLabel || '', paymentDate: item.paymentDate || '', notes: item.notes || '', category: item.category || '',
     });
     setModalOpen(true);
   };
@@ -316,6 +318,7 @@ const IncomeTracking = () => {
       milestone_label: sanitizeInput(incomeForm.milestoneLabel, 100),
       payment_date: incomeForm.paymentDate || null,
       notes: sanitizeInput(incomeForm.notes, 500),
+      category: sanitizeInput(incomeForm.category, 50),
     };
     try {
       if (editId) {
@@ -500,6 +503,7 @@ const IncomeTracking = () => {
                 <Th>Fee</Th>
                 <Th>Net</Th>
                 <Th>Platform</Th>
+                <Th>Category</Th>
                 <Th>Date</Th>
                 <Th style={{ width: 80 }}></Th>
               </tr>
@@ -513,6 +517,7 @@ const IncomeTracking = () => {
                   <Td><FeeTag>-GH₵{parseFloat(i.platformFee || 0).toFixed(2)}</FeeTag></Td>
                   <Td><NetTag>GH₵{parseFloat(i.netAmount || 0).toFixed(2)}</NetTag></Td>
                   <Td><PlatformTag>{i.platformTag}</PlatformTag></Td>
+                  <Td>{i.category || '-'}</Td>
                   <Td>{i.paymentDate || '-'}</Td>
                   <Td>
                     <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -601,10 +606,15 @@ const IncomeTracking = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label>Milestone Label</Label>
-                  <Input value={incomeForm.milestoneLabel} onChange={e => setIncomeForm(f => ({ ...f, milestoneLabel: e.target.value }))} placeholder="50% deposit" />
+                  <Label>Category</Label>
+                  <Select value={incomeForm.category} onChange={e => setIncomeForm(f => ({ ...f, category: e.target.value }))}>
+                    <option value="">No category</option>
+                    {incomeCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </Select>
                 </div>
               </div>
+              <Label>Milestone Label</Label>
+              <Input value={incomeForm.milestoneLabel} onChange={e => setIncomeForm(f => ({ ...f, milestoneLabel: e.target.value }))} placeholder="50% deposit" />
               <Label>Payment Date</Label>
               <Input type="date" value={incomeForm.paymentDate} onChange={e => setIncomeForm(f => ({ ...f, paymentDate: e.target.value }))} />
               <Label>Notes</Label>
@@ -697,7 +707,10 @@ const IncomeTracking = () => {
               <Label>Next Due Date</Label>
               <Input type="date" value={recurForm.nextDueDate} onChange={e => setRecurForm(f => ({ ...f, nextDueDate: e.target.value }))} />
               <Label>Category</Label>
-              <Input value={recurForm.category} onChange={e => setRecurForm(f => ({ ...f, category: e.target.value }))} placeholder="Hosting, retainer, maintenance..." />
+              <Select value={recurForm.category} onChange={e => setRecurForm(f => ({ ...f, category: e.target.value }))}>
+                <option value="">No category</option>
+                {incomeCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </Select>
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setRecurModal(false)} style={{ padding: '0.65rem 1.25rem', border: '1px solid #ddd', borderRadius: 8, background: 'white', cursor: 'pointer' }}>Cancel</button>
                 <button type="submit" disabled={savingRecur} style={{ padding: '0.65rem 1.25rem', border: 'none', borderRadius: 8, background: savingRecur ? '#997A6F' : '#6F240A', color: 'white', fontWeight: 600, cursor: savingRecur ? 'not-allowed' : 'pointer' }}>{savingRecur ? 'Saving...' : (recurEditId ? 'Update' : 'Add')} Recurring</button>

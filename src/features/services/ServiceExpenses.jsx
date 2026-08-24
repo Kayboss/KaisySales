@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Plus, Edit2, Trash2, Calendar } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchServiceIncome } from '../../services/api';
+import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchServiceIncome, fetchCategories } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -228,6 +228,7 @@ const SUBCATEGORIES = [
 const ServiceExpenses = () => {
   const [expenses, setExpenses] = useState([]);
   const [serviceIncome, setServiceIncome] = useState([]);
+  const [expenseCategories, setExpenseCategories] = useState([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
@@ -241,9 +242,10 @@ const ServiceExpenses = () => {
   });
 
   const load = async () => {
-    const [data, incomeData] = await Promise.all([fetchExpenses(), fetchServiceIncome()]);
+    const [data, incomeData, cats] = await Promise.all([fetchExpenses(), fetchServiceIncome(), fetchCategories('expense')]);
     setExpenses(data);
     setServiceIncome(incomeData);
+    setExpenseCategories(cats);
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -251,14 +253,14 @@ const ServiceExpenses = () => {
 
   const openAdd = () => {
     setEditId(null);
-    setForm({ title: '', amount: '', category: 'SaaS & Subscriptions', date: new Date().toISOString().split('T')[0], subcategory: 'general', vendor: '', renewalDate: '', isAsset: false, assetLifetime: '', transactionFee: '' });
+    setForm({ title: '', amount: '', category: '', date: new Date().toISOString().split('T')[0], subcategory: 'general', vendor: '', renewalDate: '', isAsset: false, assetLifetime: '', transactionFee: '' });
     setModalOpen(true);
   };
 
   const openEdit = (e) => {
     setEditId(e.id);
     setForm({
-      title: e.title, amount: e.amount, category: e.category || 'Other',
+      title: e.title, amount: e.amount, category: e.category || '',
       date: e.date || '', subcategory: e.subcategory || 'general',
       vendor: e.vendor || '', renewalDate: e.renewalDate || '',
       isAsset: e.isAsset || false, assetLifetime: e.assetLifetime || '',
@@ -477,14 +479,8 @@ const ServiceExpenses = () => {
             <div>
               <Label>Category</Label>
               <Select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                <option value="SaaS & Subscriptions">SaaS & Subscriptions</option>
-                <option value="Subcontractor">Subcontractor</option>
-                <option value="Hardware & Assets">Hardware & Assets</option>
-                <option value="Software">Software</option>
-                <option value="Office">Office</option>
-                <option value="Transport">Transport</option>
-                <option value="Utilities">Utilities</option>
-                <option value="Other">Other</option>
+                <option value="">No category</option>
+                {expenseCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </Select>
             </div>
           </div>
