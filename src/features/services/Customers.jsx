@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
@@ -260,7 +261,7 @@ const Customers = () => {
         <tbody>
           {paginated.map(c => (
             <tr key={c.id}>
-              <Td><strong>{c.name}</strong></Td>
+              <Td><Link to={`/customers/${c.id}`} style={{ color: '#6F240A', fontWeight: 700, textDecoration: 'none' }} onMouseOver={e => e.currentTarget.style.textDecoration = 'underline'} onMouseOut={e => e.currentTarget.style.textDecoration = 'none'}>{c.name}</Link></Td>
               <Td>{c.email || '-'}</Td>
               <Td>{c.phone || '-'}</Td>
               <Td>{c.location || '-'}</Td>

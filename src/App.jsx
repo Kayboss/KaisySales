@@ -27,6 +27,7 @@ import AdminDashboard from './features/admin/AdminDashboard';
 
 // Service business features
 import Customers from './features/services/Customers';
+import CustomerDetail from './features/services/CustomerDetail';
 import IncomeTracking from './features/services/IncomeTracking';
 import ServiceExpenses from './features/services/ServiceExpenses';
 import ServiceInvoices from './features/services/ServiceInvoices';
@@ -274,6 +275,7 @@ const App = () => {
                       <>
                         <Route index element={<IncomeTracking />} />
                         <Route path="income" element={<IncomeTracking />} />
+                        <Route path="customers/:id" element={<CustomerDetail />} />
                         <Route path="customers" element={<Customers />} />
                         <Route path="service-expenses" element={<ServiceExpenses />} />
                         <Route path="service-invoices" element={<ServiceInvoices />} />
