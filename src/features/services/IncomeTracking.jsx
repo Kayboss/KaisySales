@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, RefreshCw, DollarSign } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers, fetchExpenses, fetchCategories } from '../../services/api';
+import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers, fetchExpenses, fetchCategories, createCategory } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -268,6 +268,9 @@ const IncomeTracking = () => {
   const [savingIncome, setSavingIncome] = useState(false);
   const [savingRecur, setSavingRecur] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [addingNewCat, setAddingNewCat] = useState(false);
 
   const load = async () => {
     const [i, r, c, ex, cats] = await Promise.all([fetchServiceIncome(), fetchRecurringIncome(), fetchCustomers(), fetchExpenses(), fetchCategories('income')]);
@@ -280,6 +283,25 @@ const IncomeTracking = () => {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, []);
+
+  const handleCreateNewCat = async () => {
+    if (!newCatName.trim()) return;
+    setAddingNewCat(true);
+    try {
+      await createCategory({ name: newCatName.trim(), type: 'income' });
+      const cats = await fetchCategories('income');
+      setIncomeCategories(cats);
+      const name = newCatName.trim();
+      setNewCatName('');
+      setShowNewCat(false);
+      if (tab === 'income') setIncomeForm(f => ({ ...f, category: name }));
+      else setRecurForm(f => ({ ...f, category: name }));
+    } catch (error) {
+      console.error('Failed to create category', error);
+    } finally {
+      setAddingNewCat(false);
+    }
+  };
 
   // Income
   const calcNet = (amount, fee) => {
@@ -607,10 +629,21 @@ const IncomeTracking = () => {
                 </div>
                 <div>
                   <Label>Category</Label>
-                  <Select value={incomeForm.category} onChange={e => setIncomeForm(f => ({ ...f, category: e.target.value }))}>
+                  <Select value={showNewCat ? '__new__' : incomeForm.category} onChange={e => {
+                    const v = e.target.value;
+                    setShowNewCat(v === '__new__');
+                    if (v !== '__new__') setIncomeForm(f => ({ ...f, category: v }));
+                  }}>
                     <option value="">No category</option>
                     {incomeCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    <option value="__new__">＋ Add new category...</option>
                   </Select>
+                  {showNewCat && (
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                      <Input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="New income category" onKeyDown={e => { if (e.key === 'Enter') handleCreateNewCat(); }} />
+                      <button type="button" onClick={handleCreateNewCat} disabled={addingNewCat || !newCatName.trim()} style={{ padding: '0.6rem 1rem', border: 'none', borderRadius: 8, background: addingNewCat || !newCatName.trim() ? '#997A6F' : '#6F240A', color: 'white', fontWeight: 600, cursor: addingNewCat || !newCatName.trim() ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>{addingNewCat ? 'Adding...' : 'Add'}</button>
+                    </div>
+                  )}
                 </div>
               </div>
               <Label>Milestone Label</Label>
@@ -707,10 +740,21 @@ const IncomeTracking = () => {
               <Label>Next Due Date</Label>
               <Input type="date" value={recurForm.nextDueDate} onChange={e => setRecurForm(f => ({ ...f, nextDueDate: e.target.value }))} />
               <Label>Category</Label>
-              <Select value={recurForm.category} onChange={e => setRecurForm(f => ({ ...f, category: e.target.value }))}>
+              <Select value={showNewCat ? '__new__' : recurForm.category} onChange={e => {
+                const v = e.target.value;
+                setShowNewCat(v === '__new__');
+                if (v !== '__new__') setRecurForm(f => ({ ...f, category: v }));
+              }}>
                 <option value="">No category</option>
                 {incomeCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                <option value="__new__">＋ Add new category...</option>
               </Select>
+              {showNewCat && (
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <Input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="New income category" onKeyDown={e => { if (e.key === 'Enter') handleCreateNewCat(); }} />
+                  <button type="button" onClick={handleCreateNewCat} disabled={addingNewCat || !newCatName.trim()} style={{ padding: '0.6rem 1rem', border: 'none', borderRadius: 8, background: addingNewCat || !newCatName.trim() ? '#997A6F' : '#6F240A', color: 'white', fontWeight: 600, cursor: addingNewCat || !newCatName.trim() ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>{addingNewCat ? 'Adding...' : 'Add'}</button>
+                </div>
+              )}
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setRecurModal(false)} style={{ padding: '0.65rem 1.25rem', border: '1px solid #ddd', borderRadius: 8, background: 'white', cursor: 'pointer' }}>Cancel</button>
                 <button type="submit" disabled={savingRecur} style={{ padding: '0.65rem 1.25rem', border: 'none', borderRadius: 8, background: savingRecur ? '#997A6F' : '#6F240A', color: 'white', fontWeight: 600, cursor: savingRecur ? 'not-allowed' : 'pointer' }}>{savingRecur ? 'Saving...' : (recurEditId ? 'Update' : 'Add')} Recurring</button>
