@@ -179,11 +179,37 @@ const TableCard = styled.div`
   overflow: hidden;
 `;
 
-const SectionTitle = styled.h2`
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: ${({ theme }) => theme.colors.text.main};
-  margin: 1.75rem 0 0.75rem;
+const TabBar = styled.div`
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+`;
+
+const Tab = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  background: none;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: ${props => props.$active ? props.theme.colors.primary : props.theme.colors.text.muted};
+  border-bottom: 2px solid ${props => props.$active ? props.theme.colors.primary : 'transparent'};
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover { color: ${({ theme }) => theme.colors.primary}; }
+`;
+
+const TabCount = styled.span`
+  background: ${props => props.$active ? props.theme.colors.primary : props.theme.colors.outlineVariant};
+  color: ${props => props.$active ? 'white' : props.theme.colors.text.muted};
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.5rem;
 `;
 
 const Table = styled.table`
@@ -361,6 +387,7 @@ const CustomerDetail = () => {
   const [showPayments, setShowPayments] = useState(false);
   const [showEditCustomer, setShowEditCustomer] = useState(false);
   const [editInc, setEditInc] = useState(null);
+  const [viewTab, setViewTab] = useState('services');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -787,6 +814,16 @@ const CustomerDetail = () => {
         </StatCard>
       </StatRow>
 
+      <TabBar>
+        <Tab $active={viewTab === 'services'} onClick={() => setViewTab('services')}>
+          Services <TabCount $active={viewTab === 'services'}>{rows.length}</TabCount>
+        </Tab>
+        <Tab $active={viewTab === 'payments'} onClick={() => setViewTab('payments')}>
+          Payments <TabCount $active={viewTab === 'payments'}>{paymentRows.length}</TabCount>
+        </Tab>
+      </TabBar>
+
+      {viewTab === 'services' ? (
       <TableCard>
         <Table>
           <thead>
@@ -836,12 +873,7 @@ const CustomerDetail = () => {
           {rows.length === 0 && <EmptyState>No services recorded for this customer yet.</EmptyState>}
         </MobileGrid>
       </TableCard>
-
-      {rows.length === 0 && (
-        <EmptyState>No services recorded for this customer yet. Use <strong>Add Service</strong> to bill them.</EmptyState>
-      )}
-
-      <SectionTitle>Payments ({paymentRows.length})</SectionTitle>
+      ) : (
       <TableCard>
         <Table>
           <thead>
@@ -890,6 +922,7 @@ const CustomerDetail = () => {
           {paymentRows.length === 0 && <EmptyState>No payments recorded yet.</EmptyState>}
         </MobileGrid>
       </TableCard>
+      )}
 
       <Modal isOpen={showAddService} onClose={() => setShowAddService(false)} title={`Add Service for ${name}`}>
         <form onSubmit={handleAddService}>
