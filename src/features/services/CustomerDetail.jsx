@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { ArrowLeft, Plus, CheckCircle, Pencil, Mail, Phone, MapPin, Building2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
-import { fetchCustomers, fetchServiceIncome, fetchInvoices, createServiceIncome, updateInvoice, updateCustomer, updateServiceIncome } from '../../services/api';
+import { fetchCustomers, fetchServiceIncome, fetchInvoices, createInvoice, createServiceIncome, updateInvoice, updateCustomer, updateServiceIncome } from '../../services/api';
 import { sanitizeInput } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -211,8 +211,26 @@ const StatusBadge = styled.span`
   letter-spacing: 0.04em;
   padding: 0.25rem 0.6rem;
   border-radius: 999px;
-  background: ${props => props.$status === 'Paid' ? 'rgba(37, 67, 47, 0.1)' : 'rgba(135, 82, 0, 0.1)'};
-  color: ${props => props.$status === 'Paid' ? '#25432F' : '#875200'};
+  background: ${props => props.$status === 'Paid' ? 'rgba(37, 67, 47, 0.1)'
+    : props.$status === 'Partial' ? 'rgba(135, 82, 0, 0.1)'
+    : 'rgba(198, 40, 40, 0.1)'};
+  color: ${props => props.$status === 'Paid' ? '#25432F'
+    : props.$status === 'Partial' ? '#875200'
+    : '#C62828'};
+`;
+
+const ActionBtn = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.35rem;
+  color: ${({ theme }) => theme.colors.text.muted};
+  border-radius: 6px;
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.background.surfaceVariant};
+    color: ${({ theme }) => theme.colors.primary};
+  }
 `;
 
 const EmptyState = styled.div`
@@ -251,20 +269,6 @@ const MobileRow = styled.div`
   }
 `;
 
-const ActionBtn = styled.button`
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.35rem;
-  color: ${({ theme }) => theme.colors.text.muted};
-  border-radius: 6px;
-
-  &:hover {
-    background: ${({ theme }) => theme.colors.background.surfaceVariant};
-    color: ${({ theme }) => theme.colors.primary};
-  }
-`;
-
 const Label = styled.label`
   display: block;
   font-size: 0.85rem;
@@ -293,6 +297,12 @@ const PayItem = styled.div`
   &:last-child { border-bottom: none; }
 `;
 
+const PayMeta = styled.div`
+  font-size: 0.8rem;
+  color: ${({ theme }) => theme.colors.text.muted};
+  margin-top: 0.15rem;
+`;
+
 const PayBtn = styled.button`
   display: inline-flex;
   align-items: center;
@@ -311,8 +321,17 @@ const PayBtn = styled.button`
   &:disabled { opacity: 0.6; cursor: not-allowed; }
 `;
 
+const PayInput = styled.input`
+  width: 110px;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: 0.9rem;
+`;
+
 const fmt = (n) => `GH₵${(n || 0).toFixed(2)}`;
 const todayISO = () => new Date().toISOString().split('T')[0];
+const moneyOf = (v) => parseFloat(String(v).replace(/[^\d.-]/g, '')) || 0;
 
 const CustomerDetail = () => {
   const { id } = useParams();
@@ -330,6 +349,7 @@ const CustomerDetail = () => {
   const [svcForm, setSvcForm] = useState({ service: '', amount: '', date: todayISO() });
   const [custForm, setCustForm] = useState({ name: '', email: '', phone: '', location: '', notes: '' });
   const [incForm, setIncForm] = useState({ service: '', amount: '', date: todayISO() });
+  const [payments, setPayments] = useState({});
 
   const load = async () => {
     const [c, i, inv] = await Promise.all([fetchCustomers(), fetchServiceIncome(), fetchInvoices()]);
@@ -340,6 +360,11 @@ const CustomerDetail = () => {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, []);
+
+  const openPayments = () => {
+    setPayments({});
+    setShowPayments(true);
+  };
 
   const customer = customers.find(c => String(c.id) === String(id));
 
@@ -356,36 +381,122 @@ const CustomerDetail = () => {
   const customerIncome = income.filter(i => (i.clientName || '').trim().toLowerCase() === name.trim().toLowerCase());
   const customerInvoices = invoices.filter(inv => (inv.customer || '').trim().toLowerCase() === name.trim().toLowerCase());
 
-  const incomeRows = customerIncome.map(i => ({
+  const servicesOf = (inv) => {
+    if (!Array.isArray(inv.items) || inv.items.length === 0) return [];
+    return inv.items.filter(i => !i.type);
+  };
+  const serviceNameOf = (inv) => {
+    const s = servicesOf(inv)[0];
+    return s?.name || `Invoice #${inv.id}`;
+  };
+  const amountOf = (inv) => moneyOf(inv.amount);
+
+  const paymentsFor = (inv) => customerIncome.filter(i =>
+    (i.platformTag === 'invoice' || i.platformTag === 'payment') &&
+    new RegExp('invoice #' + String(inv.id) + '(?!\\d)', 'i').test(String(i.notes || ''))
+  );
+
+  const paidAmountOf = (inv) => {
+    if (inv.status === 'paid') return amountOf(inv);
+    const paid = paymentsFor(inv).reduce((s, i) => s + moneyOf(i.netAmount || i.amount), 0);
+    return Math.min(paid, amountOf(inv));
+  };
+  const balanceOf = (inv) => Math.max(0, amountOf(inv) - paidAmountOf(inv));
+  const statusOf = (inv) => {
+    if (inv.status === 'paid' || balanceOf(inv) <= 0) return 'Paid';
+    return paidAmountOf(inv) > 0 ? 'Partial' : 'Unpaid';
+  };
+
+  const legacyIncome = customerIncome.filter(i => i.platformTag === 'manual');
+
+  const invoiceRows = customerInvoices.map(inv => ({
+    id: `inv-${inv.id}`,
+    date: inv.date || '',
+    service: serviceNameOf(inv),
+    status: statusOf(inv),
+    amount: amountOf(inv),
+    balance: balanceOf(inv),
+    kind: 'invoice',
+    raw: inv,
+  }));
+
+  const legacyRows = legacyIncome.map(i => ({
     id: `ic-${i.id}`,
     date: i.paymentDate || '',
     service: i.milestoneLabel || 'Service payment',
     status: 'Paid',
-    amount: parseFloat(i.netAmount || i.amount || 0),
+    amount: moneyOf(i.netAmount || i.amount),
+    balance: 0,
     kind: 'income',
     raw: i,
   }));
 
-  const invoiceRows = customerInvoices.map(inv => {
-    const firstItem = Array.isArray(inv.items) && inv.items.length > 0 ? inv.items[0].name : '';
-    const isPaid = inv.status === 'paid';
-    return {
-      id: `inv-${inv.id}`,
-      date: inv.date || '',
-      service: firstItem || `Invoice #${inv.id}`,
-      status: isPaid ? 'Paid' : 'Outstanding',
-      amount: parseFloat(String(inv.amount).replace(/[^\d.-]/g, '')) || 0,
-      kind: 'invoice',
-      raw: inv,
-    };
-  });
+  const rows = [...invoiceRows, ...legacyRows].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
-  const rows = [...incomeRows, ...invoiceRows].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const totalReceived = customerIncome.reduce((s, i) => s + moneyOf(i.netAmount || i.amount), 0);
+  const totalBilled = customerInvoices.reduce((s, inv) => s + amountOf(inv), 0) + legacyRows.reduce((s, r) => s + r.amount, 0);
+  const outstanding = customerInvoices.reduce((s, inv) => s + balanceOf(inv), 0);
+  const outstandingInvoices = customerInvoices.filter(inv => balanceOf(inv) > 0);
+  const openServices = customerInvoices.length + legacyRows.length;
 
-  const totalReceived = incomeRows.reduce((s, r) => s + r.amount, 0);
-  const outstanding = invoiceRows.filter(r => r.status === 'Outstanding').reduce((s, r) => s + r.amount, 0);
-  const totalBilled = totalReceived;
-  const outstandingInvoices = customerInvoices.filter(inv => inv.status !== 'paid');
+  const handleAddService = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    const amount = moneyOf(svcForm.amount);
+    try {
+      await createInvoice({
+        customer: sanitizeInput(name, 100),
+        customerLocation: customer.location || '',
+        date: svcForm.date || todayISO(),
+        quantity: 1,
+        unitPrice: amount,
+        status: 'pending',
+        amount: `GH₵${amount.toFixed(2)}`,
+        notes: '',
+        items: [{ name: sanitizeInput(svcForm.service, 100), quantity: 1, unitPrice: amount }],
+      });
+      setShowAddService(false);
+      await load();
+    } catch (error) {
+      console.error('Failed to add service', error);
+      alert('Failed to add service. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRecordPayment = async (inv) => {
+    const balance = balanceOf(inv);
+    const entry = payments[inv.id] || { amount: String(balance || ''), date: todayISO() };
+    let payAmt = moneyOf(entry.amount);
+    payAmt = Math.min(payAmt, balance);
+    if (payAmt <= 0) {
+      alert('Enter an amount to record.');
+      return;
+    }
+    setPayingId(inv.id);
+    try {
+      await createServiceIncome({
+        client_name: sanitizeInput(name, 100),
+        amount: payAmt,
+        platform_fee: 0,
+        net_amount: payAmt,
+        platform_tag: 'invoice',
+        milestone_label: serviceNameOf(inv),
+        payment_date: entry.date || todayISO(),
+        notes: `Payment on invoice #${inv.id}`,
+      });
+      if (balance - payAmt <= 0) {
+        await updateInvoice(inv.id, { status: 'paid' });
+      }
+      await load();
+    } catch (error) {
+      console.error('Failed to record payment', error);
+      alert('Failed to record payment. Please try again.');
+    } finally {
+      setPayingId(null);
+    }
+  };
 
   const openEditCustomer = () => {
     setCustForm({
@@ -419,29 +530,51 @@ const CustomerDetail = () => {
     }
   };
 
-  const openEditIncome = (r) => {
-    setIncForm({
-      service: r.raw.milestoneLabel || '',
-      amount: String(r.raw.netAmount || r.raw.amount || ''),
-      date: r.raw.paymentDate || todayISO(),
-    });
-    setEditInc(r.raw);
+  const openEditService = (r) => {
+    if (r.kind === 'income') {
+      setIncForm({
+        service: r.raw.milestoneLabel || '',
+        amount: String(moneyOf(r.raw.netAmount || r.raw.amount) || ''),
+        date: r.raw.paymentDate || todayISO(),
+      });
+      setEditInc({ kind: 'income', raw: r.raw });
+    } else {
+      setIncForm({
+        service: serviceNameOf(r.raw),
+        amount: String(amountOf(r.raw) || ''),
+        date: r.raw.date || todayISO(),
+      });
+      setEditInc({ kind: 'invoice', raw: r.raw });
+    }
   };
 
-  const handleSaveIncome = async (e) => {
+  const handleSaveService = async (e) => {
     e.preventDefault();
     if (!editInc) return;
     setSavingEdit(true);
-    const amount = parseFloat(String(incForm.amount).replace(/[^\d.-]/g, '')) || 0;
+    const amount = moneyOf(incForm.amount);
     try {
-      await updateServiceIncome(editInc.id, {
-        client_name: sanitizeInput(name, 100),
-        amount,
-        net_amount: amount,
-        platform_fee: editInc.platformFee || 0,
-        milestone_label: sanitizeInput(incForm.service, 200),
-        payment_date: incForm.date || todayISO(),
-      });
+      if (editInc.kind === 'income') {
+        await updateServiceIncome(editInc.raw.id, {
+          client_name: sanitizeInput(name, 100),
+          amount,
+          net_amount: amount,
+          platform_fee: editInc.raw.platformFee || 0,
+          milestone_label: sanitizeInput(incForm.service, 200),
+          payment_date: incForm.date || todayISO(),
+        });
+      } else {
+        const paid = paidAmountOf(editInc.raw);
+        await updateInvoice(editInc.raw.id, {
+          customer: sanitizeInput(name, 100),
+          date: incForm.date || todayISO(),
+          quantity: 1,
+          unitPrice: amount,
+          status: paid >= amount ? 'paid' : 'pending',
+          amount: `GH₵${amount.toFixed(2)}`,
+          items: [{ name: sanitizeInput(incForm.service, 100), quantity: 1, unitPrice: amount }],
+        });
+      }
       setEditInc(null);
       await load();
     } catch (error) {
@@ -449,56 +582,6 @@ const CustomerDetail = () => {
       alert('Failed to update service. Please try again.');
     } finally {
       setSavingEdit(false);
-    }
-  };
-
-  const handleAddService = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    const amount = parseFloat(String(svcForm.amount).replace(/[^\d.-]/g, '')) || 0;
-    try {
-      await createServiceIncome({
-        client_name: sanitizeInput(name, 100),
-        amount,
-        platform_fee: 0,
-        net_amount: amount,
-        platform_tag: 'manual',
-        milestone_label: sanitizeInput(svcForm.service, 200),
-        payment_date: svcForm.date || todayISO(),
-        notes: '',
-      });
-      setShowAddService(false);
-      await load();
-    } catch (error) {
-      console.error('Failed to add service', error);
-      alert('Failed to add service. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRecordPayment = async (inv) => {
-    setPayingId(inv.id);
-    const amountNum = parseFloat(String(inv.amount).replace(/[^\d.-]/g, '')) || 0;
-    const firstItem = Array.isArray(inv.items) ? inv.items.find(i => !i.type) : null;
-    try {
-      await updateInvoice(inv.id, { status: 'paid' });
-      await createServiceIncome({
-        client_name: sanitizeInput(name, 100),
-        amount: amountNum,
-        platform_fee: 0,
-        net_amount: amountNum,
-        platform_tag: 'invoice',
-        milestone_label: firstItem?.name || `Invoice #${inv.id}`,
-        payment_date: todayISO(),
-        notes: `Payment for invoice #${inv.id}`,
-      });
-      await load();
-    } catch (error) {
-      console.error('Failed to record payment', error);
-      alert('Failed to record payment. Please try again.');
-    } finally {
-      setPayingId(null);
     }
   };
 
@@ -522,26 +605,26 @@ const CustomerDetail = () => {
 
         <ActionRow>
           <PrimaryBtn onClick={() => setShowAddService(true)}><Plus size={16} /> Add Service</PrimaryBtn>
-          <PaymentBtn onClick={() => setShowPayments(true)}><CheckCircle size={16} /> Make Payment</PaymentBtn>
+          <PaymentBtn onClick={openPayments}><CheckCircle size={16} /> Make Payment</PaymentBtn>
           <EditBtn onClick={openEditCustomer}><Pencil size={14} /> Edit Customer</EditBtn>
         </ActionRow>
       </Header>
 
       <StatRow>
+        <StatCard>
+          <h3>Total Billed</h3>
+          <div className="value">{fmt(totalBilled)}</div>
+          <div className="sub">{openServices} service(s) billed</div>
+        </StatCard>
         <StatCard $color="#25432F">
           <h3>Total Received</h3>
           <div className="value">{fmt(totalReceived)}</div>
-          <div className="sub">{incomeRows.length} payments</div>
+          <div className="sub">{customerIncome.length} payment(s)</div>
         </StatCard>
         <StatCard $color="#C62828">
           <h3>Outstanding Balance</h3>
           <div className="value">{fmt(outstanding)}</div>
-          <div className="sub">{outstandingInvoices.length} unpaid invoice(s)</div>
-        </StatCard>
-        <StatCard>
-          <h3>Total Billed</h3>
-          <div className="value">{fmt(totalBilled)}</div>
-          <div className="sub">All services billed to date</div>
+          <div className="sub">{outstandingInvoices.length} unpaid service(s)</div>
         </StatCard>
       </StatRow>
 
@@ -553,6 +636,7 @@ const CustomerDetail = () => {
               <Th>Service</Th>
               <Th>Status</Th>
               <Th style={{ textAlign: 'right' }}>Amount</Th>
+              <Th style={{ textAlign: 'right' }}>Balance</Th>
               <Th style={{ width: 60 }}></Th>
             </tr>
           </thead>
@@ -563,10 +647,9 @@ const CustomerDetail = () => {
                 <Td>{r.service}</Td>
                 <Td><StatusBadge $status={r.status}>{r.status}</StatusBadge></Td>
                 <Td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(r.amount)}</Td>
+                <Td style={{ textAlign: 'right', fontWeight: 700, color: r.balance > 0 ? '#C62828' : '#25432F' }}>{fmt(r.balance)}</Td>
                 <Td>
-                  {r.kind === 'income' ? (
-                    <ActionBtn onClick={() => openEditIncome(r)} title="Edit service" aria-label={`Edit ${r.service}`}><Pencil size={15} /></ActionBtn>
-                  ) : null}
+                  <ActionBtn onClick={() => openEditService(r)} title="Edit service" aria-label={`Edit ${r.service}`}><Pencil size={15} /></ActionBtn>
                 </Td>
               </tr>
             ))}
@@ -580,19 +663,18 @@ const CustomerDetail = () => {
               <MobileRow><span>Service</span><span><strong>{r.service}</strong></span></MobileRow>
               <MobileRow><span>Status</span><span><StatusBadge $status={r.status}>{r.status}</StatusBadge></span></MobileRow>
               <MobileRow><span>Amount</span><span><strong>{fmt(r.amount)}</strong></span></MobileRow>
-              {r.kind === 'income' && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                  <ActionBtn onClick={() => openEditIncome(r)} title="Edit service" aria-label={`Edit ${r.service}`}><Pencil size={15} /></ActionBtn>
-                </div>
-              )}
+              <MobileRow><span>Balance</span><span style={{ fontWeight: 700, color: r.balance > 0 ? '#C62828' : '#25432F' }}>{fmt(r.balance)}</span></MobileRow>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <ActionBtn onClick={() => openEditService(r)} title="Edit service" aria-label={`Edit ${r.service}`}><Pencil size={15} /></ActionBtn>
+              </div>
             </MobileCard>
           ))}
-          {rows.length === 0 && <EmptyState>No transactions yet for this customer.</EmptyState>}
+          {rows.length === 0 && <EmptyState>No services recorded for this customer yet.</EmptyState>}
         </MobileGrid>
       </TableCard>
 
       {rows.length === 0 && (
-        <EmptyState>No income or invoices recorded for this customer yet.</EmptyState>
+        <EmptyState>No services recorded for this customer yet. Use <strong>Add Service</strong> to bill them.</EmptyState>
       )}
 
       <Modal isOpen={showAddService} onClose={() => setShowAddService(false)} title={`Add Service for ${name}`}>
@@ -601,8 +683,11 @@ const CustomerDetail = () => {
           <Input required value={svcForm.service} onChange={e => setSvcForm(f => ({ ...f, service: e.target.value }))} placeholder="e.g. Website design, Consultation" autoFocus />
           <Label>Amount (GH₵) *</Label>
           <Input required type="number" min="0" step="0.01" value={svcForm.amount} onChange={e => setSvcForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
-          <Label>Payment Date *</Label>
+          <Label>Service Date *</Label>
           <Input required type="date" value={svcForm.date} onChange={e => setSvcForm(f => ({ ...f, date: e.target.value }))} />
+          <p style={{ fontSize: '0.85rem', color: '#55423D', margin: '-0.25rem 0 0.5rem' }}>
+            This service is billed as <strong>unpaid</strong>. Use <strong>Make Payment</strong> to record deposits or the balance later.
+          </p>
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
             <button type="button" onClick={() => setShowAddService(false)} style={{ padding: '0.65rem 1.25rem', border: '1px solid #ddd', borderRadius: 8, background: 'white', cursor: 'pointer' }}>Cancel</button>
             <button type="submit" disabled={saving} style={{ padding: '0.65rem 1.25rem', border: 'none', borderRadius: 8, background: '#6F240A', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
@@ -612,27 +697,41 @@ const CustomerDetail = () => {
         </form>
       </Modal>
 
-      <Modal isOpen={showPayments} onClose={() => setShowPayments(false)} title={`Outstanding Payments — ${name}`}>
+      <Modal isOpen={showPayments} onClose={() => setShowPayments(false)} title={`Make Payment — ${name}`}>
         {outstandingInvoices.length === 0 ? (
-          <EmptyState>No outstanding invoices for this customer. All cleared!</EmptyState>
+          <EmptyState>No outstanding balances for this customer. All settled!</EmptyState>
         ) : (
           <>
             <p style={{ fontSize: '0.9rem', color: '#55423D', marginBottom: '0.5rem' }}>
-              Select an invoice to record its payment. This adds the amount to <strong>Total Received</strong> and clears it from <strong>Outstanding Balance</strong>.
+              Customers don't always pay in full. Enter a <strong>full payment</strong> or a <strong>deposit</strong> — the balance is tracked automatically.
             </p>
             {outstandingInvoices.map(inv => {
-              const invAmount = parseFloat(String(inv.amount).replace(/[^\d.-]/g, '')) || 0;
-              const firstItem = Array.isArray(inv.items) && inv.items.length > 0 ? inv.items.find(i => !i.type) : null;
+              const balance = balanceOf(inv);
+              const entry = payments[inv.id] || { amount: String(balance || ''), date: todayISO() };
               return (
                 <PayItem key={inv.id}>
-                  <div>
-                    <strong>{firstItem?.name || `Invoice #${inv.id}`}</strong>
-                    <div style={{ fontSize: '0.8rem', color: '#55423D' }}>Invoice {inv.id} • Due {inv.date || '-'}</div>
+                  <div style={{ flex: 1 }}>
+                    <strong>{serviceNameOf(inv)}</strong>
+                    <PayMeta>Invoice {inv.id} • Billed {fmt(amountOf(inv))} • Due {inv.date || '-'}</PayMeta>
+                    <PayMeta>Remaining balance: <strong style={{ color: '#C62828' }}>{fmt(balance)}</strong></PayMeta>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <strong className="data-tabular">{fmt(invAmount)}</strong>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                    <PayInput
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={entry.amount}
+                      onChange={e => setPayments(p => ({ ...p, [inv.id]: { ...(p[inv.id] || { date: todayISO() }), amount: e.target.value } }))}
+                      placeholder="Amount"
+                    />
+                    <PayInput
+                      type="date"
+                      value={entry.date}
+                      onChange={e => setPayments(p => ({ ...p, [inv.id]: { ...(p[inv.id] || { amount: String(balance || '') }), date: e.target.value } }))}
+                      style={{ width: 130 }}
+                    />
                     <PayBtn onClick={() => handleRecordPayment(inv)} disabled={payingId === inv.id}>
-                      <CheckCircle size={14} /> {payingId === inv.id ? 'Recording...' : 'Record Payment'}
+                      <CheckCircle size={14} /> {payingId === inv.id ? 'Recording...' : 'Record'}
                     </PayBtn>
                   </div>
                 </PayItem>
@@ -664,12 +763,12 @@ const CustomerDetail = () => {
       </Modal>
 
       <Modal isOpen={!!editInc} onClose={() => setEditInc(null)} title="Edit Service">
-        <form onSubmit={handleSaveIncome}>
+        <form onSubmit={handleSaveService}>
           <Label>Service *</Label>
           <Input required value={incForm.service} onChange={e => setIncForm(f => ({ ...f, service: e.target.value }))} placeholder="e.g. Website design, Consultation" autoFocus />
           <Label>Amount (GH₵) *</Label>
           <Input required type="number" min="0" step="0.01" value={incForm.amount} onChange={e => setIncForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
-          <Label>Payment Date *</Label>
+          <Label>{editInc?.kind === 'invoice' ? 'Service Date *' : 'Payment Date *'}</Label>
           <Input required type="date" value={incForm.date} onChange={e => setIncForm(f => ({ ...f, date: e.target.value }))} />
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
             <button type="button" onClick={() => setEditInc(null)} style={{ padding: '0.65rem 1.25rem', border: '1px solid #ddd', borderRadius: 8, background: 'white', cursor: 'pointer' }}>Cancel</button>
