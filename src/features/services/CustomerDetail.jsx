@@ -373,6 +373,26 @@ const PayInput = styled.input`
   font-size: 0.9rem;
 `;
 
+const PaySelect = styled.select`
+  width: 120px;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: 0.9rem;
+  background: white;
+`;
+
+const MethodBadge = styled.span`
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
+  background: ${({ theme }) => theme.colors.primarySoft || '#F3E9E4'};
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+`;
+
 const fmt = (n) => `GH₵${(n || 0).toFixed(2)}`;
 const todayISO = () => new Date().toISOString().split('T')[0];
 const moneyOf = (v) => parseFloat(String(v).replace(/[^\d.-]/g, '')) || 0;
@@ -397,9 +417,9 @@ const CustomerDetail = () => {
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [addingNewCat, setAddingNewCat] = useState(false);
-  const [svcForm, setSvcForm] = useState({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid' });
+  const [svcForm, setSvcForm] = useState({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid', method: 'cash' });
   const [custForm, setCustForm] = useState({ name: '', email: '', phone: '', location: '', notes: '' });
-  const [incForm, setIncForm] = useState({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid' });
+  const [incForm, setIncForm] = useState({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid', method: 'cash' });
   const [payments, setPayments] = useState({});
 
   const load = async () => {
@@ -419,7 +439,7 @@ const CustomerDetail = () => {
   };
 
   const openAddService = () => {
-    setSvcForm({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid' });
+    setSvcForm({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid', method: 'cash' });
     setShowNewCat(false);
     setNewCatName('');
     setShowAddService(true);
@@ -524,6 +544,7 @@ const CustomerDetail = () => {
       date: i.paymentDate || '',
       service: i.milestoneLabel || 'Service payment',
       category: i.category || '',
+      method: methodLabelOf(i.notes) || '—',
       amount: moneyOf(i.netAmount || i.amount),
       kind: 'payment',
       raw: i,
@@ -538,6 +559,21 @@ const CustomerDetail = () => {
   const matchInvoiceId = (notes) => {
     const m = String(notes || '').match(/invoice #(\d+)/i);
     return m ? m[1] : null;
+  };
+
+  const methodOf = (notes) => {
+    const m = String(notes || '').match(/\[(cash|momo|bank)\]\s*$/i);
+    return m ? m[1].toLowerCase() : '';
+  };
+
+  const methodLabelOf = (notes) => {
+    const m = methodOf(notes);
+    return m === 'momo' ? 'Mobile Money' : m ? m[0].toUpperCase() + m.slice(1) : '';
+  };
+
+  const withMethod = (notes, method) => {
+    const base = String(notes || '').replace(/\[(cash|momo|bank)\]\s*$/i, '').trim();
+    return method ? `${base} [${method}]` : base;
   };
 
   const reconcileInvoiceStatus = async (invId) => {
@@ -581,7 +617,7 @@ const CustomerDetail = () => {
           milestone_label: sanitizeInput(svcForm.service, 200),
           category: sanitizeInput(svcForm.category, 50),
           payment_date: svcForm.date || todayISO(),
-          notes: `Payment on invoice #${created.id}`,
+          notes: withMethod(`Payment on invoice #${created.id}`, svcForm.method),
         });
       }
       setShowAddService(false);
@@ -614,7 +650,7 @@ const CustomerDetail = () => {
         milestone_label: serviceNameOf(inv),
         category: categoryOf(inv),
         payment_date: entry.date || todayISO(),
-        notes: `Payment on invoice #${inv.id}`,
+        notes: withMethod(`Payment on invoice #${inv.id}`, entry.method || 'cash'),
       });
       if (balance - payAmt <= 0) {
         await updateInvoice(inv.id, { status: 'paid' });
@@ -670,6 +706,7 @@ const CustomerDetail = () => {
         date: r.raw.paymentDate || todayISO(),
         category: r.raw.category || '',
         status: 'paid',
+        method: methodOf(r.raw.notes) || 'cash',
       });
       setEditInc({ kind: r.kind, raw: r.raw });
     } else {
@@ -699,6 +736,7 @@ const CustomerDetail = () => {
           milestone_label: sanitizeInput(incForm.service, 200),
           category: sanitizeInput(incForm.category, 50),
           payment_date: incForm.date || todayISO(),
+          notes: withMethod(editInc.raw.notes, incForm.method),
         });
         const refId = matchInvoiceId(editInc.raw.notes);
         if (refId) await reconcileInvoiceStatus(refId);
@@ -881,6 +919,7 @@ const CustomerDetail = () => {
               <Th>Date</Th>
               <Th>Service</Th>
               <Th>Category</Th>
+              <Th>Method</Th>
               <Th style={{ textAlign: 'right' }}>Amount</Th>
               <Th style={{ width: 60 }}></Th>
             </tr>
@@ -891,6 +930,7 @@ const CustomerDetail = () => {
                 <Td>{p.date || '-'}</Td>
                 <Td>{p.service}</Td>
                 <Td>{p.category || '-'}</Td>
+                <Td>{p.method === '—' ? '—' : <MethodBadge>{p.method}</MethodBadge>}</Td>
                 <Td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(p.amount)}</Td>
                 <Td>
                   <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -901,7 +941,7 @@ const CustomerDetail = () => {
               </tr>
             ))}
             {paymentRows.length === 0 && (
-              <tr><Td colSpan={5}><EmptyState>No payments recorded yet. Use <strong>Make Payment</strong> to receive money.</EmptyState></Td></tr>
+              <tr><Td colSpan={6}><EmptyState>No payments recorded yet. Use <strong>Make Payment</strong> to receive money.</EmptyState></Td></tr>
             )}
           </tbody>
         </Table>
@@ -912,6 +952,7 @@ const CustomerDetail = () => {
               <MobileRow><span>Date</span><span>{p.date || '-'}</span></MobileRow>
               <MobileRow><span>Service</span><span><strong>{p.service}</strong></span></MobileRow>
               <MobileRow><span>Category</span><span>{p.category || '-'}</span></MobileRow>
+              <MobileRow><span>Method</span><span>{p.method === '—' ? '—' : <MethodBadge>{p.method}</MethodBadge>}</span></MobileRow>
               <MobileRow><span>Amount</span><span><strong>{fmt(p.amount)}</strong></span></MobileRow>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <ActionBtn onClick={() => openEditService(p)} title="Edit payment" aria-label={`Edit ${p.service}`}><Pencil size={15} /></ActionBtn>
@@ -949,6 +990,16 @@ const CustomerDetail = () => {
             <option value="unpaid">Unpaid</option>
             <option value="paid">Paid</option>
           </Select>
+          {svcForm.status === 'paid' && (
+            <>
+              <Label>Payment Method</Label>
+              <Select value={svcForm.method} onChange={e => setSvcForm(f => ({ ...f, method: e.target.value }))}>
+                <option value="cash">Cash</option>
+                <option value="momo">Mobile Money</option>
+                <option value="bank">Bank Transfer</option>
+              </Select>
+            </>
+          )}
           <Label>Amount (GH₵) *</Label>
           <Input required type="number" min="0" step="0.01" value={svcForm.amount} onChange={e => setSvcForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
           <Label>Service Date *</Label>
@@ -977,7 +1028,7 @@ const CustomerDetail = () => {
             </p>
             {outstandingInvoices.map(inv => {
               const balance = balanceOf(inv);
-              const entry = payments[inv.id] || { amount: String(balance || ''), date: todayISO() };
+const entry = payments[inv.id] || { amount: String(balance || ''), date: todayISO(), method: 'cash' };
               return (
                 <PayItem key={inv.id}>
                   <div style={{ flex: 1 }}>
@@ -997,9 +1048,18 @@ const CustomerDetail = () => {
                     <PayInput
                       type="date"
                       value={entry.date}
-                      onChange={e => setPayments(p => ({ ...p, [inv.id]: { ...(p[inv.id] || { amount: String(balance || '') }), date: e.target.value } }))}
+                      onChange={e => setPayments(p => ({ ...p, [inv.id]: { ...(p[inv.id] || { amount: String(balance || ''), method: 'cash' }), date: e.target.value } }))}
                       style={{ width: 130 }}
                     />
+                    <PaySelect
+                      value={entry.method || 'cash'}
+                      onChange={e => setPayments(p => ({ ...p, [inv.id]: { ...(p[inv.id] || { amount: String(balance || ''), date: todayISO() }), method: e.target.value } }))}
+                      aria-label="Payment method"
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="momo">Mobile Money</option>
+                      <option value="bank">Bank Transfer</option>
+                    </PaySelect>
                     <PayBtn onClick={() => handleRecordPayment(inv)} disabled={payingId === inv.id}>
                       <CheckCircle size={14} /> {payingId === inv.id ? 'Recording...' : 'Record'}
                     </PayBtn>
@@ -1051,6 +1111,16 @@ const CustomerDetail = () => {
               <Input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="New income category" onKeyDown={e => { if (e.key === 'Enter') handleCreateNewCat(); }} />
               <button type="button" onClick={handleCreateNewCat} disabled={addingNewCat || !newCatName.trim()} style={{ padding: '0.6rem 1rem', border: 'none', borderRadius: 8, background: addingNewCat || !newCatName.trim() ? '#997A6F' : '#6F240A', color: 'white', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{addingNewCat ? 'Adding...' : 'Add'}</button>
             </div>
+          )}
+          {editInc?.kind !== 'invoice' && (
+            <>
+              <Label>Payment Method</Label>
+              <Select value={incForm.method} onChange={e => setIncForm(f => ({ ...f, method: e.target.value }))}>
+                <option value="cash">Cash</option>
+                <option value="momo">Mobile Money</option>
+                <option value="bank">Bank Transfer</option>
+              </Select>
+            </>
           )}
           {editInc?.kind === 'invoice' && (
             <>
