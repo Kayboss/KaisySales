@@ -509,6 +509,40 @@ const CustomerDetail = () => {
     return paidAmountOf(inv) > 0 ? 'Partial' : 'Unpaid';
   };
 
+  const matchInvoiceId = (notes) => {
+    const m = String(notes || '').match(/invoice #(\d+)/i);
+    return m ? m[1] : null;
+  };
+
+  const methodOf = (notes) => {
+    const m = String(notes || '').match(/\[(cash|momo|bank)\]\s*$/i);
+    return m ? m[1].toLowerCase() : '';
+  };
+
+  const methodLabelOf = (notes) => {
+    const m = methodOf(notes);
+    return m === 'momo' ? 'Mobile Money' : m ? m[0].toUpperCase() + m.slice(1) : '';
+  };
+
+  const withMethod = (notes, method) => {
+    const base = String(notes || '').replace(/\[(cash|momo|bank)\]\s*$/i, '').trim();
+    return method ? `${base} [${method}]` : base;
+  };
+
+  const reconcileInvoiceStatus = async (invId) => {
+    const inv = invoices.find(x => String(x.id) === String(invId));
+    if (!inv) return;
+    const refs = customerIncome.filter(p =>
+      new RegExp('invoice #' + String(invId) + '(?!\\d)', 'i').test(String(p.notes || ''))
+    );
+    const sum = refs.reduce((s, p) => s + moneyOf(p.netAmount || p.amount), 0);
+    if (sum > 0) {
+      await updateInvoice(invId, { status: sum >= amountOf(inv) ? 'paid' : 'pending' });
+    } else {
+      await updateInvoice(invId, { status: 'pending' });
+    }
+  };
+
   const legacyIncome = customerIncome.filter(i => i.platformTag === 'manual');
 
   const invoiceRows = customerInvoices.map(inv => ({
@@ -555,40 +589,6 @@ const CustomerDetail = () => {
   const outstanding = customerInvoices.reduce((s, inv) => s + balanceOf(inv), 0);
   const outstandingInvoices = customerInvoices.filter(inv => balanceOf(inv) > 0);
   const openServices = customerInvoices.length;
-
-  const matchInvoiceId = (notes) => {
-    const m = String(notes || '').match(/invoice #(\d+)/i);
-    return m ? m[1] : null;
-  };
-
-  const methodOf = (notes) => {
-    const m = String(notes || '').match(/\[(cash|momo|bank)\]\s*$/i);
-    return m ? m[1].toLowerCase() : '';
-  };
-
-  const methodLabelOf = (notes) => {
-    const m = methodOf(notes);
-    return m === 'momo' ? 'Mobile Money' : m ? m[0].toUpperCase() + m.slice(1) : '';
-  };
-
-  const withMethod = (notes, method) => {
-    const base = String(notes || '').replace(/\[(cash|momo|bank)\]\s*$/i, '').trim();
-    return method ? `${base} [${method}]` : base;
-  };
-
-  const reconcileInvoiceStatus = async (invId) => {
-    const inv = invoices.find(x => String(x.id) === String(invId));
-    if (!inv) return;
-    const refs = customerIncome.filter(p =>
-      new RegExp('invoice #' + String(invId) + '(?!\\d)', 'i').test(String(p.notes || ''))
-    );
-    const sum = refs.reduce((s, p) => s + moneyOf(p.netAmount || p.amount), 0);
-    if (sum > 0) {
-      await updateInvoice(invId, { status: sum >= amountOf(inv) ? 'paid' : 'pending' });
-    } else {
-      await updateInvoice(invId, { status: 'pending' });
-    }
-  };
 
   const handleAddService = async (e) => {
     e.preventDefault();
