@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { ArrowLeft, Plus, CheckCircle, Pencil, Mail, Phone, MapPin, Building2 } from 'lucide-react';
+import { ArrowLeft, Plus, CheckCircle, Pencil, Trash2, Mail, Phone, MapPin, Building2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
-import { fetchCustomers, fetchServiceIncome, fetchInvoices, fetchCategories, createCategory, createInvoice, createServiceIncome, updateInvoice, updateCustomer, updateServiceIncome, deleteServiceIncome } from '../../services/api';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { fetchCustomers, fetchServiceIncome, fetchInvoices, fetchCategories, createCategory, createInvoice, createServiceIncome, updateInvoice, updateCustomer, updateServiceIncome, deleteServiceIncome, deleteInvoice } from '../../services/api';
 import { sanitizeInput } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -353,6 +354,8 @@ const CustomerDetail = () => {
   const [showPayments, setShowPayments] = useState(false);
   const [showEditCustomer, setShowEditCustomer] = useState(false);
   const [editInc, setEditInc] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [payingId, setPayingId] = useState(null);
@@ -676,6 +679,29 @@ const CustomerDetail = () => {
     }
   };
 
+  const handleDeleteService = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      if (deleteTarget.kind === 'invoice') {
+        const toDelete = paymentsFor(deleteTarget.raw);
+        for (const p of toDelete) {
+          await deleteServiceIncome(p.id);
+        }
+        await deleteInvoice(deleteTarget.raw.id);
+      } else {
+        await deleteServiceIncome(deleteTarget.raw.id);
+      }
+      setDeleteTarget(null);
+      await load();
+    } catch (error) {
+      console.error('Failed to delete service', error);
+      alert('Failed to delete. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div>
       <Header>
@@ -740,7 +766,10 @@ const CustomerDetail = () => {
                 <Td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(r.amount)}</Td>
                 <Td style={{ textAlign: 'right', fontWeight: 700, color: r.balance > 0 ? '#C62828' : '#25432F' }}>{fmt(r.balance)}</Td>
                 <Td>
-                  <ActionBtn onClick={() => openEditService(r)} title="Edit service" aria-label={`Edit ${r.service}`}><Pencil size={15} /></ActionBtn>
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <ActionBtn onClick={() => openEditService(r)} title="Edit service" aria-label={`Edit ${r.service}`}><Pencil size={15} /></ActionBtn>
+                    <ActionBtn onClick={() => setDeleteTarget(r)} title="Delete" aria-label={`Delete ${r.service}`} style={{ color: '#C62828' }}><Trash2 size={15} /></ActionBtn>
+                  </div>
                 </Td>
               </tr>
             ))}
@@ -758,6 +787,7 @@ const CustomerDetail = () => {
               <MobileRow><span>Balance</span><span style={{ fontWeight: 700, color: r.balance > 0 ? '#C62828' : '#25432F' }}>{fmt(r.balance)}</span></MobileRow>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <ActionBtn onClick={() => openEditService(r)} title="Edit service" aria-label={`Edit ${r.service}`}><Pencil size={15} /></ActionBtn>
+                <ActionBtn onClick={() => setDeleteTarget(r)} title="Delete" aria-label={`Delete ${r.service}`} style={{ color: '#C62828' }}><Trash2 size={15} /></ActionBtn>
               </div>
             </MobileCard>
           ))}
@@ -918,6 +948,19 @@ const CustomerDetail = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onConfirm={handleDeleteService}
+        onCancel={() => setDeleteTarget(null)}
+        title={deleteTarget?.kind === 'invoice' ? 'Delete Service' : 'Delete Payment'}
+        message={
+          deleteTarget?.kind === 'invoice'
+            ? `Delete "${deleteTarget.service}" and all payments recorded against it? This cannot be undone.`
+            : `Delete this payment ("${deleteTarget?.service}")? This cannot be undone.`
+        }
+        confirmLoading={deleting}
+      />
     </div>
   );
 };
