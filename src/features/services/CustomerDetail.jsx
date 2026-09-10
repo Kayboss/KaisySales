@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { ArrowLeft, Plus, CheckCircle, Pencil, Mail, Phone, MapPin, Building2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
-import { fetchCustomers, fetchServiceIncome, fetchInvoices, fetchCategories, createCategory, createInvoice, createServiceIncome, updateInvoice, updateCustomer, updateServiceIncome } from '../../services/api';
+import { fetchCustomers, fetchServiceIncome, fetchInvoices, fetchCategories, createCategory, createInvoice, createServiceIncome, updateInvoice, updateCustomer, updateServiceIncome, deleteServiceIncome } from '../../services/api';
 import { sanitizeInput } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -360,9 +360,9 @@ const CustomerDetail = () => {
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [addingNewCat, setAddingNewCat] = useState(false);
-  const [svcForm, setSvcForm] = useState({ service: '', amount: '', date: todayISO(), category: '' });
+  const [svcForm, setSvcForm] = useState({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid' });
   const [custForm, setCustForm] = useState({ name: '', email: '', phone: '', location: '', notes: '' });
-  const [incForm, setIncForm] = useState({ service: '', amount: '', date: todayISO(), category: '' });
+  const [incForm, setIncForm] = useState({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid' });
   const [payments, setPayments] = useState({});
 
   const load = async () => {
@@ -382,7 +382,7 @@ const CustomerDetail = () => {
   };
 
   const openAddService = () => {
-    setSvcForm({ service: '', amount: '', date: todayISO(), category: '' });
+    setSvcForm({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid' });
     setShowNewCat(false);
     setNewCatName('');
     setShowAddService(true);
@@ -490,18 +490,32 @@ const CustomerDetail = () => {
     e.preventDefault();
     setSaving(true);
     const amount = moneyOf(svcForm.amount);
+    const isPaid = svcForm.status === 'paid';
     try {
-      await createInvoice({
+      const created = await createInvoice({
         customer: sanitizeInput(name, 100),
         customerLocation: customer.location || '',
         date: svcForm.date || todayISO(),
         quantity: 1,
         unitPrice: amount,
-        status: 'pending',
+        status: isPaid ? 'paid' : 'pending',
         amount: `GH₵${amount.toFixed(2)}`,
         notes: '',
         items: [{ name: sanitizeInput(svcForm.service, 100), quantity: 1, unitPrice: amount, category: sanitizeInput(svcForm.category, 50) }],
       });
+      if (isPaid && created?.id) {
+        await createServiceIncome({
+          client_name: sanitizeInput(name, 100),
+          amount,
+          platform_fee: 0,
+          net_amount: amount,
+          platform_tag: 'invoice',
+          milestone_label: sanitizeInput(svcForm.service, 200),
+          category: sanitizeInput(svcForm.category, 50),
+          payment_date: svcForm.date || todayISO(),
+          notes: `Payment on invoice #${created.id}`,
+        });
+      }
       setShowAddService(false);
       await load();
     } catch (error) {
@@ -587,6 +601,7 @@ const CustomerDetail = () => {
         amount: String(moneyOf(r.raw.netAmount || r.raw.amount) || ''),
         date: r.raw.paymentDate || todayISO(),
         category: r.raw.category || '',
+        status: 'paid',
       });
       setEditInc({ kind: 'income', raw: r.raw });
     } else {
@@ -595,6 +610,7 @@ const CustomerDetail = () => {
         amount: String(amountOf(r.raw) || ''),
         date: r.raw.date || todayISO(),
         category: categoryOf(r.raw),
+        status: r.raw.status === 'paid' ? 'paid' : 'unpaid',
       });
       setEditInc({ kind: 'invoice', raw: r.raw });
     }
@@ -618,15 +634,37 @@ const CustomerDetail = () => {
         });
       } else {
         const paid = paidAmountOf(editInc.raw);
+        const targetPaid = incForm.status === 'paid';
         await updateInvoice(editInc.raw.id, {
           customer: sanitizeInput(name, 100),
           date: incForm.date || todayISO(),
           quantity: 1,
           unitPrice: amount,
-          status: paid >= amount ? 'paid' : 'pending',
+          status: targetPaid ? 'paid' : 'pending',
           amount: `GH₵${amount.toFixed(2)}`,
           items: [{ name: sanitizeInput(incForm.service, 100), quantity: 1, unitPrice: amount, category: sanitizeInput(incForm.category, 50) }],
         });
+        if (targetPaid) {
+          const gap = amount - paid;
+          if (gap > 0) {
+            await createServiceIncome({
+              client_name: sanitizeInput(name, 100),
+              amount: gap,
+              platform_fee: 0,
+              net_amount: gap,
+              platform_tag: 'invoice',
+              milestone_label: sanitizeInput(incForm.service, 200),
+              category: sanitizeInput(incForm.category, 50),
+              payment_date: incForm.date || todayISO(),
+              notes: `Payment on invoice #${editInc.raw.id}`,
+            });
+          }
+        } else {
+          const toDelete = paymentsFor(editInc.raw);
+          for (const p of toDelete) {
+            await deleteServiceIncome(p.id);
+          }
+        }
       }
       setEditInc(null);
       await load();
@@ -751,12 +789,19 @@ const CustomerDetail = () => {
               <button type="button" onClick={handleCreateNewCat} disabled={addingNewCat || !newCatName.trim()} style={{ padding: '0.6rem 1rem', border: 'none', borderRadius: 8, background: addingNewCat || !newCatName.trim() ? '#997A6F' : '#6F240A', color: 'white', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{addingNewCat ? 'Adding...' : 'Add'}</button>
             </div>
           )}
+          <Label>Status</Label>
+          <Select value={svcForm.status} onChange={e => setSvcForm(f => ({ ...f, status: e.target.value }))}>
+            <option value="unpaid">Unpaid</option>
+            <option value="paid">Paid</option>
+          </Select>
           <Label>Amount (GH₵) *</Label>
           <Input required type="number" min="0" step="0.01" value={svcForm.amount} onChange={e => setSvcForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
           <Label>Service Date *</Label>
           <Input required type="date" value={svcForm.date} onChange={e => setSvcForm(f => ({ ...f, date: e.target.value }))} />
           <p style={{ fontSize: '0.85rem', color: '#55423D', margin: '-0.25rem 0 0.5rem' }}>
-            This service is billed as <strong>unpaid</strong>. Use <strong>Make Payment</strong> to record deposits or the balance later.
+            {svcForm.status === 'unpaid'
+              ? <>This service is billed as <strong>unpaid</strong>. Use <strong>Make Payment</strong> to record deposits or the balance later.</>
+              : <>This service is marked <strong>paid</strong> — the full amount is added to <strong>Total Received</strong> immediately.</>}
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
             <button type="button" onClick={() => setShowAddService(false)} style={{ padding: '0.65rem 1.25rem', border: '1px solid #ddd', borderRadius: 8, background: 'white', cursor: 'pointer' }}>Cancel</button>
@@ -851,6 +896,15 @@ const CustomerDetail = () => {
               <Input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="New income category" onKeyDown={e => { if (e.key === 'Enter') handleCreateNewCat(); }} />
               <button type="button" onClick={handleCreateNewCat} disabled={addingNewCat || !newCatName.trim()} style={{ padding: '0.6rem 1rem', border: 'none', borderRadius: 8, background: addingNewCat || !newCatName.trim() ? '#997A6F' : '#6F240A', color: 'white', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{addingNewCat ? 'Adding...' : 'Add'}</button>
             </div>
+          )}
+          {editInc?.kind === 'invoice' && (
+            <>
+              <Label>Status</Label>
+              <Select value={incForm.status} onChange={e => setIncForm(f => ({ ...f, status: e.target.value }))}>
+                <option value="unpaid">Unpaid</option>
+                <option value="paid">Paid</option>
+              </Select>
+            </>
           )}
           <Label>Amount (GH₵) *</Label>
           <Input required type="number" min="0" step="0.01" value={incForm.amount} onChange={e => setIncForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
