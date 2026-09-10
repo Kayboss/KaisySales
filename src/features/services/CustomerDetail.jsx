@@ -179,6 +179,13 @@ const TableCard = styled.div`
   overflow: hidden;
 `;
 
+const SectionTitle = styled.h2`
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: ${({ theme }) => theme.colors.text.main};
+  margin: 1.75rem 0 0.75rem;
+`;
+
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
@@ -481,13 +488,44 @@ const CustomerDetail = () => {
     raw: i,
   }));
 
-  const rows = [...invoiceRows, ...legacyRows].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const rows = [...invoiceRows].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  const paymentRows = [...customerIncome]
+    .sort((a, b) => (b.paymentDate || '').localeCompare(a.paymentDate || ''))
+    .map(i => ({
+      id: `pay-${i.id}`,
+      date: i.paymentDate || '',
+      service: i.milestoneLabel || 'Service payment',
+      category: i.category || '',
+      amount: moneyOf(i.netAmount || i.amount),
+      kind: 'payment',
+      raw: i,
+    }));
 
   const totalReceived = customerIncome.reduce((s, i) => s + moneyOf(i.netAmount || i.amount), 0);
   const totalBilled = customerInvoices.reduce((s, inv) => s + amountOf(inv), 0) + legacyRows.reduce((s, r) => s + r.amount, 0);
   const outstanding = customerInvoices.reduce((s, inv) => s + balanceOf(inv), 0);
   const outstandingInvoices = customerInvoices.filter(inv => balanceOf(inv) > 0);
-  const openServices = customerInvoices.length + legacyRows.length;
+  const openServices = customerInvoices.length;
+
+  const matchInvoiceId = (notes) => {
+    const m = String(notes || '').match(/invoice #(\d+)/i);
+    return m ? m[1] : null;
+  };
+
+  const reconcileInvoiceStatus = async (invId) => {
+    const inv = invoices.find(x => String(x.id) === String(invId));
+    if (!inv) return;
+    const refs = customerIncome.filter(p =>
+      new RegExp('invoice #' + String(invId) + '(?!\\d)', 'i').test(String(p.notes || ''))
+    );
+    const sum = refs.reduce((s, p) => s + moneyOf(p.netAmount || p.amount), 0);
+    if (sum > 0) {
+      await updateInvoice(invId, { status: sum >= amountOf(inv) ? 'paid' : 'pending' });
+    } else {
+      await updateInvoice(invId, { status: 'pending' });
+    }
+  };
 
   const handleAddService = async (e) => {
     e.preventDefault();
@@ -598,7 +636,7 @@ const CustomerDetail = () => {
   const openEditService = (r) => {
     setShowNewCat(false);
     setNewCatName('');
-    if (r.kind === 'income') {
+    if (r.kind === 'payment' || r.kind === 'income') {
       setIncForm({
         service: r.raw.milestoneLabel || '',
         amount: String(moneyOf(r.raw.netAmount || r.raw.amount) || ''),
@@ -606,7 +644,7 @@ const CustomerDetail = () => {
         category: r.raw.category || '',
         status: 'paid',
       });
-      setEditInc({ kind: 'income', raw: r.raw });
+      setEditInc({ kind: r.kind, raw: r.raw });
     } else {
       setIncForm({
         service: serviceNameOf(r.raw),
@@ -625,7 +663,7 @@ const CustomerDetail = () => {
     setSavingEdit(true);
     const amount = moneyOf(incForm.amount);
     try {
-      if (editInc.kind === 'income') {
+      if (editInc.kind === 'income' || editInc.kind === 'payment') {
         await updateServiceIncome(editInc.raw.id, {
           client_name: sanitizeInput(name, 100),
           amount,
@@ -635,6 +673,8 @@ const CustomerDetail = () => {
           category: sanitizeInput(incForm.category, 50),
           payment_date: incForm.date || todayISO(),
         });
+        const refId = matchInvoiceId(editInc.raw.notes);
+        if (refId) await reconcileInvoiceStatus(refId);
       } else {
         const paid = paidAmountOf(editInc.raw);
         const targetPaid = incForm.status === 'paid';
@@ -691,6 +731,8 @@ const CustomerDetail = () => {
         await deleteInvoice(deleteTarget.raw.id);
       } else {
         await deleteServiceIncome(deleteTarget.raw.id);
+        const refId = matchInvoiceId(deleteTarget.raw.notes);
+        if (refId) await reconcileInvoiceStatus(refId);
       }
       setDeleteTarget(null);
       await load();
@@ -798,6 +840,56 @@ const CustomerDetail = () => {
       {rows.length === 0 && (
         <EmptyState>No services recorded for this customer yet. Use <strong>Add Service</strong> to bill them.</EmptyState>
       )}
+
+      <SectionTitle>Payments ({paymentRows.length})</SectionTitle>
+      <TableCard>
+        <Table>
+          <thead>
+            <tr>
+              <Th>Date</Th>
+              <Th>Service</Th>
+              <Th>Category</Th>
+              <Th style={{ textAlign: 'right' }}>Amount</Th>
+              <Th style={{ width: 60 }}></Th>
+            </tr>
+          </thead>
+          <tbody>
+            {paymentRows.map(p => (
+              <tr key={p.id}>
+                <Td>{p.date || '-'}</Td>
+                <Td>{p.service}</Td>
+                <Td>{p.category || '-'}</Td>
+                <Td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(p.amount)}</Td>
+                <Td>
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <ActionBtn onClick={() => openEditService(p)} title="Edit payment" aria-label={`Edit ${p.service}`}><Pencil size={15} /></ActionBtn>
+                    <ActionBtn onClick={() => setDeleteTarget(p)} title="Delete" aria-label={`Delete ${p.service}`} style={{ color: '#C62828' }}><Trash2 size={15} /></ActionBtn>
+                  </div>
+                </Td>
+              </tr>
+            ))}
+            {paymentRows.length === 0 && (
+              <tr><Td colSpan={5}><EmptyState>No payments recorded yet. Use <strong>Make Payment</strong> to receive money.</EmptyState></Td></tr>
+            )}
+          </tbody>
+        </Table>
+
+        <MobileGrid>
+          {paymentRows.map(p => (
+            <MobileCard key={p.id}>
+              <MobileRow><span>Date</span><span>{p.date || '-'}</span></MobileRow>
+              <MobileRow><span>Service</span><span><strong>{p.service}</strong></span></MobileRow>
+              <MobileRow><span>Category</span><span>{p.category || '-'}</span></MobileRow>
+              <MobileRow><span>Amount</span><span><strong>{fmt(p.amount)}</strong></span></MobileRow>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <ActionBtn onClick={() => openEditService(p)} title="Edit payment" aria-label={`Edit ${p.service}`}><Pencil size={15} /></ActionBtn>
+                <ActionBtn onClick={() => setDeleteTarget(p)} title="Delete" aria-label={`Delete ${p.service}`} style={{ color: '#C62828' }}><Trash2 size={15} /></ActionBtn>
+              </div>
+            </MobileCard>
+          ))}
+          {paymentRows.length === 0 && <EmptyState>No payments recorded yet.</EmptyState>}
+        </MobileGrid>
+      </TableCard>
 
       <Modal isOpen={showAddService} onClose={() => setShowAddService(false)} title={`Add Service for ${name}`}>
         <form onSubmit={handleAddService}>
@@ -907,7 +999,7 @@ const CustomerDetail = () => {
         </form>
       </Modal>
 
-      <Modal isOpen={!!editInc} onClose={() => setEditInc(null)} title="Edit Service">
+      <Modal isOpen={!!editInc} onClose={() => setEditInc(null)} title={editInc?.kind === 'invoice' ? 'Edit Service' : 'Edit Payment'}>
         <form onSubmit={handleSaveService}>
           <Label>Service *</Label>
           <Input required value={incForm.service} onChange={e => setIncForm(f => ({ ...f, service: e.target.value }))} placeholder="e.g. Website design, Consultation" autoFocus />
