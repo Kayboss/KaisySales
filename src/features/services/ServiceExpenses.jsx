@@ -258,13 +258,15 @@ const ServiceExpenses = () => {
   };
 
   const openEdit = (e) => {
+    const stored = parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0;
+    const fee = sanitizeNumber(e.transactionFee);
     setEditId(e.id);
     setForm({
-      title: e.title, amount: e.amount, category: e.category || '',
+      title: e.title, amount: (stored - fee) || '', category: e.category || '',
       date: e.date || '', subcategory: e.subcategory || 'general',
       vendor: e.vendor || '', renewalDate: e.renewalDate || '',
       isAsset: e.isAsset || false, assetLifetime: e.assetLifetime || '',
-      transactionFee: e.transactionFee || '',
+      transactionFee: fee || '',
     });
     setModalOpen(true);
   };
@@ -272,9 +274,11 @@ const ServiceExpenses = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
+    const base = sanitizeNumber(form.amount);
+    const fee = sanitizeNumber(form.transactionFee);
     const payload = {
       title: sanitizeInput(form.title, 100),
-      amount: `GH₵${sanitizeNumber(form.amount)}`,
+      amount: `GH₵${(base + fee).toFixed(2)}`,
       category: form.category,
       date: form.date || null,
       subcategory: form.subcategory,
@@ -282,7 +286,7 @@ const ServiceExpenses = () => {
       renewal_date: form.renewalDate || null,
       is_asset: form.isAsset,
       asset_lifetime_years: form.isAsset ? parseInt(form.assetLifetime) || null : null,
-      transaction_fee: sanitizeNumber(form.transactionFee),
+      transaction_fee: fee,
     };
     try {
       if (editId) {
