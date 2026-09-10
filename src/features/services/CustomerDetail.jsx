@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { ArrowLeft, Plus, CheckCircle, Pencil, Mail, Phone, MapPin, Building2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
-import { fetchCustomers, fetchServiceIncome, fetchInvoices, createInvoice, createServiceIncome, updateInvoice, updateCustomer, updateServiceIncome } from '../../services/api';
+import { fetchCustomers, fetchServiceIncome, fetchInvoices, fetchCategories, createCategory, createInvoice, createServiceIncome, updateInvoice, updateCustomer, updateServiceIncome } from '../../services/api';
 import { sanitizeInput } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -286,6 +286,16 @@ const Input = styled.input`
   margin-bottom: 1rem;
 `;
 
+const Select = styled.select`
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  background: white;
+`;
+
 const PayItem = styled.div`
   display: flex;
   justify-content: space-between;
@@ -346,16 +356,21 @@ const CustomerDetail = () => {
   const [saving, setSaving] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [payingId, setPayingId] = useState(null);
-  const [svcForm, setSvcForm] = useState({ service: '', amount: '', date: todayISO() });
+  const [categories, setCategories] = useState([]);
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [addingNewCat, setAddingNewCat] = useState(false);
+  const [svcForm, setSvcForm] = useState({ service: '', amount: '', date: todayISO(), category: '' });
   const [custForm, setCustForm] = useState({ name: '', email: '', phone: '', location: '', notes: '' });
-  const [incForm, setIncForm] = useState({ service: '', amount: '', date: todayISO() });
+  const [incForm, setIncForm] = useState({ service: '', amount: '', date: todayISO(), category: '' });
   const [payments, setPayments] = useState({});
 
   const load = async () => {
-    const [c, i, inv] = await Promise.all([fetchCustomers(), fetchServiceIncome(), fetchInvoices()]);
+    const [c, i, inv, cats] = await Promise.all([fetchCustomers(), fetchServiceIncome(), fetchInvoices(), fetchCategories('income')]);
     setCustomers(c);
     setIncome(i);
     setInvoices(inv);
+    setCategories(cats);
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -364,6 +379,32 @@ const CustomerDetail = () => {
   const openPayments = () => {
     setPayments({});
     setShowPayments(true);
+  };
+
+  const openAddService = () => {
+    setSvcForm({ service: '', amount: '', date: todayISO(), category: '' });
+    setShowNewCat(false);
+    setNewCatName('');
+    setShowAddService(true);
+  };
+
+  const handleCreateNewCat = async () => {
+    if (!newCatName.trim()) return;
+    setAddingNewCat(true);
+    try {
+      await createCategory({ name: newCatName.trim(), type: 'income' });
+      const cats = await fetchCategories('income');
+      setCategories(cats);
+      setSvcForm(f => ({ ...f, category: newCatName.trim() }));
+      setIncForm(f => ({ ...f, category: newCatName.trim() }));
+      setNewCatName('');
+      setShowNewCat(false);
+    } catch (error) {
+      console.error('Failed to create category', error);
+      alert('Failed to create category. Please try again.');
+    } finally {
+      setAddingNewCat(false);
+    }
   };
 
   const customer = customers.find(c => String(c.id) === String(id));
@@ -389,6 +430,10 @@ const CustomerDetail = () => {
     const s = servicesOf(inv)[0];
     return s?.name || `Invoice #${inv.id}`;
   };
+  const categoryOf = (inv) => {
+    const s = servicesOf(inv)[0];
+    return s?.category || '';
+  };
   const amountOf = (inv) => moneyOf(inv.amount);
 
   const paymentsFor = (inv) => customerIncome.filter(i =>
@@ -413,6 +458,7 @@ const CustomerDetail = () => {
     id: `inv-${inv.id}`,
     date: inv.date || '',
     service: serviceNameOf(inv),
+    category: categoryOf(inv),
     status: statusOf(inv),
     amount: amountOf(inv),
     balance: balanceOf(inv),
@@ -424,6 +470,7 @@ const CustomerDetail = () => {
     id: `ic-${i.id}`,
     date: i.paymentDate || '',
     service: i.milestoneLabel || 'Service payment',
+    category: i.category || '',
     status: 'Paid',
     amount: moneyOf(i.netAmount || i.amount),
     balance: 0,
@@ -453,7 +500,7 @@ const CustomerDetail = () => {
         status: 'pending',
         amount: `GH₵${amount.toFixed(2)}`,
         notes: '',
-        items: [{ name: sanitizeInput(svcForm.service, 100), quantity: 1, unitPrice: amount }],
+        items: [{ name: sanitizeInput(svcForm.service, 100), quantity: 1, unitPrice: amount, category: sanitizeInput(svcForm.category, 50) }],
       });
       setShowAddService(false);
       await load();
@@ -483,6 +530,7 @@ const CustomerDetail = () => {
         net_amount: payAmt,
         platform_tag: 'invoice',
         milestone_label: serviceNameOf(inv),
+        category: categoryOf(inv),
         payment_date: entry.date || todayISO(),
         notes: `Payment on invoice #${inv.id}`,
       });
@@ -531,11 +579,14 @@ const CustomerDetail = () => {
   };
 
   const openEditService = (r) => {
+    setShowNewCat(false);
+    setNewCatName('');
     if (r.kind === 'income') {
       setIncForm({
         service: r.raw.milestoneLabel || '',
         amount: String(moneyOf(r.raw.netAmount || r.raw.amount) || ''),
         date: r.raw.paymentDate || todayISO(),
+        category: r.raw.category || '',
       });
       setEditInc({ kind: 'income', raw: r.raw });
     } else {
@@ -543,6 +594,7 @@ const CustomerDetail = () => {
         service: serviceNameOf(r.raw),
         amount: String(amountOf(r.raw) || ''),
         date: r.raw.date || todayISO(),
+        category: categoryOf(r.raw),
       });
       setEditInc({ kind: 'invoice', raw: r.raw });
     }
@@ -561,6 +613,7 @@ const CustomerDetail = () => {
           net_amount: amount,
           platform_fee: editInc.raw.platformFee || 0,
           milestone_label: sanitizeInput(incForm.service, 200),
+          category: sanitizeInput(incForm.category, 50),
           payment_date: incForm.date || todayISO(),
         });
       } else {
@@ -572,7 +625,7 @@ const CustomerDetail = () => {
           unitPrice: amount,
           status: paid >= amount ? 'paid' : 'pending',
           amount: `GH₵${amount.toFixed(2)}`,
-          items: [{ name: sanitizeInput(incForm.service, 100), quantity: 1, unitPrice: amount }],
+          items: [{ name: sanitizeInput(incForm.service, 100), quantity: 1, unitPrice: amount, category: sanitizeInput(incForm.category, 50) }],
         });
       }
       setEditInc(null);
@@ -604,7 +657,7 @@ const CustomerDetail = () => {
         </ProfileCard>
 
         <ActionRow>
-          <PrimaryBtn onClick={() => setShowAddService(true)}><Plus size={16} /> Add Service</PrimaryBtn>
+          <PrimaryBtn onClick={openAddService}><Plus size={16} /> Add Service</PrimaryBtn>
           <PaymentBtn onClick={openPayments}><CheckCircle size={16} /> Make Payment</PaymentBtn>
           <EditBtn onClick={openEditCustomer}><Pencil size={14} /> Edit Customer</EditBtn>
         </ActionRow>
@@ -644,7 +697,7 @@ const CustomerDetail = () => {
             {rows.map(r => (
               <tr key={r.id}>
                 <Td>{r.date || '-'}</Td>
-                <Td>{r.service}</Td>
+                <Td>{r.service}{r.category ? <div style={{ fontSize: '0.75rem', color: '#875200', fontWeight: 600 }}>{r.category}</div> : null}</Td>
                 <Td><StatusBadge $status={r.status}>{r.status}</StatusBadge></Td>
                 <Td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(r.amount)}</Td>
                 <Td style={{ textAlign: 'right', fontWeight: 700, color: r.balance > 0 ? '#C62828' : '#25432F' }}>{fmt(r.balance)}</Td>
@@ -661,6 +714,7 @@ const CustomerDetail = () => {
             <MobileCard key={r.id}>
               <MobileRow><span>Date</span><span>{r.date || '-'}</span></MobileRow>
               <MobileRow><span>Service</span><span><strong>{r.service}</strong></span></MobileRow>
+              {r.category && <MobileRow><span>Category</span><span style={{ color: '#875200', fontWeight: 700 }}>{r.category}</span></MobileRow>}
               <MobileRow><span>Status</span><span><StatusBadge $status={r.status}>{r.status}</StatusBadge></span></MobileRow>
               <MobileRow><span>Amount</span><span><strong>{fmt(r.amount)}</strong></span></MobileRow>
               <MobileRow><span>Balance</span><span style={{ fontWeight: 700, color: r.balance > 0 ? '#C62828' : '#25432F' }}>{fmt(r.balance)}</span></MobileRow>
@@ -681,6 +735,22 @@ const CustomerDetail = () => {
         <form onSubmit={handleAddService}>
           <Label>Service *</Label>
           <Input required value={svcForm.service} onChange={e => setSvcForm(f => ({ ...f, service: e.target.value }))} placeholder="e.g. Website design, Consultation" autoFocus />
+          <Label>Category</Label>
+          <Select value={showNewCat ? '__new__' : svcForm.category} onChange={e => {
+            const v = e.target.value;
+            setShowNewCat(v === '__new__');
+            if (v !== '__new__') setSvcForm(f => ({ ...f, category: v }));
+          }}>
+            <option value="">No category</option>
+            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            <option value="__new__">＋ Add new category...</option>
+          </Select>
+          {showNewCat && (
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+              <Input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="New income category" onKeyDown={e => { if (e.key === 'Enter') handleCreateNewCat(); }} />
+              <button type="button" onClick={handleCreateNewCat} disabled={addingNewCat || !newCatName.trim()} style={{ padding: '0.6rem 1rem', border: 'none', borderRadius: 8, background: addingNewCat || !newCatName.trim() ? '#997A6F' : '#6F240A', color: 'white', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{addingNewCat ? 'Adding...' : 'Add'}</button>
+            </div>
+          )}
           <Label>Amount (GH₵) *</Label>
           <Input required type="number" min="0" step="0.01" value={svcForm.amount} onChange={e => setSvcForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
           <Label>Service Date *</Label>
@@ -766,6 +836,22 @@ const CustomerDetail = () => {
         <form onSubmit={handleSaveService}>
           <Label>Service *</Label>
           <Input required value={incForm.service} onChange={e => setIncForm(f => ({ ...f, service: e.target.value }))} placeholder="e.g. Website design, Consultation" autoFocus />
+          <Label>Category</Label>
+          <Select value={showNewCat ? '__new__' : incForm.category} onChange={e => {
+            const v = e.target.value;
+            setShowNewCat(v === '__new__');
+            if (v !== '__new__') setIncForm(f => ({ ...f, category: v }));
+          }}>
+            <option value="">No category</option>
+            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            <option value="__new__">＋ Add new category...</option>
+          </Select>
+          {showNewCat && (
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+              <Input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="New income category" onKeyDown={e => { if (e.key === 'Enter') handleCreateNewCat(); }} />
+              <button type="button" onClick={handleCreateNewCat} disabled={addingNewCat || !newCatName.trim()} style={{ padding: '0.6rem 1rem', border: 'none', borderRadius: 8, background: addingNewCat || !newCatName.trim() ? '#997A6F' : '#6F240A', color: 'white', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{addingNewCat ? 'Adding...' : 'Add'}</button>
+            </div>
+          )}
           <Label>Amount (GH₵) *</Label>
           <Input required type="number" min="0" step="0.01" value={incForm.amount} onChange={e => setIncForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
           <Label>{editInc?.kind === 'invoice' ? 'Service Date *' : 'Payment Date *'}</Label>
