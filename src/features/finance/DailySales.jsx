@@ -10,7 +10,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
-import { formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -24,7 +24,7 @@ const Header = styled.div`
 
 const StatsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1.5rem;
   margin-bottom: 2.5rem;
 
@@ -428,12 +428,16 @@ const DailySales = () => {
     const totalAmount = subtotal * (1 - discountPct / 100);
     
     const invMatch = inventoryItems.find(i => i.name === formData.item);
+    const unitCost = invMatch?.costPrice
+      ? parseFloat(String(invMatch.costPrice).replace(/[^\d.-]/g, '')) || 0
+      : 0;
     
     const salePayload = {
       item: sanitizeInput(formData.item, 100),
       category: invMatch?.category || '',
       quantity: sanitizeNumber(formData.quantity),
       unitPrice: sanitizeNumber(formData.unitPrice),
+      cost: isEditing ? undefined : unitCost,
       paymentMethod: formData.paymentMethod,
       date: new Date().toISOString().split('T')[0],
       time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
@@ -525,6 +529,21 @@ const DailySales = () => {
   }, {});
   const topCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
 
+  const costByItem = {};
+  inventoryItems.forEach(i => {
+    costByItem[i.name] = i.costPrice ? parseFloat(String(i.costPrice).replace(/[^\d.-]/g, '')) || 0 : 0;
+  });
+
+  const profitOf = (sale) => {
+    const amt = parseAmount(sale.amount || sale.totalAmount);
+    const unitCost = (sale.cost != null && sale.cost !== '')
+      ? parseAmount(sale.cost)
+      : (costByItem[sale.item] || 0);
+    const totalCost = unitCost * (parseInt(sale.quantity) || 1);
+    return amt - totalCost;
+  };
+  const todayProfit = sales.reduce((acc, sale) => acc + profitOf(sale), 0);
+
   const handleExport = () => {
     const headers = {
       date: 'Date',
@@ -533,9 +552,16 @@ const DailySales = () => {
       category: 'Category',
       quantity: 'Quantity',
       unitPrice: 'Unit Price',
-      totalAmount: 'Total Amount'
+      cost: 'Unit Cost',
+      totalAmount: 'Total Amount',
+      profit: 'Profit'
     };
-    const csv = convertToCSV(sales, headers);
+    const exportRows = sales.map(s => ({
+      ...s,
+      cost: (s.cost != null && s.cost !== '') ? parseAmount(s.cost) : (costByItem[s.item] || 0),
+      profit: profitOf(s)
+    }));
+    const csv = convertToCSV(exportRows, headers);
     downloadCSV(csv, `DailySales_${new Date().toISOString().split('T')[0]}.csv`);
   };
 
@@ -677,6 +703,11 @@ const DailySales = () => {
           </div>
         </StatCard>
         <StatCard>
+          <StatLabel>Today's Profit</StatLabel>
+          <StatValue className="data-tabular" style={{ color: todayProfit >= 0 ? '#25432F' : '#BA1A1A' }}>{formatCurrency(todayProfit, currency)}</StatValue>
+          <div style={{ color: '#89726C', fontSize: '0.75rem', fontWeight: 600 }}>After cost of goods</div>
+        </StatCard>
+        <StatCard>
           <StatLabel>Items Sold</StatLabel>
           <StatValue className="data-tabular">{itemsSold}</StatValue>
           <div style={{ color: '#89726C', fontSize: '0.75rem', fontWeight: 600 }}>Total units today</div>
@@ -721,6 +752,7 @@ const DailySales = () => {
             <Th>Item</Th>
             <Th>Category</Th>
             <Th style={{ textAlign: 'right' }}>Amount</Th>
+            <Th style={{ textAlign: 'right' }}>Profit</Th>
             <Th>Payment</Th>
             <Th></Th>
           </tr>
@@ -739,6 +771,9 @@ const DailySales = () => {
               <Td><Badge>{sale.category}</Badge></Td>
               <Td style={{ textAlign: 'right', fontWeight: 800, color: '#6F240A' }} className="data-tabular">
                 {sale.amount}
+              </Td>
+              <Td style={{ textAlign: 'right', fontWeight: 700, color: profitOf(sale) >= 0 ? '#25432F' : '#BA1A1A' }} className="data-tabular">
+                {formatCurrency(profitOf(sale), currency)}
               </Td>
               <Td style={{ color: '#55423D', fontWeight: 600 }}>{sale.paymentMethod}</Td>
               <Td style={{ textAlign: 'right' }}>
@@ -767,6 +802,12 @@ const DailySales = () => {
               <AmountRow>
                 <AmountLabel>Total</AmountLabel>
                 <AmountValue className="data-tabular">{sale.amount}</AmountValue>
+              </AmountRow>
+              <AmountRow>
+                <AmountLabel>Profit</AmountLabel>
+                <AmountValue className="data-tabular" style={{ color: profitOf(sale) >= 0 ? '#25432F' : '#BA1A1A', fontSize: '1rem' }}>
+                  {formatCurrency(profitOf(sale), currency)}
+                </AmountValue>
               </AmountRow>
             </CardBody>
             <CardDivider />

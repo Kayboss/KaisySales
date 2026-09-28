@@ -98,7 +98,7 @@ const FormGroup = styled.div`
     color: ${({ theme }) => theme.colors.text.primary};
   }
   
-  input, select {
+  input, select, textarea {
     width: 100%;
     padding: 0.75rem;
     border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
@@ -222,7 +222,7 @@ const Invoices = () => {
   const prevStatus = useRef('pending');
 
   const [formData, setFormData] = useState({
-    customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0
+    customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0, notes: ''
   });
 
   const [statusFilter, setStatusFilter] = useState('all');
@@ -305,6 +305,7 @@ const Invoices = () => {
       unitPrice: items[0]?.unitPrice || '',
       status: formData.status,
       amount: `GH₵${totalAmount.toFixed(2)}`,
+      notes: sanitizeInput(formData.notes, 500),
       items: [
         ...items.map(i => ({ name: sanitizeInput(i.name, 100), quantity: sanitizeNumber(i.quantity), unitPrice: sanitizeNumber(i.unitPrice) })),
         ...(discountPct > 0 ? [{ type: '_meta', discount: discountPct }] : [])
@@ -419,7 +420,8 @@ const Invoices = () => {
       date: invoice.date,
       items: finalItems,
       status: invoice.status,
-      discount
+      discount,
+      notes: invoice.notes || ''
     });
     setEditId(invoice.id);
     setIsEditing(true);
@@ -515,7 +517,7 @@ const Invoices = () => {
     setIsEditing(false);
     setEditId(null);
     prevStatus.current = 'pending';
-    setFormData({ customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0 });
+    setFormData({ customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0, notes: '' });
   };
 
   const handleExport = () => {
@@ -715,6 +717,16 @@ const Invoices = () => {
               readOnly 
               value={formatCurrency(invoiceTotal, currency)}
               style={{ background: '#f5f5f5', cursor: 'not-allowed', fontWeight: 800, fontSize: '1.1rem', color: '#6F240A' }}
+            />
+          </FormGroup>
+          <FormGroup>
+            <label>Notes (optional)</label>
+            <textarea 
+              rows={3} 
+              value={formData.notes}
+              onChange={e => setFormData({...formData, notes: e.target.value})}
+              placeholder="Payment terms, payment information, additional details..."
+              style={{ fontFamily: 'inherit', resize: 'vertical' }}
             />
           </FormGroup>
           <ModalActions>

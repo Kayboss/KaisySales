@@ -77,7 +77,7 @@ function mockSet(collection, data) {
  * Called automatically after sign-in/sign-up when Supabase is active.
  */
 async function migrateLocalData(newUid) {
-  const collections = ['sales', 'invoices', 'expenses', 'inventory', 'stores', 'categories', 'customers', 'service_income', 'recurring_income'];
+  const collections = ['sales', 'invoices', 'expenses', 'inventory', 'stores', 'categories', 'customers', 'service_income', 'recurring_income', 'services'];
   let migrated = false;
 
   for (const col of collections) {

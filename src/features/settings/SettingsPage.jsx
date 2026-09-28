@@ -7,6 +7,7 @@ import { fetchCategories, createCategory, updateCategory, deleteCategory, upload
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, Crown, DollarSign, Upload } from 'lucide-react';
 import SubscriptionSettings from './SubscriptionSettings';
+import ServiceCatalog from '../services/ServiceCatalog';
 import { CURRENCY_OPTIONS } from '../../utils/currency';
 import { sanitizeInput } from '../../utils/sanitize';
 
@@ -271,6 +272,7 @@ const avatarColors = ['#6F240A', '#1E3A8A', '#25432F', '#D4AF37', '#8B5E7C'];
 const SETTINGS_TABS = [
   { id: 'profile', label: 'Business Profile', icon: Building },
   { id: 'subscription', label: 'Subscription', icon: Crown },
+  { id: 'services', label: 'Service Catalog', icon: Briefcase },
 ];
 
 const SettingsPage = () => {
@@ -285,8 +287,13 @@ const SettingsPage = () => {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTab('subscription');
     }
+    if (tabParam === 'services') {
+      setActiveTab('services');
+    }
   }, [location.search]);
   const settings = useSettingsStore();
+  const isServices = settings.businessType === 'services';
+  const settingsTabs = isServices ? SETTINGS_TABS : SETTINGS_TABS.filter(t => t.id !== 'services');
   
   const [formData, setFormData] = useState({
     businessName: settings.businessName,
@@ -454,7 +461,7 @@ const SettingsPage = () => {
       </Header>
 
       <TabsRow>
-        {SETTINGS_TABS.map(tab => (
+        {settingsTabs.map(tab => (
           <TabBtn key={tab.id} $active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
             <tab.icon size={18} />
             {tab.label}
@@ -463,6 +470,8 @@ const SettingsPage = () => {
       </TabsRow>
 
       {activeTab === 'subscription' && <SubscriptionSettings />}
+
+      {activeTab === 'services' && isServices && <ServiceCatalog />}
 
       {activeTab === 'profile' && <><FormCard>
         {saved && (

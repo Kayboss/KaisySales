@@ -29,7 +29,7 @@ const Container = styled.div`
   background: white;
   border-radius: 16px;
   width: 100%;
-  max-width: 700px;
+  max-width: 860px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0,0,0,0.15);
@@ -241,6 +241,27 @@ const Footer = styled.div`
   color: #89726C;
 `;
 
+const NotesBlock = styled.div`
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: #FAF7F4;
+  border: 1px solid #F0EEE8;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #55423D;
+  white-space: pre-wrap;
+  line-height: 1.5;
+`;
+
+const NotesLabel = styled.div`
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #89726C;
+  margin-bottom: 0.4rem;
+`;
+
 const CloseButton = styled.button`
   background: none;
   border: none;
@@ -262,9 +283,10 @@ const CloseButton = styled.button`
 
 const PRINT_STYLE_ID = 'invoice-print-styles';
 
-const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, businessLocation }) => {
+const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, businessLocation, mergedRefs, mergedCode, discountRows }) => {
   const { currency, logoUrl } = useSettingsStore();
   const contentRef = useRef(null);
+  const isMerged = Array.isArray(mergedRefs) && mergedRefs.length > 0;
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -325,26 +347,27 @@ const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, busines
   };
 
   const handleShare = async () => {
+    const label = isMerged ? `Combined invoice ${mergedCode}` : `Invoice ${invoice.id}`;
     const shareData = {
-      title: `Invoice ${invoice.id}`,
-      text: `Invoice ${invoice.id} for ${invoice.customer} - ${invoice.amount}`,
+      title: label,
+      text: `${label} for ${invoice.customer} - ${invoice.amount}`,
       url: window.location.href,
     };
     if (navigator.share) {
       await navigator.share(shareData).catch(() => {});
     } else {
       await navigator.clipboard.writeText(
-        `Invoice ${invoice.id}\nCustomer: ${invoice.customer}\nAmount: ${invoice.amount}\nStatus: ${invoice.status}\nDate: ${invoice.date}`
+        `${label}\nCustomer: ${invoice.customer}\nAmount: ${invoice.amount}\nStatus: ${invoice.status}\nDate: ${invoice.date}`
       );
       alert('Invoice details copied to clipboard!');
     }
   };
 
   return createPortal(
-    <Overlay onClick={onClose} data-invoice-overlay>
+    <Overlay data-invoice-overlay>
       <Container onClick={e => e.stopPropagation()} ref={contentRef}>
         <Toolbar>
-          <ToolbarTitle>Invoice Preview</ToolbarTitle>
+          <ToolbarTitle>{isMerged ? 'Combined Invoice Preview' : 'Invoice Preview'}</ToolbarTitle>
           <ToolbarActions>
             <ToolBtn onClick={handleShare}>
               <Share2 size={16} /> Share
@@ -371,7 +394,7 @@ const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, busines
               </Brand>
             <InvoiceMeta>
               <InvoiceTitle>INVOICE</InvoiceTitle>
-              <InvoiceNumber>{invoice.id}</InvoiceNumber>
+              <InvoiceNumber>{isMerged ? mergedCode : invoice.id}</InvoiceNumber>
             </InvoiceMeta>
           </Header>
 
@@ -427,15 +450,27 @@ const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, busines
             </tbody>
           </Table>
 
-          {discountPct > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#89726C' }}>
-              <span style={{ marginRight: '2rem' }}>Discount ({discountPct}%)</span>
-              <span style={{ fontWeight: 700, color: '#BA1A1A', minWidth: '120px', textAlign: 'right' }}>
-                -{(() => {
-                  const sub = lineItems.reduce((s, i) => s + ((parseInt(i.quantity) || 1) * (parseFloat(i.unitPrice) || 0)), 0);
-                  return formatCurrency(sub * discountPct / 100, currency);
-                })()}
-              </span>
+          {(discountPct > 0 || (Array.isArray(discountRows) && discountRows.length > 0)) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.75rem' }}>
+              {discountPct > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.875rem', color: '#89726C' }}>
+                  <span style={{ marginRight: '2rem' }}>Discount ({discountPct}%)</span>
+                  <span style={{ fontWeight: 700, color: '#BA1A1A', minWidth: '120px', textAlign: 'right' }}>
+                    -{(() => {
+                      const sub = lineItems.reduce((s, i) => s + ((parseInt(i.quantity) || 1) * (parseFloat(i.unitPrice) || 0)), 0);
+                      return formatCurrency(sub * discountPct / 100, currency);
+                    })()}
+                  </span>
+                </div>
+              )}
+              {(Array.isArray(discountRows) ? discountRows : []).map(d => (
+                <div key={d.label} style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.875rem', color: '#89726C' }}>
+                  <span style={{ marginRight: '2rem' }}>Discount - {d.label}</span>
+                  <span style={{ fontWeight: 700, color: '#BA1A1A', minWidth: '120px', textAlign: 'right' }}>
+                    -{formatCurrency(d.value, currency)}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
 
@@ -443,6 +478,13 @@ const InvoicePreview = ({ invoice, onClose, businessName, businessPhone, busines
             <TotalLabel>Total Amount</TotalLabel>
             <TotalValue>{invoice.amount}</TotalValue>
           </TotalRow>
+
+          {invoice.notes && (
+            <NotesBlock>
+              <NotesLabel>Notes</NotesLabel>
+              {invoice.notes}
+            </NotesBlock>
+          )}
 
           <Footer>
             KaisySales - Know your Business, Stay in Control

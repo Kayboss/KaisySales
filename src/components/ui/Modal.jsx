@@ -20,7 +20,7 @@ const ModalContainer = styled.div`
   background: white;
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   width: 100%;
-  max-width: ${({ $wide }) => $wide ? '720px' : '500px'};
+  max-width: ${({ $wide }) => $wide ? '900px' : '640px'};
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: ${({ theme }) => theme.shadows.ambient};
@@ -89,7 +89,7 @@ const Modal = ({ isOpen, onClose, title, children, wide }) => {
   if (!isOpen) return null;
 
   return (
-    <Overlay onClick={onClose}>
+    <Overlay>
       <ModalContainer $wide={wide} onClick={(e) => e.stopPropagation()}>
         <Header>
           <h2>{title}</h2>

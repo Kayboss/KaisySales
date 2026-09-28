@@ -4,8 +4,9 @@ import { Plus, Edit2, Trash2, RefreshCw, DollarSign } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers, fetchExpenses, fetchCategories, createCategory } from '../../services/api';
+import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers, fetchExpenses, fetchCategories, createCategory, fetchServices } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
+import CatalogPicker from './CatalogPicker';
 
 const Header = styled.div`
   display: flex;
@@ -250,6 +251,7 @@ const IncomeTracking = () => {
   const [customers, setCustomers] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [incomeCategories, setIncomeCategories] = useState([]);
+  const [services, setServices] = useState([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
@@ -273,12 +275,13 @@ const IncomeTracking = () => {
   const [addingNewCat, setAddingNewCat] = useState(false);
 
   const load = async () => {
-    const [i, r, c, ex, cats] = await Promise.all([fetchServiceIncome(), fetchRecurringIncome(), fetchCustomers(), fetchExpenses(), fetchCategories('income')]);
+    const [i, r, c, ex, cats, svcs] = await Promise.all([fetchServiceIncome(), fetchRecurringIncome(), fetchCustomers(), fetchExpenses(), fetchCategories('income'), fetchServices()]);
     setIncome(i);
     setRecurring(r);
     setCustomers(c);
     setExpenses(ex);
     setIncomeCategories(cats);
+    setServices(svcs);
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -591,6 +594,9 @@ const IncomeTracking = () => {
               ) : (
                 <Input value={incomeForm.clientName} onChange={e => setIncomeForm(f => ({ ...f, clientName: e.target.value }))} placeholder="Client name" autoFocus />
               )}
+              {services.length > 0 && (
+                <CatalogPicker services={services} onPick={s => setIncomeForm(f => ({ ...f, amount: String(s.price || ''), netAmount: calcNet(s.price || '', f.platformFee), milestoneLabel: s.name || '', category: s.category || '' }))} />
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <Label>Gross Amount (GH₵)</Label>
@@ -722,6 +728,9 @@ const IncomeTracking = () => {
                 </Select>
               ) : (
                 <Input required value={recurForm.clientName} onChange={e => setRecurForm(f => ({ ...f, clientName: e.target.value }))} placeholder="Monthly retainer client" autoFocus />
+              )}
+              {services.length > 0 && (
+                <CatalogPicker services={services} onPick={s => setRecurForm(f => ({ ...f, amount: String(s.price || ''), category: s.category || '' }))} />
               )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>

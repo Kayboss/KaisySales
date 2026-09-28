@@ -376,7 +376,7 @@ const InventoryManagement = () => {
   const [deleting, setDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: '', category: '', stock: '', price: '', minStock: 5, newCategory: ''
+    name: '', category: '', stock: '', price: '', costPrice: '', minStock: 5, newCategory: ''
   });
 
   const loadData = async () => {
@@ -431,6 +431,7 @@ const InventoryManagement = () => {
       stock: stockNum,
       minStock: minStock,
       price: `GH₵${sanitizeNumber(formData.price).toFixed(2)}`,
+      costPrice: `GH₵${sanitizeNumber(formData.costPrice).toFixed(2)}`,
       status: stockNum > minStock ? 'In Stock' : stockNum > 0 ? 'Low Stock' : 'Out of Stock'
     };
     
@@ -452,11 +453,13 @@ const InventoryManagement = () => {
 
   const handleEdit = (item) => {
     const parsedPrice = item.price ? parseFloat(String(item.price).replace(/[^\d.-]/g, '')) : 0;
+    const parsedCostPrice = item.costPrice ? parseFloat(String(item.costPrice).replace(/[^\d.-]/g, '')) : 0;
     setFormData({
       name: item.name,
       category: item.category,
       stock: item.stock,
       price: parsedPrice,
+      costPrice: parsedCostPrice,
       minStock: item.minStock || 5,
       newCategory: ''
     });
@@ -482,7 +485,7 @@ const InventoryManagement = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
-    setFormData({ name: '', category: '', stock: '', price: '', minStock: 5, newCategory: '' });
+    setFormData({ name: '', category: '', stock: '', price: '', costPrice: '', minStock: 5, newCategory: '' });
   };
 
   const adjustStock = async (item, delta) => {
@@ -508,6 +511,7 @@ const InventoryManagement = () => {
       category: 'Category',
       stock: 'Stock',
       price: 'Price',
+      costPrice: 'Cost Price',
       status: 'Status',
       minStock: 'Reorder At'
     };
@@ -519,6 +523,13 @@ const InventoryManagement = () => {
     if (typeof price === 'number') return price;
     if (typeof price !== 'string') return 0;
     return parseFloat(price.replace(/[^\d.]/g, '')) || 0;
+  };
+
+  const marginOf = (item) => {
+    const sell = parsePrice(item.price);
+    const cost = parsePrice(item.costPrice);
+    if (sell <= 0 || cost <= 0) return null;
+    return ((sell - cost) / sell) * 100;
   };
 
   const totalPages = Math.ceil(inventory.length / PAGE_SIZE);
@@ -633,6 +644,16 @@ const InventoryManagement = () => {
                 placeholder="0.00" 
               />
             </FormGroup>
+            <FormGroup>
+              <label>Cost Price ({getCurrencySymbol(currency)})</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                value={formData.costPrice}
+                onChange={e => setFormData({...formData, costPrice: e.target.value})}
+                placeholder="0.00" 
+              />
+            </FormGroup>
           </FormRow>
           <ModalActions>
             <button type="button" className="cancel" onClick={closeModal}>Cancel</button>
@@ -661,6 +682,8 @@ const InventoryManagement = () => {
             <Th>Category</Th>
             <Th>Stock</Th>
             <Th>Price</Th>
+            <Th>Cost</Th>
+            <Th>Margin</Th>
             <Th>Status</Th>
             <Th style={{ textAlign: 'right' }}>Actions</Th>
           </tr>
@@ -678,6 +701,16 @@ const InventoryManagement = () => {
                 </div>
               </Td>
               <Td className="data-tabular" style={{ fontWeight: 600 }}>{item.price}</Td>
+              <Td className="data-tabular">{item.costPrice || '—'}</Td>
+              <Td className="data-tabular">
+                {marginOf(item) == null ? (
+                  '—'
+                ) : (
+                  <span style={{ fontWeight: 700, color: marginOf(item) >= 0 ? '#25432F' : '#BA1A1A' }}>
+                    {marginOf(item).toFixed(1)}%
+                  </span>
+                )}
+              </Td>
               <Td>
                 <StockBadge $low={item.status === 'Low Stock'}>
                   {item.status}
@@ -715,6 +748,16 @@ const InventoryManagement = () => {
               <InvPriceRow>
                 <InvPriceLabel>Unit Price</InvPriceLabel>
                 <InvPriceValue className="data-tabular">{item.price}</InvPriceValue>
+              </InvPriceRow>
+              <InvPriceRow>
+                <InvPriceLabel>Cost</InvPriceLabel>
+                <InvPriceValue className="data-tabular" style={{ color: '#55423D', fontWeight: 700, fontSize: '1rem' }}>{item.costPrice || '—'}</InvPriceValue>
+              </InvPriceRow>
+              <InvPriceRow>
+                <InvPriceLabel>Margin</InvPriceLabel>
+                <InvPriceValue className="data-tabular" style={{ color: marginOf(item) != null && marginOf(item) < 0 ? '#BA1A1A' : '#25432F', fontWeight: 800, fontSize: '1rem' }}>
+                  {marginOf(item) == null ? '—' : `${marginOf(item).toFixed(1)}%`}
+                </InvPriceValue>
               </InvPriceRow>
             </InvCardBody>
             <InvCardDivider />

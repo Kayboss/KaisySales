@@ -423,6 +423,34 @@ export const deleteCustomer = async (id) => {
 };
 
 // ====================================================
+// 10. SERVICE CATALOG (Services)
+// ====================================================
+export const fetchServices = async () => {
+  try {
+    const uid = getUid();
+    return await dbService.fetchUserRecords(uid, 'services');
+  } catch (error) {
+    console.error('Error fetching services:', error);
+    return [];
+  }
+};
+
+export const createService = async (service) => {
+  const uid = getUid();
+  return await dbService.createUserRecord(uid, 'services', service);
+};
+
+export const updateService = async (id, service) => {
+  const uid = getUid();
+  return await dbService.updateUserRecord(uid, 'services', id, service);
+};
+
+export const deleteService = async (id) => {
+  const uid = getUid();
+  await dbService.deleteUserRecord(uid, 'services', id);
+};
+
+// ====================================================
 // 11. SERVICE INCOME (Services)
 // ====================================================
 export const fetchServiceIncome = async () => {

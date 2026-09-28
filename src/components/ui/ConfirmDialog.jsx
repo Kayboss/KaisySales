@@ -117,7 +117,7 @@ const ConfirmDialog = ({ isOpen, title, message, confirmLabel, onConfirm, onCanc
   if (!isOpen) return null;
 
   return (
-    <Overlay onClick={onCancel}>
+    <Overlay>
       <Card onClick={e => e.stopPropagation()}>
         <Header>
           <IconWrap><AlertTriangle size={20} /></IconWrap>

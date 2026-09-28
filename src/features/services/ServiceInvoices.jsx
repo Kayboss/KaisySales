@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
-import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircle, DollarSign } from 'lucide-react';
+import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircle, DollarSign, Layers } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
@@ -13,6 +13,8 @@ import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { formatCurrency, getCurrencySymbol } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
+import SizePricingCalculator from './SizePricingCalculator';
+import { freshSizeLine, numOf, round2, roundUp, solvedTotal, solveSizeLines, unitLabel } from './sizePricing';
 
 const Header = styled.div`
   display: flex;
@@ -208,6 +210,7 @@ const ServiceInvoices = () => {
   const { currency, subscriptionPlan } = useSettingsStore();
   const { businessName, phone: businessPhone, location: businessLocation } = useSettingsStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useAuthStore(s => s.user);
   const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -226,8 +229,16 @@ const ServiceInvoices = () => {
     status: 'pending', discount: 0, notes: '',
   });
 
+  const [sizeMode, setSizeMode] = useState(false);
+  const [sizeLines, setSizeLines] = useState([freshSizeLine()]);
+  const [sizeRate, setSizeRate] = useState(0);
+
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [mergedRefs, setMergedRefs] = useState([]);
+  const [mergedCode, setMergedCode] = useState('');
+  const [mergedDiscounts, setMergedDiscounts] = useState([]);
 
   const addItem = () => {
     setFormData(prev => ({ ...prev, items: [...prev.items, { name: '', quantity: 1, unitPrice: '' }] }));
@@ -251,7 +262,21 @@ const ServiceInvoices = () => {
     return q * p;
   };
 
-  const invoiceSubtotal = formData.items.reduce((sum, i) => sum + lineTotal(i), 0);
+  const solvedSize = solveSizeLines(sizeLines, sizeRate);
+  const sizeItemsValid = solvedSize.filter(s => s.valid);
+  const sizeSubtotal = solvedTotal(solvedSize);
+
+  const startSizeMode = () => {
+    setSizeMode(true);
+    setSizeRate(prev => (numOf(prev) > 0 ? prev : numOf(useSettingsStore.getState().areaPrice)));
+  };
+
+  const stopSizeMode = () => {
+    setSizeMode(false);
+    setSizeLines([freshSizeLine()]);
+  };
+
+  const invoiceSubtotal = sizeMode ? sizeSubtotal : formData.items.reduce((sum, i) => sum + lineTotal(i), 0);
   const discountPct = parseFloat(formData.discount) || 0;
   const invoiceTotal = invoiceSubtotal * (1 - discountPct / 100);
 
@@ -260,8 +285,10 @@ const ServiceInvoices = () => {
       const [data, cust] = await Promise.all([fetchInvoices(), fetchCustomers()]);
       setInvoices(data);
       setCustomers(cust);
+      return data;
     } catch (error) {
       console.error('Failed to load invoices', error);
+      return [];
     }
   };
 
@@ -273,6 +300,12 @@ const ServiceInvoices = () => {
     setSaving(true);
     setLimitError(null);
 
+    if (sizeMode && sizeItemsValid.length === 0) {
+      alert('Enter a length and height for at least one item, or switch back to simple items.');
+      setSaving(false);
+      return;
+    }
+
     if (!isEditing) {
       const check = await checkCreateLimit(supabase, user?.uid, subscriptionPlan, 'invoices');
       if (!check.allowed) {
@@ -282,12 +315,32 @@ const ServiceInvoices = () => {
       }
     }
 
-    const items = formData.items.filter(i => i.name);
-    const subtotal = items.reduce((sum, i) => sum + (sanitizeNumber(i.quantity) * sanitizeNumber(i.unitPrice)), 0);
+    const solved = solvedSize.filter(s => s.valid);
+    const sizePayload = solved.map(s => ({
+      name: sanitizeInput(s.label || 'Item', 100),
+      quantity: s.Q,
+      unitPrice: round2(s.itemPrice),
+      size: { unit: s.unit, length: round2(s.L), height: round2(s.H), rate: round2(s.P) }
+    }));
+    if (sizeMode && sizePayload.length > 0) {
+      const lineSum = sizePayload.reduce((sum, i) => sum + (i.unitPrice * i.quantity), 0);
+      const target = sizeSubtotal;
+      const last = sizePayload[sizePayload.length - 1];
+      last.unitPrice = Math.max(0, round2(last.unitPrice + (target - lineSum) / last.quantity));
+    }
+
+    const items = sizeMode
+      ? (sizePayload.length > 0 ? sizePayload : [{ name: '', quantity: 1, unitPrice: 0 }])
+      : formData.items.filter(i => i.name);
+    const subtotal = sizeMode ? sizeSubtotal : items.reduce((sum, i) => sum + (sanitizeNumber(i.quantity) * sanitizeNumber(i.unitPrice)), 0);
     const totalQty = items.reduce((sum, i) => sum + (sanitizeNumber(i.quantity) || 0), 0);
     const discPct = sanitizeNumber(formData.discount) || 0;
-    const totalAmount = subtotal * (1 - discPct / 100);
+    const totalAmount = roundUp(subtotal * (1 - discPct / 100));
     const isPaid = formData.status === 'paid';
+
+    const prevMarkers = isEditing
+      ? (invoices.find(i => String(i.id) === String(editId))?.items || []).filter(i => i.type === '_saleId' || i.type === '_incomeId')
+      : [];
 
     const invoicePayload = {
       customer: sanitizeInput(formData.customer, 100),
@@ -299,8 +352,11 @@ const ServiceInvoices = () => {
       amount: `GH₵${totalAmount.toFixed(2)}`,
       notes: sanitizeInput(formData.notes, 500),
       items: [
-        ...items.map(i => ({ name: sanitizeInput(i.name, 100), quantity: sanitizeNumber(i.quantity), unitPrice: sanitizeNumber(i.unitPrice) })),
-        ...(discPct > 0 ? [{ type: '_meta', discount: discPct }] : [])
+        ...items.filter(i => i.name).map(i => (sizeMode
+          ? i
+          : { name: sanitizeInput(i.name, 100), quantity: sanitizeNumber(i.quantity), unitPrice: sanitizeNumber(i.unitPrice) })),
+        ...(discPct > 0 ? [{ type: '_meta', discount: discPct }] : []),
+        ...prevMarkers
       ]
     };
 
@@ -380,9 +436,10 @@ const ServiceInvoices = () => {
     const metaItem = rawItems.find(i => i.type === '_meta');
     const discount = metaItem?.discount || 0;
     const savedItems = rawItems.filter(i => i.type !== '_meta' && i.type !== '_saleId' && i.type !== '_incomeId');
+    const sizedItems = savedItems.filter(i => i.size && i.size.length > 0 && i.size.height > 0);
     const finalItems = savedItems.length > 0
       ? savedItems.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice }))
-      : [{ name: '', quantity: invoice.quantity || 1, unitPrice: invoice.unitPrice || parseFloat(invoice.amount.replace(/[^\d.-]/g, '')) }];
+      : [{ name: '', quantity: invoice.quantity || 1, unitPrice: invoice.unitPrice || parseFloat(String(invoice.amount || '').replace(/[^\d.-]/g, '')) }];
     prevStatus.current = invoice.status;
     setFormData({
       customer: invoice.customer,
@@ -393,10 +450,45 @@ const ServiceInvoices = () => {
       discount,
       notes: invoice.notes || '',
     });
+    if (sizedItems.length > 0) {
+      setSizeMode(true);
+      setSizeLines(sizedItems.map(i => ({
+        ...freshSizeLine(),
+        label: i.name || '',
+        unit: i.size.unit || 'feet',
+        length: String(i.size.length ?? ''),
+        height: String(i.size.height ?? ''),
+        quantity: i.quantity || 1
+      })));
+      setSizeRate(numOf(sizedItems[0].size.rate) || numOf(useSettingsStore.getState().areaPrice));
+    } else {
+      setSizeMode(false);
+      setSizeLines([freshSizeLine()]);
+      setSizeRate(0);
+    }
     setEditId(invoice.id);
     setIsEditing(true);
     setIsModalOpen(true);
   };
+
+  useEffect(() => {
+    const targetId = location.state?.openInvoiceId;
+    if (!targetId) return;
+    navigate(location.pathname, { replace: true, state: {} });
+    let cancelled = false;
+    fetchInvoices()
+      .then(data => {
+        if (cancelled) return;
+        const target = data.find(i => String(i.id) === String(targetId));
+        if (target) handleEdit(target);
+        else alert('That invoice could not be found.');
+      })
+      .catch(() => {
+        if (!cancelled) alert('That invoice could not be loaded.');
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state?.openInvoiceId]);
 
   const handleDelete = async (id) => {
     setDeleting(true);
@@ -415,6 +507,7 @@ const ServiceInvoices = () => {
         console.warn('Associated sale/income delete skipped:', saleErr);
       }
       await deleteInvoice(id);
+      setSelectedIds(prev => prev.filter(pid => String(pid) !== String(id)));
       await loadData();
     } catch (error) {
       console.error('Failed to delete invoice', error);
@@ -481,11 +574,72 @@ const ServiceInvoices = () => {
     }
   };
 
+  const selectedInvoices = invoices.filter(inv => selectedIds.includes(inv.id));
+  const selectedCustomer = selectedInvoices[0]?.customer || '';
+  const mergedTotal = selectedInvoices.reduce((sum, inv) => sum + numOf(inv.amount), 0);
+
+  const toggleSelect = (invoice) => {
+    setSelectedIds(prev => {
+      if (prev.includes(invoice.id)) return prev.filter(id => id !== invoice.id);
+      const anchor = invoices.find(inv => prev.includes(inv.id));
+      if (anchor && anchor.customer !== invoice.customer) {
+        alert(`You can only combine invoices for the same customer. "${anchor.customer}" is already selected.`);
+        return prev;
+      }
+      return [...prev, invoice.id];
+    });
+  };
+
+  const canSelect = (invoice) => {
+    if (selectedIds.length === 0) return true;
+    return selectedInvoices.every(inv => inv.customer === invoice.customer);
+  };
+
+  const handleMerge = () => {
+    if (selectedInvoices.length < 2) return;
+    const refs = selectedInvoices.map(inv => inv.id);
+    const mergedItems = [];
+    const discountRows = [];
+    selectedInvoices.forEach(inv => {
+      const raw = Array.isArray(inv.items) ? inv.items : [];
+      const lines = raw.filter(i => !i.type);
+      if (lines.length > 0) {
+        lines.forEach(l => mergedItems.push({ ...l }));
+        const meta = raw.find(i => i.type === '_meta');
+        const pct = numOf(meta?.discount);
+        if (pct > 0) {
+          const sub = lines.reduce((s, l) => s + (numOf(l.quantity) || 1) * numOf(l.unitPrice), 0);
+          discountRows.push({ label: `${inv.id} (${pct}%)`, value: round2(sub * pct / 100) });
+        }
+      } else {
+        mergedItems.push({ name: 'Service charge', quantity: parseInt(inv.quantity) || 1, unitPrice: numOf(inv.unitPrice) });
+      }
+    });
+    setPreviewInvoice({
+      id: 'COMBINED',
+      customer: selectedCustomer,
+      customerLocation: selectedInvoices[0].customerLocation || '',
+      date: new Date().toISOString().slice(0, 10),
+      amount: `GH₵${mergedTotal.toFixed(2)}`,
+      quantity: mergedItems.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0),
+      unitPrice: mergedTotal,
+      status: selectedInvoices.every(i => i.status === 'paid') ? 'paid' : 'pending',
+      items: mergedItems,
+      notes: '',
+    });
+    setMergedRefs(refs);
+    setMergedCode('CINV-' + selectedInvoices.map(inv => String(inv.id).replace(/^INV-/i, '')).join('-'));
+    setMergedDiscounts(discountRows);
+  };
+
   const closeModal = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
     prevStatus.current = 'pending';
+    setSizeMode(false);
+    setSizeLines([freshSizeLine()]);
+    setSizeRate(0);
     setFormData({ customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0, notes: '' });
   };
 
@@ -558,12 +712,32 @@ const ServiceInvoices = () => {
           </FormRow>
 
           <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <label style={{ fontWeight: 600, color: '#1C1C18' }}>Service Items</label>
-              <button type="button" onClick={addItem} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'none', border: '1px solid #D0C8C4', borderRadius: '6px', padding: '0.35rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: '#6F240A' }}>
-                <PlusCircle size={14} /> Add Item
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" onClick={() => (sizeMode ? stopSizeMode() : startSizeMode())} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: sizeMode ? '#6F240A' : 'none', color: sizeMode ? 'white' : '#6F240A', border: '1px solid #D0C8C4', borderRadius: '6px', padding: '0.35rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                  <DollarSign size={14} /> {sizeMode ? 'Switch to simple items' : 'Price by size'}
+                </button>
+                {!sizeMode && (
+                  <button type="button" onClick={addItem} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'none', border: '1px solid #D0C8C4', borderRadius: '6px', padding: '0.35rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: '#6F240A' }}>
+                    <PlusCircle size={14} /> Add Item
+                  </button>
+                )}
+              </div>
             </div>
+            {sizeMode ? (
+              <>
+                <FormGroup style={{ marginBottom: '0.75rem' }}>
+                  <label>Price per sq ft (GH₵)</label>
+                  <input type="number" min="0" step="0.01" value={sizeRate} onChange={e => setSizeRate(e.target.value)} placeholder="e.g. 4.70" />
+                </FormGroup>
+                <SizePricingCalculator lines={sizeLines} onChange={setSizeLines} pricePerSqFt={sizeRate} />
+                {sizeItemsValid.length === 0 && (
+                  <p style={{ fontSize: '0.8rem', color: '#875200', margin: '0.5rem 0 0' }}>Enter a length and height for at least one item.</p>
+                )}
+              </>
+            ) : (
+              <>
             <FormGridHeader>
               <span>Service / Description</span>
               <span style={{ textAlign: 'right' }}>Qty</span>
@@ -592,6 +766,8 @@ const ServiceInvoices = () => {
                 <button type="button" onClick={() => removeItem(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BA1A1A', padding: '0.6rem 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
               </LineItemRow>
             ))}
+              </>
+            )}
           </div>
 
           <FormRow>
@@ -633,18 +809,52 @@ const ServiceInvoices = () => {
         </div>
       </div>
 
+      {selectedInvoices.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', background: '#6F240A', color: 'white', padding: '0.9rem 1.25rem', borderRadius: '10px', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Layers size={18} />
+            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+              {selectedInvoices.length} selected for {selectedCustomer}
+            </span>
+            <span style={{ fontSize: '0.9rem', opacity: 0.85 }}>Total: GH₵{mergedTotal.toFixed(2)}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button onClick={() => setSelectedIds([])} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.5)', background: 'transparent', color: 'white', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Clear</button>
+            <button
+              onClick={handleMerge}
+              disabled={selectedInvoices.length < 2}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1.1rem', borderRadius: '8px', border: 'none', background: selectedInvoices.length < 2 ? 'rgba(255,255,255,0.35)' : '#D4AF37', color: '#1C1C18', fontWeight: 700, fontSize: '0.85rem', cursor: selectedInvoices.length < 2 ? 'not-allowed' : 'pointer' }}
+            >
+              <Layers size={15} /> Combine &amp; Download
+            </button>
+          </div>
+          {selectedInvoices.length < 2 && <span style={{ width: '100%', fontSize: '0.78rem', opacity: 0.85 }}>Select one more invoice for the same customer to combine them into one document.</span>}
+        </div>
+      )}
+
       <InvoicesGrid>
         {invoices
           .filter(inv => statusFilter === 'all' || inv.status === statusFilter)
           .filter(inv => !searchTerm || inv.id?.toLowerCase().includes(searchTerm.toLowerCase()) || inv.customer?.toLowerCase().includes(searchTerm.toLowerCase()))
           .map(invoice => {
+            const lines = (Array.isArray(invoice.items) ? invoice.items : []).filter(i => !i.type);
             return (
-              <InvoiceCard key={invoice.id}>
+              <InvoiceCard key={invoice.id} style={selectedIds.includes(invoice.id) ? { borderColor: '#6F240A', boxShadow: '0 0 0 2px rgba(111, 36, 10, 0.15)' } : undefined}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <StatusBadge $status={invoice.status}>
-                    {invoice.status === 'paid' ? <CheckCircle size={12} /> : <Clock size={12} />}
-                    {invoice.status}
-                  </StatusBadge>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(invoice.id)}
+                      disabled={!canSelect(invoice)}
+                      onChange={() => toggleSelect(invoice)}
+                      aria-label={`Select invoice ${invoice.id} to combine`}
+                      style={{ width: '1.05rem', height: '1.05rem', accentColor: '#6F240A', cursor: canSelect(invoice) ? 'pointer' : 'not-allowed' }}
+                    />
+                    <StatusBadge $status={invoice.status} style={{ marginBottom: 0 }}>
+                      {invoice.status === 'paid' ? <CheckCircle size={12} /> : <Clock size={12} />}
+                      {invoice.status}
+                    </StatusBadge>
+                  </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(invoice)} />
                     <Trash2 size={16} color="#BA1A1A" cursor="pointer" onClick={() => setDeleteTarget(invoice)} />
@@ -654,6 +864,19 @@ const ServiceInvoices = () => {
                 <h3 style={{ fontSize: '1.25rem', margin: '0.25rem 0', color: '#1C1C18' }}>
                   {invoice.customer}
                 </h3>
+                {lines.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', margin: '0.35rem 0 0.6rem' }}>
+                    {lines.map((l, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.78rem', color: '#55423D' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {l.name}
+                          {l.size ? <span style={{ color: '#89726C' }}> — {l.size.length}×{l.size.height} {unitLabel(l.size.unit)} @ GH₵{numOf(l.size.rate).toFixed(2)}/sq ft</span> : null}
+                        </span>
+                        <span style={{ whiteSpace: 'nowrap', color: '#1C1C18', fontWeight: 600 }}>×{l.quantity || 1}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <Amount className="data-tabular">{invoice.amount}</Amount>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #F0EEE8' }}>
                   <span style={{ fontSize: '0.875rem', color: '#55423D' }}>Due: {invoice.date}</span>
@@ -673,7 +896,7 @@ const ServiceInvoices = () => {
       </InvoicesGrid>
 
       {previewInvoice && (
-        <InvoicePreview invoice={previewInvoice} onClose={() => setPreviewInvoice(null)} businessName={businessName} businessPhone={businessPhone} businessLocation={businessLocation} />
+        <InvoicePreview invoice={previewInvoice} onClose={() => { setPreviewInvoice(null); setMergedRefs([]); setMergedCode(''); setMergedDiscounts([]); }} businessName={businessName} businessPhone={businessPhone} businessLocation={businessLocation} mergedRefs={mergedRefs} mergedCode={mergedCode} discountRows={mergedDiscounts} />
       )}
 
       {deleteTarget && (

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Download, DollarSign, TrendingUp, TrendingDown, PieChart, Users, Calendar } from 'lucide-react';
+import { Download, DollarSign, TrendingUp, TrendingDown, PieChart, Users, Calendar, Wallet, AlertCircle } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart as RPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import { fetchServiceIncome, fetchRecurringIncome, fetchExpenses, fetchCustomers } from '../../services/api';
+import { fetchServiceIncome, fetchRecurringIncome, fetchExpenses, fetchCustomers, fetchInvoices } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 
 const Container = styled.div`
@@ -187,11 +187,14 @@ const PIE_COLORS = ['#6F240A', '#D4AF37', '#25432F', '#1E3A8A', '#8B5E7C', '#875
 
 const tooltipStyle = { borderRadius: 8, border: '1px solid #E8E5DF', fontSize: 13 };
 
+const moneyOf = (v) => parseFloat(String(v).replace(/[^\d.-]/g, '')) || 0;
+
 const ServiceReporting = () => {
   const [tab, setTab] = useState('overview');
   const [income, setIncome] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [startDate, setStartDate] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() - 3);
     return d.toISOString().split('T')[0];
@@ -201,9 +204,9 @@ const ServiceReporting = () => {
   useEffect(() => {
     Promise.all([
       fetchServiceIncome(), fetchRecurringIncome(), fetchExpenses(),
-      fetchCustomers(),
-    ]).then(([i, , e, c]) => {
-      setIncome(i); setExpenses(e); setCustomers(c);
+      fetchCustomers(), fetchInvoices(),
+    ]).then(([i, , e, c, inv]) => {
+      setIncome(i); setExpenses(e); setCustomers(c); setInvoices(inv);
     });
   }, []);
 
@@ -215,6 +218,7 @@ const ServiceReporting = () => {
 
   const filteredIncome = filterByDate(income, 'paymentDate');
   const filteredExpenses = filterByDate(expenses, 'date');
+  const filteredInvoices = filterByDate(invoices, 'date');
 
   const totalNet = filteredIncome.reduce((s, i) => s + (parseFloat(i.netAmount || i.amount) || 0), 0);
   const totalExpenses = filteredExpenses.reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
@@ -458,12 +462,225 @@ const ServiceReporting = () => {
     </>
   );
 
+  const renderClients = () => {
+    const clientIncome = {};
+    filteredIncome.forEach(i => {
+      const name = (i.clientName || '').trim() || 'Unknown';
+      clientIncome[name] = (clientIncome[name] || 0) + (parseFloat(i.netAmount || i.amount) || 0);
+    });
+    const clientExpenses = {};
+    filteredExpenses.forEach(e => {
+      const name = (e.clientName || '').trim();
+      if (!name) return;
+      clientExpenses[name] = (clientExpenses[name] || 0) + moneyOf(e.amount);
+    });
+
+    const allNames = [...new Set([
+      ...customers.map(c => (c.name || '').trim()).filter(Boolean),
+      ...Object.keys(clientIncome),
+      ...Object.keys(clientExpenses),
+    ])];
+
+    const rows = allNames.map(name => {
+      const inc = clientIncome[name] || 0;
+      const exp = clientExpenses[name] || 0;
+      const profit = inc - exp;
+      return {
+        name,
+        income: parseFloat(inc.toFixed(2)),
+        expenses: parseFloat(exp.toFixed(2)),
+        profit: parseFloat(profit.toFixed(2)),
+        margin: inc > 0 ? ((profit / inc) * 100).toFixed(1) : '0.0',
+      };
+    })
+      .filter(r => r.income > 0 || r.expenses > 0)
+      .sort((a, b) => b.profit - a.profit);
+
+    const totalProfit = rows.reduce((s, r) => s + r.profit, 0);
+    const profitableCount = rows.filter(r => r.profit > 0).length;
+    const chartData = rows.slice(0, 8).map(r => ({
+      name: r.name.length > 14 ? r.name.slice(0, 12) + '..' : r.name,
+      profit: r.profit,
+    }));
+
+    return (
+      <>
+        <StatGrid>
+          <StatCard $accent="#6F240A">
+            <StatIcon $bg="#F5E6D3" $color="#6F240A"><Users size={18} /></StatIcon>
+            <StatLabel>Clients Tracked</StatLabel>
+            <StatValue>{rows.length}</StatValue>
+          </StatCard>
+          <StatCard $accent="#2E7D32">
+            <StatIcon $bg="#E8F5E9" $color="#2E7D32"><DollarSign size={18} /></StatIcon>
+            <StatLabel>Total Client Profit</StatLabel>
+            <StatValue>{formatAmt(totalProfit)}</StatValue>
+          </StatCard>
+          <StatCard $accent="#875200">
+            <StatIcon $bg="#FFF3E0" $color="#875200"><TrendingUp size={18} /></StatIcon>
+            <StatLabel>Profitable Clients</StatLabel>
+            <StatValue>{profitableCount}</StatValue>
+          </StatCard>
+        </StatGrid>
+
+        {chartData.length > 0 && (
+          <ChartBox>
+            <ChartTitle>Profit per Client (Top 8)</ChartTitle>
+            <ResponsiveContainer width="100%" height={Math.max(200, chartData.length * 45 + 30)}>
+              <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 20, left: 5, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F0EEE8" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#89726C' }} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#1C1C18' }} tickLine={false} axisLine={false} width={100} />
+                <Tooltip contentStyle={tooltipStyle} formatter={value => [`GH₵${Number(value).toFixed(2)}`, 'Profit']} />
+                <Bar dataKey="profit" fill="#25432F" radius={[0, 6, 6, 0]} barSize={22} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartBox>
+        )}
+
+        <ReportSection>
+          <ReportTitle>Per Client P&amp;L</ReportTitle>
+          {rows.length > 0 ? (
+            <Table>
+              <thead>
+                <tr><Th>Client</Th><Th style={{ textAlign: 'right' }}>Income</Th><Th style={{ textAlign: 'right' }}>Expenses</Th><Th style={{ textAlign: 'right' }}>Profit</Th><Th style={{ textAlign: 'right' }}>Margin</Th></tr>
+              </thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={r.name}>
+                    <Td><strong>{r.name}</strong></Td>
+                    <Td style={{ textAlign: 'right' }}>{formatAmt(r.income)}</Td>
+                    <Td style={{ textAlign: 'right' }}>{formatAmt(r.expenses)}</Td>
+                    <Td style={{ textAlign: 'right', fontWeight: 700, color: r.profit >= 0 ? '#25432F' : '#C62828' }}>{formatAmt(r.profit)}</Td>
+                    <Td style={{ textAlign: 'right' }}>{r.margin}%</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          ) : <EmptyState>No income or client-linked expenses in this period.</EmptyState>}
+        </ReportSection>
+      </>
+    );
+  };
+
+  const renderOutstanding = () => {
+    const paymentsFor = (inv) => income.filter(i =>
+      (i.platformTag === 'invoice' || i.platformTag === 'payment') &&
+      new RegExp('invoice #' + String(inv.id) + '(?!\\d)', 'i').test(String(i.notes || ''))
+    );
+    const paidAmountOf = (inv) => {
+      if (inv.status === 'paid') return moneyOf(inv.amount);
+      const paid = paymentsFor(inv).reduce((s, i) => s + moneyOf(i.netAmount || i.amount), 0);
+      return Math.min(paid, moneyOf(inv.amount));
+    };
+
+    const openRows = filteredInvoices.map(inv => {
+      const amount = moneyOf(inv.amount);
+      const paid = paidAmountOf(inv);
+      const items = Array.isArray(inv.items) ? inv.items.filter(i => !i.type) : [];
+      return {
+        customer: inv.customer || 'Unknown',
+        invoiceId: inv.id,
+        service: items[0]?.name || `Invoice #${inv.id}`,
+        date: inv.date || '',
+        amount,
+        paid,
+        balance: Math.max(0, amount - paid),
+      };
+    }).filter(r => r.balance > 0);
+
+    const totalOutstanding = openRows.reduce((s, r) => s + r.balance, 0);
+    const grouped = {};
+    openRows.forEach(r => {
+      if (!grouped[r.customer]) grouped[r.customer] = [];
+      grouped[r.customer].push(r);
+    });
+    const customerSummary = Object.entries(grouped).map(([name, rs]) => ({
+      name,
+      count: rs.length,
+      total: rs.reduce((s, r) => s + r.balance, 0),
+      oldest: rs.map(r => r.date).filter(Boolean).sort()[0] || '',
+    })).sort((a, b) => b.total - a.total);
+
+    const todayIso = new Date().toISOString().split('T')[0];
+    const overdueCount = openRows.filter(r => r.date && r.date < todayIso).length;
+
+    return (
+      <>
+        <StatGrid>
+          <StatCard $accent="#C62828">
+            <StatIcon $bg="#FFEBEE" $color="#C62828"><Wallet size={18} /></StatIcon>
+            <StatLabel>Total Outstanding</StatLabel>
+            <StatValue>{formatAmt(totalOutstanding)}</StatValue>
+          </StatCard>
+          <StatCard $accent="#875200">
+            <StatIcon $bg="#FFF3E0" $color="#875200"><AlertCircle size={18} /></StatIcon>
+            <StatLabel>Open Items</StatLabel>
+            <StatValue>{openRows.length}</StatValue>
+          </StatCard>
+          <StatCard $accent="#BA1A1A">
+            <StatIcon $bg="#FFF0F0" $color="#BA1A1A"><TrendingDown size={18} /></StatIcon>
+            <StatLabel>Overdue</StatLabel>
+            <StatValue>{overdueCount}</StatValue>
+          </StatCard>
+        </StatGrid>
+
+        <ReportSection>
+          <ReportTitle>By Customer</ReportTitle>
+          {customerSummary.length > 0 ? (
+            <Table>
+              <thead>
+                <tr><Th>Customer</Th><Th style={{ textAlign: 'right' }}>Open Items</Th><Th>Oldest Due</Th><Th style={{ textAlign: 'right' }}>Outstanding</Th></tr>
+              </thead>
+              <tbody>
+                {customerSummary.map(c => (
+                  <tr key={c.name}>
+                    <Td><strong>{c.name}</strong></Td>
+                    <Td style={{ textAlign: 'right' }}>{c.count}</Td>
+                    <Td>{c.oldest || '-'}</Td>
+                    <Td style={{ textAlign: 'right', fontWeight: 700, color: '#C62828' }}>{formatAmt(c.total)}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          ) : <EmptyState>Nothing outstanding — all invoices are settled.</EmptyState>}
+        </ReportSection>
+
+        <ReportSection>
+          <ReportTitle>Outstanding Items</ReportTitle>
+          {openRows.length > 0 ? (
+            <Table>
+              <thead>
+                <tr><Th>Customer</Th><Th>Service</Th><Th>Invoice #</Th><Th>Date</Th><Th style={{ textAlign: 'right' }}>Billed</Th><Th style={{ textAlign: 'right' }}>Paid</Th><Th style={{ textAlign: 'right' }}>Balance</Th></tr>
+              </thead>
+              <tbody>
+                {openRows.sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(r => (
+                  <tr key={r.invoiceId}>
+                    <Td><strong>{r.customer}</strong></Td>
+                    <Td>{r.service}</Td>
+                    <Td>{r.invoiceId}</Td>
+                    <Td>{r.date || '-'}</Td>
+                    <Td style={{ textAlign: 'right' }}>{formatAmt(r.amount)}</Td>
+                    <Td style={{ textAlign: 'right' }}>{formatAmt(r.paid)}</Td>
+                    <Td style={{ textAlign: 'right', fontWeight: 700, color: '#C62828' }}>{formatAmt(r.balance)}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          ) : <EmptyState>No outstanding items.</EmptyState>}
+        </ReportSection>
+      </>
+    );
+  };
+
   return (
     <Container>
       <Title>Reports</Title>
 
       <Tabs>
         <Tab $active={tab === 'overview'} onClick={() => setTab('overview')}>P&L Overview</Tab>
+        <Tab $active={tab === 'clients'} onClick={() => setTab('clients')}>Per Client P&L</Tab>
+        <Tab $active={tab === 'outstanding'} onClick={() => setTab('outstanding')}>Outstanding</Tab>
         <Tab $active={tab === 'customers'} onClick={() => setTab('customers')}>Customers</Tab>
       </Tabs>
 
@@ -475,6 +692,8 @@ const ServiceReporting = () => {
       </DateRange>
 
       {tab === 'overview' && renderOverview()}
+      {tab === 'clients' && renderClients()}
+      {tab === 'outstanding' && renderOutstanding()}
       {tab === 'customers' && renderCustomers()}
     </Container>
   );

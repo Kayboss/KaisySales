@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Plus, Edit2, Trash2, Calendar } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchServiceIncome, fetchCategories } from '../../services/api';
+import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchServiceIncome, fetchCategories, createCategory, fetchCustomers } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -229,6 +229,7 @@ const ServiceExpenses = () => {
   const [expenses, setExpenses] = useState([]);
   const [serviceIncome, setServiceIncome] = useState([]);
   const [expenseCategories, setExpenseCategories] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
@@ -236,16 +237,19 @@ const ServiceExpenses = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showCatInput, setShowCatInput] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
   const [form, setForm] = useState({
     title: '', amount: '', category: 'SaaS & Subscriptions', date: new Date().toISOString().split('T')[0],
-    subcategory: 'general', vendor: '', renewalDate: '', isAsset: false, assetLifetime: '', transactionFee: '',
+    subcategory: 'general', vendor: '', renewalDate: '', isAsset: false, assetLifetime: '', transactionFee: '', clientName: '',
   });
 
   const load = async () => {
-    const [data, incomeData, cats] = await Promise.all([fetchExpenses(), fetchServiceIncome(), fetchCategories('expense')]);
+    const [data, incomeData, cats, custs] = await Promise.all([fetchExpenses(), fetchServiceIncome(), fetchCategories('expense'), fetchCustomers()]);
     setExpenses(data);
     setServiceIncome(incomeData);
     setExpenseCategories(cats);
+    setCustomers(custs);
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -253,7 +257,7 @@ const ServiceExpenses = () => {
 
   const openAdd = () => {
     setEditId(null);
-    setForm({ title: '', amount: '', category: '', date: new Date().toISOString().split('T')[0], subcategory: 'general', vendor: '', renewalDate: '', isAsset: false, assetLifetime: '', transactionFee: '' });
+    setForm({ title: '', amount: '', category: '', date: new Date().toISOString().split('T')[0], subcategory: 'general', vendor: '', renewalDate: '', isAsset: false, assetLifetime: '', transactionFee: '', clientName: '' });
     setModalOpen(true);
   };
 
@@ -266,7 +270,7 @@ const ServiceExpenses = () => {
       date: e.date || '', subcategory: e.subcategory || 'general',
       vendor: e.vendor || '', renewalDate: e.renewalDate || '',
       isAsset: e.isAsset || false, assetLifetime: e.assetLifetime || '',
-      transactionFee: fee || '',
+      transactionFee: fee || '', clientName: e.clientName || '',
     });
     setModalOpen(true);
   };
@@ -287,6 +291,7 @@ const ServiceExpenses = () => {
       is_asset: form.isAsset,
       asset_lifetime_years: form.isAsset ? parseInt(form.assetLifetime) || null : null,
       transaction_fee: fee,
+      client_name: form.clientName || '',
     };
     try {
       if (editId) {
@@ -313,6 +318,21 @@ const ServiceExpenses = () => {
       console.error('Failed to delete expense', error);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    const name = sanitizeInput(newCatName.trim(), 50);
+    if (!name) return;
+    try {
+      await createCategory({ name, type: 'expense' });
+      const cats = await fetchCategories('expense');
+      setExpenseCategories(cats);
+      setForm(f => ({ ...f, category: name }));
+      setNewCatName('');
+      setShowCatInput(false);
+    } catch (error) {
+      console.error('Failed to add category', error);
     }
   };
 
@@ -391,6 +411,7 @@ const ServiceExpenses = () => {
         <thead>
           <tr>
             <Th>Title</Th>
+            <Th>Client</Th>
             <Th>Category</Th>
             <Th>Amount</Th>
             <Th>Vendor</Th>
@@ -405,6 +426,7 @@ const ServiceExpenses = () => {
             return (
               <tr key={e.id}>
                 <Td><strong>{e.title}</strong></Td>
+                <Td>{e.clientName || '-'}</Td>
                 <Td>
                   <SubCategoryTag $type={e.subcategory}>{e.category}</SubCategoryTag>
                   {e.isAsset && <AssetBadge style={{ marginLeft: '0.35rem' }}>Asset</AssetBadge>}
@@ -440,6 +462,7 @@ const ServiceExpenses = () => {
           return (
             <MobileCard key={e.id} $type={e.subcategory}>
               <MobileRow><span>Title</span><span><strong>{e.title}</strong></span></MobileRow>
+              <MobileRow><span>Client</span><span>{e.clientName || '-'}</span></MobileRow>
               <MobileRow>
                 <span>Category</span>
                 <span><SubCategoryTag $type={e.subcategory}>{e.category}</SubCategoryTag> {e.isAsset && <AssetBadge>Asset</AssetBadge>}</span>
@@ -475,6 +498,11 @@ const ServiceExpenses = () => {
         <form onSubmit={handleSave}>
           <Label>Title *</Label>
           <Input required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Adobe Creative Cloud" autoFocus />
+          <Label>Client (for per-client P&L)</Label>
+          <Select value={form.clientName} onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))}>
+            <option value="">— General / Not attributed —</option>
+            {customers.map(c => <option key={c.id} value={c.name}>{c.name}{c.company ? ` (${c.company})` : ''}</option>)}
+          </Select>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
               <Label>Amount (GH₵)</Label>
@@ -486,6 +514,14 @@ const ServiceExpenses = () => {
                 <option value="">No category</option>
                 {expenseCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </Select>
+              {showCatInput ? (
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <Input style={{ marginBottom: 0, flex: 1 }} value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="New category name" autoFocus />
+                  <button type="button" onClick={handleAddCategory} style={{ padding: '0.7rem 0.85rem', border: 'none', borderRadius: '8px', background: '#6F240A', color: 'white', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Add</button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setShowCatInput(true)} style={{ padding: '0.5rem 0.75rem', border: '1px dashed #ddd', borderRadius: '8px', background: 'transparent', color: '#6F240A', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem', width: '100%' }}>+ New Category</button>
+              )}
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

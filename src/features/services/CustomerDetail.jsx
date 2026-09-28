@@ -4,8 +4,12 @@ import styled from 'styled-components';
 import { ArrowLeft, Plus, CheckCircle, Pencil, Trash2, Mail, Phone, MapPin, Building2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { fetchCustomers, fetchServiceIncome, fetchInvoices, fetchCategories, createCategory, createInvoice, createServiceIncome, updateInvoice, updateCustomer, updateServiceIncome, deleteServiceIncome, deleteInvoice } from '../../services/api';
+import { fetchCustomers, fetchServiceIncome, fetchInvoices, fetchCategories, createCategory, createInvoice, createServiceIncome, updateInvoice, updateCustomer, updateServiceIncome, deleteServiceIncome, deleteInvoice, fetchServices } from '../../services/api';
 import { sanitizeInput } from '../../utils/sanitize';
+import { useSettingsStore } from '../../store/settingsStore';
+import CatalogPicker from './CatalogPicker';
+import SizePricingCalculator from './SizePricingCalculator';
+import { freshSizeLine, numOf, solveSizeLines, round2, roundUp, SQFT_DIVISOR } from './sizePricing';
 
 const Header = styled.div`
   display: flex;
@@ -330,6 +334,33 @@ const Select = styled.select`
   background: white;
 `;
 
+const SegBox = styled.div`
+  display: flex;
+  background: #F5F3F0;
+  border-radius: 10px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 1rem;
+`;
+
+const SegBtn = styled.button`
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: ${props => props.$active ? '#6F240A' : 'transparent'};
+  color: ${props => props.$active ? 'white' : '#55423D'};
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: inherit;
+
+  &:hover {
+    background: ${props => props.$active ? '#6F240A' : '#ECE7E2'};
+    color: ${props => props.$active ? 'white' : '#6F240A'};
+  }
+`;
+
 const PayItem = styled.div`
   display: flex;
   justify-content: space-between;
@@ -396,14 +427,18 @@ const MethodBadge = styled.span`
 const fmt = (n) => `GH₵${(n || 0).toFixed(2)}`;
 const todayISO = () => new Date().toISOString().split('T')[0];
 const moneyOf = (v) => parseFloat(String(v).replace(/[^\d.-]/g, '')) || 0;
+const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const CustomerDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const settings = useSettingsStore();
   const [customers, setCustomers] = useState([]);
   const [income, setIncome] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [showAddService, setShowAddService] = useState(false);
+  const [priceMode, setPriceMode] = useState('flat');
+  const [calcLines, setCalcLines] = useState([freshSizeLine()]);
   const [showPayments, setShowPayments] = useState(false);
   const [showEditCustomer, setShowEditCustomer] = useState(false);
   const [editInc, setEditInc] = useState(null);
@@ -414,20 +449,26 @@ const CustomerDetail = () => {
   const [savingEdit, setSavingEdit] = useState(false);
   const [payingId, setPayingId] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [services, setServices] = useState([]);
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [addingNewCat, setAddingNewCat] = useState(false);
-  const [svcForm, setSvcForm] = useState({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid', method: 'cash' });
+  const [svcForm, setSvcForm] = useState({ service: '', amount: '', quantity: 1, date: todayISO(), category: '', status: 'unpaid', method: 'cash', areaPrice: '' });
   const [custForm, setCustForm] = useState({ name: '', email: '', phone: '', location: '', notes: '' });
   const [incForm, setIncForm] = useState({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid', method: 'cash' });
+  const [editSizeMode, setEditSizeMode] = useState(false);
+  const [editSizeLines, setEditSizeLines] = useState([freshSizeLine()]);
+  const [editSizeRate, setEditSizeRate] = useState(0);
+  const [editItems, setEditItems] = useState([{ name: '', quantity: '1', unitPrice: '' }]);
   const [payments, setPayments] = useState({});
 
   const load = async () => {
-    const [c, i, inv, cats] = await Promise.all([fetchCustomers(), fetchServiceIncome(), fetchInvoices(), fetchCategories('income')]);
+    const [c, i, inv, cats, svcs] = await Promise.all([fetchCustomers(), fetchServiceIncome(), fetchInvoices(), fetchCategories('income'), fetchServices()]);
     setCustomers(c);
     setIncome(i);
     setInvoices(inv);
     setCategories(cats);
+    setServices(svcs);
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -439,7 +480,9 @@ const CustomerDetail = () => {
   };
 
   const openAddService = () => {
-    setSvcForm({ service: '', amount: '', date: todayISO(), category: '', status: 'unpaid', method: 'cash' });
+    setSvcForm({ service: '', amount: '', quantity: 1, date: todayISO(), category: '', status: 'unpaid', method: 'cash', areaPrice: '' });
+    setPriceMode('flat');
+    setCalcLines([freshSizeLine()]);
     setShowNewCat(false);
     setNewCatName('');
     setShowAddService(true);
@@ -549,6 +592,7 @@ const CustomerDetail = () => {
     id: `inv-${inv.id}`,
     date: inv.date || '',
     service: serviceNameOf(inv),
+    lines: servicesOf(inv),
     category: categoryOf(inv),
     status: statusOf(inv),
     amount: amountOf(inv),
@@ -590,29 +634,115 @@ const CustomerDetail = () => {
   const outstandingInvoices = customerInvoices.filter(inv => balanceOf(inv) > 0);
   const openServices = customerInvoices.length;
 
+  const areaConfig = () => {
+    const pRaw = svcForm.areaPrice !== undefined && svcForm.areaPrice !== '' ? svcForm.areaPrice : (settings.areaPrice || '0');
+    return { P: Math.max(0, moneyOf(pRaw)) };
+  };
+
+  const solveCalcLines = () => solveSizeLines(calcLines, areaConfig().P);
+
+  const printQuote = () => {
+    const { P } = areaConfig();
+    const rows = solveCalcLines()
+      .filter(s => s.valid)
+      .map(s => {
+        const formula = s.unit === 'feet'
+          ? `(L×H)×P×Q = (${s.L.toFixed(2)}×${s.H.toFixed(2)})×${P.toFixed(2)}×${s.Q}`
+          : `(L×H÷${SQFT_DIVISOR})×P×Q = (${s.L.toFixed(2)}×${s.H.toFixed(2)}÷${SQFT_DIVISOR})×${P.toFixed(2)}×${s.Q}`;
+        return `
+        <tr>
+          <td>${esc(s.label || svcForm.service || 'Item')}</td>
+          <td>${s.L.toFixed(2)} × ${s.H.toFixed(2)} ${s.unit === 'feet' ? 'ft' : s.unit === 'inches' ? 'in' : 'cm'}</td>
+          <td>${P.toFixed(2)}</td>
+          <td><b>${s.itemPrice.toFixed(2)}</b></td>
+          <td>${s.Q}</td>
+          <td><b>${s.total.toFixed(2)}</b></td>
+          <td class="muted">${formula}</td>
+        </tr>`;
+      })
+      .join('');
+    const grand = roundUp(solveCalcLines().filter(s => s.valid).reduce((sum, s) => sum + s.total, 0));
+    const w = window.open('', '_blank', 'width=780,height=920');
+    if (!w) return;
+    w.document.write(`<!doctype html>
+      <html>
+        <head><meta charset="utf-8" /><title>Price Quote</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; color: #1C1C18; margin: 40px; }
+          .hdr { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #6F240A; padding-bottom: 12px; margin-bottom: 16px; }
+          .brand { font-size: 20px; font-weight: 800; color: #6F240A; }
+          .sub { font-size: 13px; color: #55423D; }
+          .kv { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #F0EEE8; font-size: 14px; }
+          .kv b { color: #1C1C18; }
+          table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+          th { text-align: left; background: #F5F3F0; padding: 8px; }
+          td { padding: 8px; border-bottom: 1px solid #F0EEE8; }
+          .muted { color: #89726C; font-size: 11px; }
+          .total { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 12px 16px; background: #25432F; color: #fff; border-radius: 10px; font-size: 18px; font-weight: 800; }
+          .foot { text-align: center; margin-top: 28px; font-size: 12px; color: #89726C; }
+        </style></head>
+        <body>
+          <div class="hdr">
+            <div><div class="brand">${esc(settings.businessName || 'KaisySales')}</div><div class="sub">Price Quote</div></div>
+            <div class="sub">${new Date().toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+          </div>
+          <div class="kv"><span>Client</span><b>${esc(name)}</b></div>
+          <div class="kv"><span>Service</span><b>${esc(svcForm.service || '—')}</b></div>
+          <table>
+            <tr><th>Item</th><th>Size</th><th>Rate/sq ft</th><th>Sq Ft Price</th><th>Qty</th><th>Total</th><th>Formula</th></tr>
+            ${rows || '<tr><td colspan="7">No items</td></tr>'}
+          </table>
+          <div class="total"><span>Grand Total</span><span>GH₵${grand.toLocaleString()}</span></div>
+          <p class="foot">KaisySales - Know your Business, Stay in Control</p>
+        </body>
+      </html>`);
+    w.document.close();
+    w.print();
+  };
+
   const handleAddService = async (e) => {
     e.preventDefault();
     setSaving(true);
-    const amount = moneyOf(svcForm.amount);
+    const sizeItems = solveCalcLines().filter(s => s.valid);
+    const usingSize = priceMode === 'size' && sizeItems.length > 0;
+    const unitPrice = moneyOf(svcForm.amount);
+    const qty = Math.max(1, parseInt(svcForm.quantity) || 1);
+    const items = usingSize
+      ? sizeItems.map(it => ({
+          name: sanitizeInput(it.label || svcForm.service, 100),
+          quantity: it.Q,
+          unitPrice: round2(it.itemPrice),
+          category: sanitizeInput(svcForm.category, 50),
+          size: { unit: it.unit, length: round2(it.L), height: round2(it.H), rate: round2(it.P) }
+        }))
+      : [{ name: sanitizeInput(svcForm.service, 100), quantity: qty, unitPrice: unitPrice, category: sanitizeInput(svcForm.category, 50) }];
+    const lineSum = () => items.reduce((s, it) => s + (it.unitPrice * it.quantity), 0);
+    const total = usingSize ? roundUp(lineSum()) : (unitPrice * qty);
+    if (usingSize && items.length > 0) {
+      const last = items[items.length - 1];
+      last.unitPrice = Math.max(0, round2(last.unitPrice + (total - lineSum()) / last.quantity));
+    }
+    const totalQty = usingSize ? items.reduce((s, it) => s + it.quantity, 0) : qty;
     const isPaid = svcForm.status === 'paid';
     try {
       const created = await createInvoice({
         customer: sanitizeInput(name, 100),
         customerLocation: customer.location || '',
         date: svcForm.date || todayISO(),
-        quantity: 1,
-        unitPrice: amount,
+        quantity: totalQty,
+        unitPrice: totalQty > 0 ? +(total / totalQty) : unitPrice,
         status: isPaid ? 'paid' : 'pending',
-        amount: `GH₵${amount.toFixed(2)}`,
+        amount: `GH₵${total.toFixed(2)}`,
         notes: '',
-        items: [{ name: sanitizeInput(svcForm.service, 100), quantity: 1, unitPrice: amount, category: sanitizeInput(svcForm.category, 50) }],
+        items,
       });
       if (isPaid && created?.id) {
         await createServiceIncome({
           client_name: sanitizeInput(name, 100),
-          amount,
+          amount: total,
           platform_fee: 0,
-          net_amount: amount,
+          net_amount: total,
           platform_tag: 'invoice',
           milestone_label: sanitizeInput(svcForm.service, 200),
           category: sanitizeInput(svcForm.category, 50),
@@ -709,7 +839,35 @@ const CustomerDetail = () => {
         method: methodOf(r.raw.notes) || 'cash',
       });
       setEditInc({ kind: r.kind, raw: r.raw });
+      setEditSizeMode(false);
+      setEditSizeLines([freshSizeLine()]);
+      setEditSizeRate(0);
+      setEditItems([{ name: '', quantity: '1', unitPrice: '' }]);
     } else {
+      const rawItems = Array.isArray(r.raw.items) ? r.raw.items : [];
+      const lines = rawItems.filter(i => !i.type);
+      const sized = lines.filter(i => i.size);
+      setEditItems(
+        lines.length > 0
+          ? lines.map(i => ({ name: i.name || '', quantity: String(parseInt(i.quantity) || 1), unitPrice: String(numOf(i.unitPrice)) }))
+          : [{ name: serviceNameOf(r.raw), quantity: String(parseInt(r.raw.quantity) || 1), unitPrice: String(amountOf(r.raw)) }]
+      );
+      if (sized.length > 0) {
+        setEditSizeLines(sized.map(i => ({
+          key: `ed-${i.size.unit || 'feet'}-${i.size.length}-${i.size.height}-${i.quantity || 1}-${i.name || ''}`,
+          label: i.name || '',
+          unit: i.size.unit || 'feet',
+          length: String(i.size.length ?? ''),
+          height: String(i.size.height ?? ''),
+          quantity: parseInt(i.quantity) || 1,
+        })));
+        setEditSizeRate(sized[0].size.rate ?? settings.areaPrice ?? 0);
+        setEditSizeMode(true);
+      } else {
+        setEditSizeMode(false);
+        setEditSizeLines([freshSizeLine()]);
+        setEditSizeRate(0);
+      }
       setIncForm({
         service: serviceNameOf(r.raw),
         amount: String(amountOf(r.raw) || ''),
@@ -724,6 +882,10 @@ const CustomerDetail = () => {
   const handleSaveService = async (e) => {
     e.preventDefault();
     if (!editInc) return;
+    if (editInc.kind === 'invoice' && editSizeMode && solveSizeLines(editSizeLines, editSizeRate).filter(s => s.valid).length === 0) {
+      alert('Enter a length and height for at least one item, or switch back to flat price.');
+      return;
+    }
     setSavingEdit(true);
     const amount = moneyOf(incForm.amount);
     try {
@@ -743,17 +905,54 @@ const CustomerDetail = () => {
       } else {
         const paid = paidAmountOf(editInc.raw);
         const targetPaid = incForm.status === 'paid';
+        const rawItems = Array.isArray(editInc.raw.items) ? editInc.raw.items : [];
+        const markers = rawItems.filter(i => i.type === '_saleId' || i.type === '_incomeId');
+        const metaItem = rawItems.find(i => i.type === '_meta');
+
+        let items;
+        let finalAmount = amount;
+        if (editSizeMode) {
+          const valid = solveSizeLines(editSizeLines, editSizeRate).filter(s => s.valid);
+          const exact = valid.reduce((s, l) => s + l.total, 0);
+          finalAmount = roundUp(exact);
+          const built = valid.map(l => ({
+            name: sanitizeInput(l.label || 'Item', 100),
+            quantity: l.Q,
+            unitPrice: round2(l.itemPrice),
+            size: { unit: l.unit, length: l.L, height: l.H, rate: round2(editSizeRate) },
+          }));
+          if (built.length > 0) {
+            const lineSum = built.reduce((s, i) => s + round2(i.unitPrice * i.quantity), 0);
+            const last = built[built.length - 1];
+            last.unitPrice = round2(last.unitPrice + (finalAmount - lineSum) / last.quantity);
+          }
+          items = built;
+        } else {
+          items = editItems
+            .filter(i => i.name.trim())
+            .map(i => ({
+              name: sanitizeInput(i.name, 100),
+              quantity: Math.max(1, parseInt(i.quantity) || 1),
+              unitPrice: round2(numOf(i.unitPrice)),
+              category: sanitizeInput(incForm.category, 50),
+            }));
+          finalAmount = round2(items.reduce((s, i) => s + i.unitPrice * i.quantity, 0));
+        }
+        const discPct = numOf(metaItem?.discount);
+        if (discPct > 0) finalAmount = round2(finalAmount * (1 - discPct / 100));
+        const itemTotal = items.reduce((s, i) => s + round2((parseInt(i.quantity) || 1) * numOf(i.unitPrice)), 0);
+
         await updateInvoice(editInc.raw.id, {
           customer: sanitizeInput(name, 100),
           date: incForm.date || todayISO(),
-          quantity: 1,
-          unitPrice: amount,
+          quantity: items.length,
+          unitPrice: items.length ? round2(itemTotal / items.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0)) : 0,
           status: targetPaid ? 'paid' : 'pending',
-          amount: `GH₵${amount.toFixed(2)}`,
-          items: [{ name: sanitizeInput(incForm.service, 100), quantity: 1, unitPrice: amount, category: sanitizeInput(incForm.category, 50) }],
+          amount: `GH₵${finalAmount.toFixed(2)}`,
+          items: [...(metaItem ? [metaItem] : []), ...items, ...markers],
         });
         if (targetPaid) {
-          const gap = amount - paid;
+          const gap = finalAmount - paid;
           if (gap > 0) {
             await createServiceIncome({
               client_name: sanitizeInput(name, 100),
@@ -761,10 +960,10 @@ const CustomerDetail = () => {
               platform_fee: 0,
               net_amount: gap,
               platform_tag: 'invoice',
-              milestone_label: sanitizeInput(incForm.service, 200),
+              milestone_label: sanitizeInput(items[0]?.name || incForm.service, 200),
               category: sanitizeInput(incForm.category, 50),
               payment_date: incForm.date || todayISO(),
-              notes: `Payment on invoice #${editInc.raw.id}`,
+              notes: withMethod(`Payment on invoice #${editInc.raw.id}`, incForm.method || 'cash'),
             });
           }
         } else {
@@ -808,6 +1007,10 @@ const CustomerDetail = () => {
       setDeleting(false);
     }
   };
+
+  const { P: areaP } = areaConfig();
+  const sizeCount = solveCalcLines().filter(s => s.valid).length;
+  const editSizeValid = solveSizeLines(editSizeLines, editSizeRate).filter(s => s.valid).length;
 
   return (
     <div>
@@ -878,7 +1081,13 @@ const CustomerDetail = () => {
             {rows.map(r => (
               <tr key={r.id}>
                 <Td>{r.date || '-'}</Td>
-                <Td>{r.service}{r.category ? <div style={{ fontSize: '0.75rem', color: '#875200', fontWeight: 600 }}>{r.category}</div> : null}</Td>
+                <Td>
+                  {r.service}
+                  {r.lines && r.lines.length > 1 && (
+                    <div style={{ fontSize: '0.75rem', color: '#89726C' }}>+{r.lines.length - 1} more item{r.lines.length - 1 > 1 ? 's' : ''}</div>
+                  )}
+                  {r.category ? <div style={{ fontSize: '0.75rem', color: '#875200', fontWeight: 600 }}>{r.category}</div> : null}
+                </Td>
                 <Td><StatusBadge $status={r.status}>{r.status}</StatusBadge></Td>
                 <Td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(r.amount)}</Td>
                 <Td style={{ textAlign: 'right', fontWeight: 700, color: r.balance > 0 ? '#C62828' : '#25432F' }}>{fmt(r.balance)}</Td>
@@ -897,7 +1106,7 @@ const CustomerDetail = () => {
           {rows.map(r => (
             <MobileCard key={r.id}>
               <MobileRow><span>Date</span><span>{r.date || '-'}</span></MobileRow>
-              <MobileRow><span>Service</span><span><strong>{r.service}</strong></span></MobileRow>
+              <MobileRow><span>Service</span><span><strong>{r.service}</strong>{r.lines && r.lines.length > 1 ? <span style={{ display: 'block', fontSize: '0.75rem', color: '#89726C' }}>+{r.lines.length - 1} more item{r.lines.length - 1 > 1 ? 's' : ''}</span> : null}</span></MobileRow>
               {r.category && <MobileRow><span>Category</span><span style={{ color: '#875200', fontWeight: 700 }}>{r.category}</span></MobileRow>}
               <MobileRow><span>Status</span><span><StatusBadge $status={r.status}>{r.status}</StatusBadge></span></MobileRow>
               <MobileRow><span>Amount</span><span><strong>{fmt(r.amount)}</strong></span></MobileRow>
@@ -967,8 +1176,15 @@ const CustomerDetail = () => {
 
       <Modal isOpen={showAddService} onClose={() => setShowAddService(false)} title={`Add Service for ${name}`}>
         <form onSubmit={handleAddService}>
+          {services.length > 0 && (
+            <CatalogPicker services={services} onPick={s => {
+              setSvcForm(f => ({ ...f, service: s.name || '', amount: String(s.price || ''), quantity: 1, category: s.category || '', areaPrice: s.areaPrice ?? '' }));
+              if (moneyOf(s.areaPrice) > 0) setPriceMode('size');
+              setShowNewCat(false);
+            }} />
+          )}
           <Label>Service *</Label>
-          <Input required value={svcForm.service} onChange={e => setSvcForm(f => ({ ...f, service: e.target.value }))} placeholder="e.g. Website design, Consultation" autoFocus />
+          <Input required value={svcForm.service} onChange={e => setSvcForm(f => ({ ...f, service: e.target.value, areaPrice: '' }))} placeholder="e.g. Website design, Consultation" autoFocus />
           <Label>Category</Label>
           <Select value={showNewCat ? '__new__' : svcForm.category} onChange={e => {
             const v = e.target.value;
@@ -1000,8 +1216,30 @@ const CustomerDetail = () => {
               </Select>
             </>
           )}
-          <Label>Amount (GH₵) *</Label>
-          <Input required type="number" min="0" step="0.01" value={svcForm.amount} onChange={e => setSvcForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
+          <Label>Pricing</Label>
+          <SegBox>
+            <SegBtn type="button" $active={priceMode === 'flat'} onClick={() => setPriceMode('flat')}>Flat Price</SegBtn>
+            <SegBtn type="button" $active={priceMode === 'size'} onClick={() => setPriceMode('size')}>By Size</SegBtn>
+          </SegBox>
+
+          {priceMode === 'flat' ? (
+            <>
+              <Label>Unit Price (GH₵) *</Label>
+              <Input required type="number" min="0" step="0.01" value={svcForm.amount} onChange={e => setSvcForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
+              <Label>Quantity *</Label>
+              <Input required type="number" min="1" step="1" value={svcForm.quantity} onChange={e => setSvcForm(f => ({ ...f, quantity: e.target.value }))} placeholder="1" />
+              <p style={{ fontSize: '0.9rem', color: '#25432F', fontWeight: 700, marginTop: '-0.25rem' }}>
+                Total: GH₵{((moneyOf(svcForm.amount) || 0) * Math.max(1, parseInt(svcForm.quantity) || 1)).toFixed(2)}
+              </p>
+              {areaP > 0 && svcForm.service && (
+                <p style={{ fontSize: '0.8rem', color: '#89726C', marginTop: '-0.25rem' }}>
+                  "{svcForm.service}" is GH₵{areaP.toFixed(2)} per sq ft — switch to <strong>By Size</strong> to price by dimensions.
+                </p>
+              )}
+            </>
+          ) : (
+            <SizePricingCalculator lines={calcLines} onChange={setCalcLines} pricePerSqFt={areaP} onPrint={printQuote} emptyRateHint="Set this service's price per sq ft in Service Catalog, or the account default, to price by size." />
+          )}
           <Label>Service Date *</Label>
           <Input required type="date" value={svcForm.date} onChange={e => setSvcForm(f => ({ ...f, date: e.target.value }))} />
           <p style={{ fontSize: '0.85rem', color: '#55423D', margin: '-0.25rem 0 0.5rem' }}>
@@ -1011,7 +1249,7 @@ const CustomerDetail = () => {
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
             <button type="button" onClick={() => setShowAddService(false)} style={{ padding: '0.65rem 1.25rem', border: '1px solid #ddd', borderRadius: 8, background: 'white', cursor: 'pointer' }}>Cancel</button>
-            <button type="submit" disabled={saving} style={{ padding: '0.65rem 1.25rem', border: 'none', borderRadius: 8, background: '#6F240A', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
+            <button type="submit" disabled={saving || (priceMode === 'size' && sizeCount === 0)} style={{ padding: '0.65rem 1.25rem', border: 'none', borderRadius: 8, background: saving || (priceMode === 'size' && sizeCount === 0) ? '#997A6F' : '#6F240A', color: 'white', fontWeight: 600, cursor: saving || (priceMode === 'size' && sizeCount === 0) ? 'not-allowed' : 'pointer' }}>
               {saving ? 'Adding...' : 'Add Service'}
             </button>
           </div>
@@ -1094,8 +1332,67 @@ const entry = payments[inv.id] || { amount: String(balance || ''), date: todayIS
 
       <Modal isOpen={!!editInc} onClose={() => setEditInc(null)} title={editInc?.kind === 'invoice' ? 'Edit Service' : 'Edit Payment'}>
         <form onSubmit={handleSaveService}>
-          <Label>Service *</Label>
-          <Input required value={incForm.service} onChange={e => setIncForm(f => ({ ...f, service: e.target.value }))} placeholder="e.g. Website design, Consultation" autoFocus />
+          {editInc?.kind === 'invoice' && (
+            <>
+              <Label>Pricing</Label>
+              <SegBox>
+                <SegBtn type="button" $active={!editSizeMode} onClick={() => setEditSizeMode(false)}>Flat Price</SegBtn>
+                <SegBtn type="button" $active={editSizeMode} onClick={() => {
+                  const blank = editSizeLines.length === 0 || (editSizeLines.length === 1 && !editSizeLines[0].length && !editSizeLines[0].label);
+                  if (blank) {
+                    setEditSizeLines(editItems.map(i => ({ ...freshSizeLine(), label: i.name, quantity: parseInt(i.quantity) || 1 })));
+                  }
+                  if (!editSizeRate) setEditSizeRate(settings.areaPrice || 0);
+                  setEditSizeMode(true);
+                }}>By Size</SegBtn>
+              </SegBox>
+
+              {editSizeMode ? (
+                <>
+                  <Label>Price per sq ft (GH₵)</Label>
+                  <Input type="number" min="0" step="0.01" value={editSizeRate} onChange={e => setEditSizeRate(e.target.value)} />
+                  <div style={{ height: '0.75rem' }} />
+                  <SizePricingCalculator lines={editSizeLines} onChange={setEditSizeLines} pricePerSqFt={editSizeRate} />
+                </>
+              ) : (
+                <>
+                  {editItems.map((it, i) => (
+                    <div key={i} style={{ background: '#FCF9F3', border: '1px solid #F0EEE8', borderRadius: 12, padding: '0.75rem', marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
+                        <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#6F240A' }}>Item {i + 1}</span>
+                        {editItems.length > 1 && (
+                          <button type="button" onClick={() => setEditItems(editItems.filter((_, x) => x !== i))} aria-label={`Remove item ${i + 1}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BA1A1A', display: 'flex', padding: '0.2rem' }}>
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                      <Label>Description *</Label>
+                      <Input required value={it.name} onChange={e => setEditItems(editItems.map((x, xi) => (xi === i ? { ...x, name: e.target.value } : x)))} placeholder="e.g. Banner 10x5 ft" />
+                      <Label>Quantity *</Label>
+                      <Input required type="number" min="1" step="1" value={it.quantity} onChange={e => setEditItems(editItems.map((x, xi) => (xi === i ? { ...x, quantity: e.target.value } : x)))} placeholder="1" />
+                      <Label>Unit Price (GH₵) *</Label>
+                      <Input required type="number" min="0" step="0.01" value={it.unitPrice} onChange={e => setEditItems(editItems.map((x, xi) => (xi === i ? { ...x, unitPrice: e.target.value } : x)))} placeholder="0.00" />
+                      <p style={{ fontSize: '0.9rem', color: '#25432F', fontWeight: 700, marginTop: '-0.25rem' }}>
+                        Total: GH₵{(numOf(it.unitPrice) * Math.max(1, parseInt(it.quantity) || 1)).toFixed(2)}
+                      </p>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setEditItems([...editItems, { name: '', quantity: '1', unitPrice: '' }])} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', padding: '0.55rem', border: '1px dashed #D0C8C4', borderRadius: 10, background: 'white', color: '#6F240A', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}>
+                    <Plus size={16} /> Add Item
+                  </button>
+                  <p style={{ fontSize: '0.9rem', color: '#25432F', fontWeight: 700, marginTop: '0.6rem' }}>
+                    Total: GH₵{editItems.filter(i => i.name.trim()).reduce((s, i) => s + numOf(i.unitPrice) * Math.max(1, parseInt(i.quantity) || 1), 0).toFixed(2)}
+                  </p>
+                </>
+              )}
+            </>
+          )}
+          {editInc?.kind !== 'invoice' && (
+            <>
+              <Label>Service *</Label>
+              <Input required value={incForm.service} onChange={e => setIncForm(f => ({ ...f, service: e.target.value }))} placeholder="e.g. Website design, Consultation" autoFocus />
+            </>
+          )}
           <Label>Category</Label>
           <Select value={showNewCat ? '__new__' : incForm.category} onChange={e => {
             const v = e.target.value;
@@ -1131,13 +1428,38 @@ const entry = payments[inv.id] || { amount: String(balance || ''), date: todayIS
               </Select>
             </>
           )}
-          <Label>Amount (GH₵) *</Label>
-          <Input required type="number" min="0" step="0.01" value={incForm.amount} onChange={e => setIncForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
+          {editInc?.kind === 'invoice' && incForm.status === 'paid' && (
+            <>
+              <Label>Payment Method</Label>
+              <Select value={incForm.method || 'cash'} onChange={e => setIncForm(f => ({ ...f, method: e.target.value }))}>
+                <option value="cash">Cash</option>
+                <option value="momo">Mobile Money</option>
+                <option value="bank">Bank Transfer</option>
+              </Select>
+            </>
+          )}
+          {editInc?.kind !== 'invoice' && (
+            <>
+              <Label>Amount (GH₵) *</Label>
+              <Input required type="number" min="0" step="0.01" value={incForm.amount} onChange={e => setIncForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
+            </>
+          )}
           <Label>{editInc?.kind === 'invoice' ? 'Service Date *' : 'Payment Date *'}</Label>
           <Input required type="date" value={incForm.date} onChange={e => setIncForm(f => ({ ...f, date: e.target.value }))} />
+          {editInc?.kind === 'invoice' && (
+            <p style={{ fontSize: '0.85rem', color: '#55423D', margin: '-0.25rem 0 0.5rem' }}>
+              {incForm.status === 'unpaid'
+                ? <>This service is billed as <strong>unpaid</strong>. Use <strong>Make Payment</strong> to record deposits or the balance later.</>
+                : <>This service is marked <strong>paid</strong> — the full amount is added to <strong>Total Received</strong> immediately.</>}
+            </p>
+          )}
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
             <button type="button" onClick={() => setEditInc(null)} style={{ padding: '0.65rem 1.25rem', border: '1px solid #ddd', borderRadius: 8, background: 'white', cursor: 'pointer' }}>Cancel</button>
-            <button type="submit" disabled={savingEdit} style={{ padding: '0.65rem 1.25rem', border: 'none', borderRadius: 8, background: '#6F240A', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
+            <button
+              type="submit"
+              disabled={savingEdit || (editInc?.kind === 'invoice' && editSizeMode && editSizeValid === 0)}
+              style={{ padding: '0.65rem 1.25rem', border: 'none', borderRadius: 8, background: savingEdit || (editInc?.kind === 'invoice' && editSizeMode && editSizeValid === 0) ? '#997A6F' : '#6F240A', color: 'white', fontWeight: 600, cursor: savingEdit ? 'pointer' : 'pointer' }}
+            >
               {savingEdit ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
