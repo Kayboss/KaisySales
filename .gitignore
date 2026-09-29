@@ -25,3 +25,6 @@ Thumbs.db
 
 .vercel
 supabase/.temp/
+
+# Personal reference (may contain secrets - never commit)
+SECURITY.md
