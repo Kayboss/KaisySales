@@ -5,12 +5,20 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  # The authorization suite queries the live database rather than this repository,
+  # so a policy changed outside git (in the Supabase dashboard, or by hand) would
+  # otherwise go unnoticed until the next push. Nightly catches that.
+  # 03:17 rather than 03:00: on-the-hour schedules are heavily oversubscribed.
+  schedule:
+    - cron: '17 3 * * *'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # The event is part of the group so a push does not cancel the nightly run, and
+  # the nightly run does not cancel a push's run. Both use refs/heads/master.
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

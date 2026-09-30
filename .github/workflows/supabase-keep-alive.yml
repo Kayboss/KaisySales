@@ -9,26 +9,21 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: SELECT - Recent activity check
+      # This job used to read and write the keep_alive table with the anon key.
+      # The August hardening revoked that table from anon, so both calls have
+      # been answering 401 ever since — but curl -s exits 0 on a 401, so the job
+      # stayed green while doing nothing at all. --fail-with-body makes it report
+      # what actually happened, and subscription_plans is the one table anon may
+      # read, so this is now a real request instead of a fictional one.
+      - name: Confirm the project answers
         run: |
-          curl -s -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/keep_alive?select=id,created_at&order=created_at.desc&limit=3" \
+          body=$(curl --fail-with-body -sS --max-time 30 \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/subscription_plans?select=id&limit=1" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Accept: application/json"
-
-      - name: INSERT - New keep-alive ping
-        run: |
-          curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/keep_alive" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Content-Type: application/json" \
-            -H "Accept: application/json" \
-            -d '{}'
-
-      - name: DELETE - Cleanup records older than 30 days
-        run: |
-          THIRTY_DAYS_AGO=$(date -d '30 days ago' --iso-8601=seconds)
-          curl -s -X DELETE "${{ secrets.SUPABASE_URL }}/rest/v1/keep_alive?created_at=lt.$THIRTY_DAYS_AGO" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Accept: application/json"
+            -H "Accept: application/json")
+          echo "response: $body"
+          if ! echo "$body" | grep -q '^\['; then
+            echo "::error::the project answered but not with a row array — treating that as down"
+            exit 1
+          fi
