@@ -48,7 +48,7 @@ jobs:
       - name: Production bundle must not contain privileged secrets
         run: npm run scan:dist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist
@@ -114,7 +114,7 @@ jobs:
           fi
           echo "no ERROR-level alerts"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: zap-report
