@@ -53,7 +53,14 @@ for (const file of ['.env.local', '.env']) {
 const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
 const restBase = `${url}/rest/v1`;
 const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
-const writeProbes = ['notes', 'description', 'name', 'title', 'vendor', 'milestone_label'];
+// Columns to try when probing whether a user can write to another user's rows.
+// The first one the table actually has is used, so a table with no matching
+// column skips rather than passing vacuously.
+const writeProbes = [
+  'notes', 'description', 'name', 'title', 'vendor', 'milestone_label',
+  'client_name', 'customer', 'item', 'business_name', 'owner_name', 'category',
+  'status', 'message', 'content', 'platform_tag', 'location', 'phone',
+];
 const ownerCandidates = ['user_id', 'owner_id', 'created_by'];
 
 // Tables that are deliberately world-readable. subscription_plans is the pricing
