@@ -120,8 +120,12 @@ jobs:
       - name: ZAP baseline scan
         run: |
           set +e
-          docker run --rm --network=host -v "$PWD:/zap/wrk" ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://127.0.0.1:4173 -J zap-report.json -l WARN -I 2>&1 | tee zap-scan.log
+          # --user and --shm-size matter on CI: the image runs as its own uid and
+          # cannot write the report into the mounted workspace without the first,
+          # and its default 64MB /dev/shm makes the browser crash on startup.
+          docker run --rm --network=host --shm-size=2g --user "$(id -u):$(id -g)" \
+            -v "$PWD:/zap/wrk" ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://127.0.0.1:4173 -J zap-report.json -l WARN -I -m 5 2>&1 | tee zap-scan.log
           echo "scanner exit status: ${PIPESTATUS[0]} (not the security verdict)"
           set -e
           if [ ! -s zap-report.json ]; then
