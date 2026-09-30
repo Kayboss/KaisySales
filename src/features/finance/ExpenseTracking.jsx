@@ -53,7 +53,7 @@ const CardLabel = styled.div`
 
 const CardValue = styled.div`
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: 600;
   color: ${props => props.$color || '#6F240A'};
   
   @media (max-width: 768px) {

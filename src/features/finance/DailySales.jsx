@@ -59,8 +59,8 @@ const StatLabel = styled.div`
 `;
 
 const StatValue = styled.div`
-  font-size: 1.75rem;
-  font-weight: 800;
+  font-size: 1.5rem;
+  font-weight: 600;
   font-family: ${({ theme }) => theme.fonts.display};
   color: ${({ theme }) => theme.colors.primary};
 

@@ -165,7 +165,7 @@ const StatCard = styled.div`
 
   .value {
     font-size: 1.5rem;
-    font-weight: 900;
+    font-weight: 600;
     color: ${props => props.$color || props.theme.colors.primary};
   }
 

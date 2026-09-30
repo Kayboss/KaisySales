@@ -49,7 +49,7 @@ const StatLabel = styled.div`
 
 const StatValue = styled.div`
   font-size: 2rem;
-  font-weight: 900;
+  font-weight: 600;
   color: #1C1C18;
   letter-spacing: -0.5px;
 `;

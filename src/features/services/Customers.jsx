@@ -110,17 +110,26 @@ const MobileCard = styled.div`
   padding: 1rem;
 `;
 
-const MobileRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.35rem 0;
-  font-size: 0.9rem;
-
-  span:first-child {
-    color: ${({ theme }) => theme.colors.text.muted};
-    font-size: 0.8rem;
+const CustomerLink = styled(Link)`
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  /* the whole block is the tap target, so it needs a pressed state */
+  &:active {
+    opacity: 0.6;
   }
+`;
+
+const MobileName = styled.div`
+  font-weight: 600;
+  font-size: 1rem;
+  color: ${({ theme }) => theme.colors.primary};
+`;
+
+const MobilePhone = styled.div`
+  font-size: 0.875rem;
+  color: ${({ theme }) => theme.colors.onSurfaceVariant};
+  margin-top: 0.15rem;
 `;
 
 const Label = styled.label`
@@ -279,25 +288,13 @@ const Customers = () => {
       <MobileGrid>
         {paginated.map(c => (
           <MobileCard key={c.id}>
-            <MobileRow>
-              <span>Name</span>
-              <span><strong>{c.name}</strong></span>
-            </MobileRow>
-            <MobileRow>
-              <span>Email</span>
-              <span>{c.email || '-'}</span>
-            </MobileRow>
-            <MobileRow>
-              <span>Phone</span>
-              <span>{c.phone || '-'}</span>
-            </MobileRow>
-            <MobileRow>
-              <span>Location</span>
-              <span>{c.location || '-'}</span>
-            </MobileRow>
+            <CustomerLink to={`/customers/${c.id}`}>
+              <MobileName>{c.name}</MobileName>
+              <MobilePhone>{c.phone || 'No phone number'}</MobilePhone>
+            </CustomerLink>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', justifyContent: 'flex-end' }}>
-              <ActionBtn onClick={() => openEdit(c)}><Edit2 size={16} /></ActionBtn>
-              <ActionBtn onClick={() => setDeleteTarget(c.id)}><Trash2 size={16} /></ActionBtn>
+              <ActionBtn onClick={() => openEdit(c)} aria-label={`Edit ${c.name}`}><Edit2 size={16} /></ActionBtn>
+              <ActionBtn onClick={() => setDeleteTarget(c.id)} aria-label={`Delete ${c.name}`}><Trash2 size={16} /></ActionBtn>
             </div>
           </MobileCard>
         ))}

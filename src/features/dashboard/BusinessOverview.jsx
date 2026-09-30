@@ -59,7 +59,9 @@ const IconWrapper = styled.div`
 
 const Value = styled.div`
   font-size: 1.75rem;
-  font-weight: 800;
+  /* Tango Sans is only loaded at 400/700. Asking for 800 fell through to
+     Manrope 800 — a different typeface — and read as too heavy. */
+  font-weight: 700;
   font-family: ${({ theme }) => theme.fonts.display};
   color: ${({ theme }) => theme.colors.primary};
   
@@ -152,7 +154,7 @@ const PaymentBadge = styled.span`
 `;
 
 const SaleAmount = styled.div`
-  font-weight: 800;
+  font-weight: 600;
   font-size: 1rem;
   color: #6F240A;
 `;

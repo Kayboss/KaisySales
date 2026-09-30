@@ -206,7 +206,7 @@ const StatCard = styled.div`
 
   .value {
     font-size: 1.5rem;
-    font-weight: 900;
+    font-weight: 600;
     color: ${({ theme }) => theme.colors.primary};
   }
 

@@ -12,8 +12,10 @@
       ]
     }
   ],
+  "redirects": [
+    { "source": "/", "destination": "/landing/index.html", "permanent": true }
+  ],
   "rewrites": [
-    { "source": "/", "destination": "/landing/index.html" },
     { "source": "/landing/:path*", "destination": "/landing/:path*" },
     { "source": "/pages/:path*", "destination": "/landing/pages/:path*" },
     { "source": "/:path*", "destination": "/index.html" }
