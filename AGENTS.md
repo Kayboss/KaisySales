@@ -105,6 +105,9 @@ A user is either retail or services — never both. Components in each mode neve
 - Branch is `master`, not `main`.
 - PowerShell environment (Windows): no `&&` chaining; use `;` or `if ($?) { }`.
 - Windows CRLF warnings on git add are harmless.
+- GitHub log/artifact APIs return **403** to this machine (no auth), so a red CI step must be diagnosable from its own step output. Print the evidence in the step, not just in an artifact.
+- The DAST job must **not** use `docker run --network=host` for ZAP: it makes ZAP bind its own API port on the runner and the daemon dies with `Failed to start ZAP :(` (exit 3) before scanning anything. Use the default bridge plus `--add-host=host.docker.internal:host-gateway`, with the preview server bound to `0.0.0.0`, `--shm-size=2g`, and a writable workspace so the report lands in the volume.
+- GitHub Actions cannot read repo `secrets.*` in an `if:` condition. The `authz` job tests for empty values in a shell step and gates the next step on an output instead.
 - Expense `amount` is stored as TEXT with `GH₵` prefix — always strip before parseFloat.
 - Recharts is the chart library (AreaChart, PieChart, BarChart) — do not hand-roll SVG charts.
 - Income "Mark Paid" creates `service_income` + `sales` records; delete cascades.
