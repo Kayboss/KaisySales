@@ -22,6 +22,9 @@ const ModalContainer = styled.div`
   width: 100%;
   max-width: ${({ $wide }) => $wide ? '900px' : '640px'};
   max-height: 90vh;
+  max-height: 90dvh;
+  /* keeps the last input and the action buttons clear of the home indicator */
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
   overflow-y: auto;
   box-shadow: ${({ theme }) => theme.shadows.ambient};
   animation: slideIn 0.3s ease-out;

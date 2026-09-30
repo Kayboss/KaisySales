@@ -6,7 +6,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchCategories, createCategory, fetchInvoices, fetchLargestExpenseCategory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
-import { formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
+import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -382,7 +382,7 @@ const ExpenseTracking = () => {
       quantity: sanitizeNumber(formData.quantity),
       unitPrice: sanitizeNumber(formData.unitPrice),
       date: formData.date,
-      amount: `GH₵${totalAmount.toFixed(2)}`,
+      amount: `GHS ${totalAmount.toFixed(2)}`,
       trend: 'up' // default
     };
     
@@ -625,7 +625,7 @@ const ExpenseTracking = () => {
                 </div>
               </div>
               <div style={{ fontWeight: 700, color: '#6F240A', textAlign: 'left' }} className="data-tabular">
-                {expense.amount}
+                {formatCurrency(expense.amount, currency)}
               </div>
               <div style={{ whiteSpace: 'nowrap' }}>
                 <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(expense)} />
@@ -648,7 +648,7 @@ const ExpenseTracking = () => {
                 <ExpCategoryTag>{expense.category}</ExpCategoryTag>
                 <ExpAmountRow>
                   <ExpAmountLabel>Total</ExpAmountLabel>
-                  <ExpAmountValue className="data-tabular">{expense.amount}</ExpAmountValue>
+                  <ExpAmountValue className="data-tabular">{formatCurrency(expense.amount, currency)}</ExpAmountValue>
                 </ExpAmountRow>
               </ExpCardBody>
               <ExpCardDivider />

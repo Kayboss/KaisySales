@@ -5,8 +5,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { fetchCategories, createCategory, updateCategory, deleteCategory, uploadBusinessLogo, deleteBusinessLogo } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, Crown, DollarSign, Upload } from 'lucide-react';
-import SubscriptionSettings from './SubscriptionSettings';
+import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, DollarSign, Upload } from 'lucide-react';
 import ServiceCatalog from '../services/ServiceCatalog';
 import { CURRENCY_OPTIONS } from '../../utils/currency';
 import { sanitizeInput } from '../../utils/sanitize';
@@ -271,7 +270,6 @@ const avatarColors = ['#6F240A', '#1E3A8A', '#25432F', '#D4AF37', '#8B5E7C'];
 
 const SETTINGS_TABS = [
   { id: 'profile', label: 'Business Profile', icon: Building },
-  { id: 'subscription', label: 'Subscription', icon: Crown },
   { id: 'services', label: 'Service Catalog', icon: Briefcase },
 ];
 
@@ -283,11 +281,8 @@ const SettingsPage = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab');
-    if (tabParam === 'subscription') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setActiveTab('subscription');
-    }
     if (tabParam === 'services') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTab('services');
     }
   }, [location.search]);
@@ -469,8 +464,6 @@ const SettingsPage = () => {
         ))}
       </TabsRow>
 
-      {activeTab === 'subscription' && <SubscriptionSettings />}
-
       {activeTab === 'services' && isServices && <ServiceCatalog />}
 
       {activeTab === 'profile' && <><FormCard>
@@ -590,7 +583,7 @@ const SettingsPage = () => {
                 onChange={e => setFormData(prev => ({ ...prev, currency: e.target.value }))}
               >
                 {CURRENCY_OPTIONS.map(opt => (
-                  <option key={opt.code} value={opt.code}>{opt.symbol} - {opt.label}</option>
+                  <option key={opt.code} value={opt.code}>{opt.symbol === opt.code ? opt.code : `${opt.symbol} (${opt.code})`}</option>
                 ))}
               </Select>
             </InputWrapper>

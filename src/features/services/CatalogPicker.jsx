@@ -16,9 +16,9 @@ const label = (s) => {
   const flat = num(s.price);
   const perSqFt = num(s.areaPrice);
   const cat = s.category ? ` (${s.category})` : '';
-  if (perSqFt > 0 && flat > 0) return `${s.name} — GH₵${flat.toFixed(2)} or GH₵${perSqFt.toFixed(2)}/sq ft${cat}`;
-  if (perSqFt > 0) return `${s.name} — GH₵${perSqFt.toFixed(2)}/sq ft${cat}`;
-  return `${s.name} — GH₵${flat.toFixed(2)}${cat}`;
+  if (perSqFt > 0 && flat > 0) return `${s.name} — GHS ${flat.toFixed(2)} or GHS ${perSqFt.toFixed(2)}/sq ft${cat}`;
+  if (perSqFt > 0) return `${s.name} — GHS ${perSqFt.toFixed(2)}/sq ft${cat}`;
+  return `${s.name} — GHS ${flat.toFixed(2)}${cat}`;
 };
 
 const CatalogPicker = ({ services, onPick }) => (

@@ -75,7 +75,7 @@ A user is either retail or services — never both. Components in each mode neve
 ### Key tables
 - `service_income`: id, user_id, client_name, amount, platform_fee, net_amount, platform_tag, milestone_label, payment_date, notes, **category** (TEXT, added by migration), created_at
 - `recurring_income`: id, user_id, client_name, amount, frequency (monthly/quarterly/yearly), next_due_date, category (TEXT free text), active, timestamps
-- `expenses`: id, user_id, title, amount (TEXT with `GH₵` prefix — must strip with `parseFloat(String(e.amount).replace(/[^\d.-]/g, ''))`), category, date, vendor, subcategory, renewal_date, is_asset, asset_lifetime_years, transaction_fee
+- `expenses`: id, user_id, title, amount (TEXT with a `GHS ` prefix — read it with `parseAmount()` from `src/utils/currency.js`, never `parseFloat` on the raw string), category, date, vendor, subcategory, renewal_date, is_asset, asset_lifetime_years, transaction_fee
 - `categories`: id, user_id, name, type (income/expense/inventory/sales), created_at
 - `profiles`: includes business_type, business_name, logo_url, avatar_color, currency
 
@@ -108,7 +108,8 @@ A user is either retail or services — never both. Components in each mode neve
 - GitHub log/artifact APIs return **403** to this machine (no auth), so a red CI step must be diagnosable from its own step output. Print the evidence in the step, not just in an artifact.
 - The DAST job must **not** use `docker run --network=host` for ZAP: it makes ZAP bind its own API port on the runner and the daemon dies with `Failed to start ZAP :(` (exit 3) before scanning anything. Use the default bridge plus `--add-host=host.docker.internal:host-gateway`, with the preview server bound to `0.0.0.0`, `--shm-size=2g`, and a writable workspace so the report lands in the volume.
 - GitHub Actions cannot read repo `secrets.*` in an `if:` condition. The `authz` job tests for empty values in a shell step and gates the next step on an output instead.
-- Expense `amount` is stored as TEXT with `GH₵` prefix — always strip before parseFloat.
+- Expense `amount` is stored as TEXT with a `GHS ` prefix — always strip before parseFloat. Rows written before the 2026-09-30 currency switch still carry the old `GH₵` prefix; `parseAmount()` strips either, but **display must go through `formatCurrency()`/`formatCurrencyShort()`** so old and new rows render identically.
+- Currency is displayed as the ISO code (`GHS`), never the `₵` glyph: `formatCurrency` uses `currencyDisplay: 'code'`. Tango Sans has no `₵` glyph, so the symbol was being drawn by Manrope inside Tango Sans figures.
 - Recharts is the chart library (AreaChart, PieChart, BarChart) — do not hand-roll SVG charts.
 - Income "Mark Paid" creates `service_income` + `sales` records; delete cascades.
 - Lint must stay 0 errors / 0 warnings.

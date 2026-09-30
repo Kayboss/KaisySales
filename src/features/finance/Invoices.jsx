@@ -545,7 +545,7 @@ const Invoices = () => {
       quantity: totalQty,
       unitPrice: items[0]?.unitPrice || '',
       status: formData.status,
-      amount: `GH₵${totalAmount.toFixed(2)}`,
+      amount: `GHS ${totalAmount.toFixed(2)}`,
       notes: sanitizeInput(formData.notes, 500),
       items: [
         ...items.map(i => ({ name: sanitizeInput(i.name, 100), quantity: sanitizeNumber(i.quantity), unitPrice: sanitizeNumber(i.unitPrice) })),
@@ -596,7 +596,7 @@ const Invoices = () => {
             paymentMethod: 'Invoice',
             date: formData.date || new Date().toISOString().split('T')[0],
             time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
-            amount: `GH₵${totalAmount.toFixed(2)}`
+            amount: `GHS ${totalAmount.toFixed(2)}`
           });
           // Store sale reference back in invoice
           if (invoiceId && saleResult?.id) {
@@ -1061,7 +1061,7 @@ const Invoices = () => {
                   )}
                 </Cell>
                 <Cell className="c-amount">
-                  <RowAmount className="data-tabular">{invoice.amount}</RowAmount>
+                  <RowAmount className="data-tabular">{formatCurrency(invoice.amount, currency)}</RowAmount>
                 </Cell>
                 <Cell className="c-status">
                   <StatusBadge $status={invoice.status} style={{ marginBottom: 0 }}>
@@ -1102,7 +1102,7 @@ const Invoices = () => {
             
             <div style={{ color: '#55423D', fontSize: '0.75rem', fontWeight: 600 }}>{invoice.id}</div>
             <h3 style={{ fontSize: '1.25rem', margin: '0.25rem 0', color: '#1C1C18' }}>{invoice.customer}</h3>
-            <Amount className="data-tabular">{invoice.amount}</Amount>
+            <Amount className="data-tabular">{formatCurrency(invoice.amount, currency)}</Amount>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #F0EEE8' }}>
               <span style={{ fontSize: '0.875rem', color: '#55423D' }}>Due: {invoice.date}</span>

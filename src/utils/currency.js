@@ -1,20 +1,20 @@
 const CURRENCY_MAP = {
-  'en-GH': { code: 'GHS', symbol: 'GH₵', locale: 'en-GH' },
-  'en-NG': { code: 'NGN', symbol: '₦', locale: 'en-NG' },
+  'en-GH': { code: 'GHS', symbol: 'GHS', locale: 'en-GH' },
+  'en-NG': { code: 'NGN', symbol: 'NGN', locale: 'en-NG' },
   'en-KE': { code: 'KES', symbol: 'KSh', locale: 'en-KE' },
-  'en-ZA': { code: 'ZAR', symbol: 'R', locale: 'en-ZA' },
+  'en-ZA': { code: 'ZAR', symbol: 'ZAR', locale: 'en-ZA' },
   'en-TZ': { code: 'TZS', symbol: 'TSh', locale: 'en-TZ' },
-  'en-UG': { code: 'UGX', symbol: 'USh', locale: 'en-UG' },
+  'en-UG': { code: 'UGX', symbol: 'UGX', locale: 'en-UG' },
   'en-US': { code: 'USD', symbol: '$', locale: 'en-US' },
   'en-GB': { code: 'GBP', symbol: '£', locale: 'en-GB' },
   'en-CM': { code: 'XAF', symbol: 'FCFA', locale: 'en-CM' },
   'fr-CM': { code: 'XAF', symbol: 'FCFA', locale: 'fr-CM' },
-  'en-SL': { code: 'SLL', symbol: 'Le', locale: 'en-SL' },
-  'en-LR': { code: 'LRD', symbol: '$', locale: 'en-LR' },
-  'en-GM': { code: 'GMD', symbol: 'D', locale: 'en-GM' },
+  'en-SL': { code: 'SLL', symbol: 'SLL', locale: 'en-SL' },
+  'en-LR': { code: 'LRD', symbol: 'LRD', locale: 'en-LR' },
+  'en-GM': { code: 'GMD', symbol: 'GMD', locale: 'en-GM' },
 };
 
-const FALLBACK = { code: 'GHS', symbol: 'GH₵', locale: 'en-GH' };
+const FALLBACK = { code: 'GHS', symbol: 'GHS', locale: 'en-GH' };
 
 export function detectCurrency() {
   try {
@@ -40,11 +40,12 @@ export function formatCurrency(amount, currencyCode) {
     return new Intl.NumberFormat(currency.locale, {
       style: 'currency',
       currency: currency.code,
+      currencyDisplay: 'code',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(num);
   } catch {
-    return `${currency.symbol}${num.toFixed(2)}`;
+    return `${currency.symbol} ${num.toFixed(2)}`;
   }
 }
 
@@ -53,7 +54,7 @@ export function formatCurrencyShort(amount, currencyCode) {
     ? Object.values(CURRENCY_MAP).find(c => c.code === currencyCode) || FALLBACK
     : FALLBACK;
   const num = parseAmount(amount);
-  return `${currency.symbol}${num.toLocaleString()}`;
+  return `${currency.symbol} ${num.toLocaleString()}`;
 }
 
 export function getCurrencySymbol(currencyCode) {

@@ -13,13 +13,12 @@ import {
   Phone, 
   MapPin, 
   Check, 
-  Briefcase,
-  Crown,
-  CheckCircle
+  Briefcase
 } from 'lucide-react';
 
 const Container = styled.div`
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -27,6 +26,9 @@ const Container = styled.div`
   position: relative;
   overflow: hidden;
   padding: 2rem;
+  /* keep the centred card clear of the notch and the home indicator */
+  padding-top: calc(2rem + env(safe-area-inset-top));
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
 
   &::before {
     content: '';
@@ -242,130 +244,11 @@ const OptionDescription = styled.div`
   }
 `;
 
-const PlanGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
-
-  @media (max-width: 600px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const PlanCard = styled.div`
-  border: 2px solid ${props => props.$selected ? '#6F240A' : '#F0EEE8'};
-  background: ${props => props.$selected ? 'rgba(111, 36, 10, 0.04)' : 'white'};
-  border-radius: 12px;
-  padding: 1.25rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    border-color: #6F240A;
-  }
-`;
-
-const PlanCardTitle = styled.div`
-  font-size: 1rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #1C1C18;
-  margin-top: 0.5rem;
-`;
-
-const PlanCardPrice = styled.div`
-  font-size: 1.5rem;
-  font-weight: 900;
-  color: #6F240A;
-  margin: 0.35rem 0;
-`;
-
-const PlanPeriod = styled.div`
-  font-size: 0.75rem;
-  color: #89726C;
-  margin-bottom: 0.75rem;
-`;
-
-const PlanFeatureList = styled.div`
-  text-align: left;
-  font-size: 0.8rem;
-  color: #55423D;
-`;
-
-const PlanFeatureItem = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem 0;
-  border-bottom: 1px solid #F0EEE8;
-
-  &:last-child { border-bottom: none; }
-`;
-
-const ToggleRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
-`;
-
-const ToggleLabel = styled.span`
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: ${props => props.$active ? '#6F240A' : '#89726C'};
-`;
-
-const ToggleSwitch = styled.button`
-  width: 44px;
-  height: 24px;
-  border-radius: 12px;
-  border: none;
-  background: ${props => props.$yearly ? '#6F240A' : '#D0C8C4'};
-  position: relative;
-  cursor: pointer;
-  transition: background 0.2s ease;
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: ${props => props.$yearly ? '23px' : '2px'};
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: white;
-    transition: left 0.2s ease;
-  }
-`;
-
-const SaveBadge = styled.span`
-  display: inline-block;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  font-size: 0.55rem;
-  font-weight: 800;
-  color: white;
-  background: #25432F;
-  margin-left: 0.3rem;
-  vertical-align: middle;
-`;
-
-const InfoBox = styled.div`
-  padding: 0.75rem;
-  background: #FFF0E0;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  color: #875200;
-  text-align: center;
-  margin-top: 0.5rem;
-  word-break: break-word;
-`;
-
 const Footer = styled.div`
   padding: 2rem 3rem;
+  /* the Continue button lives here, at the very bottom of the card, which is
+     where the mobile home / back / recents bar is drawn */
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
   border-top: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   background: ${({ theme }) => theme.colors.background.surfaceVariant};
   display: flex;
@@ -373,6 +256,7 @@ const Footer = styled.div`
 
   @media (max-width: 500px) {
     padding: 1.5rem;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
   }
 `;
 
@@ -423,36 +307,12 @@ const NextButton = styled.button`
   }
 `;
 
-const PLANS = {
-  free: {
-    key: 'free',
-    label: 'Free Trial',
-    priceLabel: '3 days free',
-    features: ['Up to 10 sales', 'Up to 2 invoices', 'Up to 5 products', 'Basic reporting'],
-  },
-  silver: {
-    key: 'silver',
-    label: 'Silver',
-    monthlyPrice: 35,
-    yearlyPrice: 350,
-    features: ['Up to 100 sales/mo', 'Up to 20 invoices/mo', 'Up to 50 products', 'Email support'],
-  },
-  gold: {
-    key: 'gold',
-    label: 'Gold',
-    monthlyPrice: 75,
-    yearlyPrice: 750,
-    features: ['Unlimited sales', 'Unlimited invoices', 'Unlimited products', 'Priority support'],
-  },
-};
-
 const OnboardingWizard = () => {
   const { user, logout } = useAuthStore();
   const updateSettings = useSettingsStore(state => state.updateSettings);
   
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [yearly, setYearly] = useState(false);
   const [formData, setFormData] = useState({
     ownerName: '',
     businessName: '',
@@ -460,8 +320,7 @@ const OnboardingWizard = () => {
     location: 'Accra, Greater Accra',
     category: 'Food & Beverage',
     avatarColor: '#6F240A',
-    currency: 'GHS',
-    subscriptionPlan: 'free'
+    currency: 'GHS'
   });
 
   const handleChange = (e) => {
@@ -477,13 +336,9 @@ const OnboardingWizard = () => {
     setFormData(prev => ({ ...prev, avatarColor: col }));
   };
 
-  const setPlan = (plan) => {
-    setFormData(prev => ({ ...prev, subscriptionPlan: plan }));
-  };
-
   const handleNext = (e) => {
     e.preventDefault();
-    if (step < 4) {
+    if (step < 3) {
       setStep(step + 1);
     } else {
       handleSubmit();
@@ -494,16 +349,6 @@ const OnboardingWizard = () => {
     if (step > 1) {
       setStep(step - 1);
     }
-  };
-
-  const getDisplayPrice = (plan) => {
-    if (plan.key === 'free') return null;
-    return yearly ? plan.yearlyPrice : plan.monthlyPrice;
-  };
-
-  const getPeriod = (plan) => {
-    if (plan.key === 'free') return '3 days';
-    return yearly ? '/year' : '/month';
   };
 
   const handleSubmit = async () => {
@@ -540,7 +385,6 @@ const OnboardingWizard = () => {
   };
 
   const avatarColors = ['#6F240A', '#1E3A8A', '#25432F', '#D4AF37', '#8B5E7C'];
-  const planKeys = ['free', 'silver', 'gold'];
 
   return (
     <Container>
@@ -566,7 +410,6 @@ const OnboardingWizard = () => {
           <ProgressSegment $active={step >= 1} />
           <ProgressSegment $active={step >= 2} />
           <ProgressSegment $active={step >= 3} />
-          <ProgressSegment $active={step >= 4} />
         </TopProgressBar>
 
         <Content>
@@ -705,67 +548,18 @@ const OnboardingWizard = () => {
                 <div>
                   <Label>Preferred Currency</Label>
                   <InputWrapper>
-                    <span style={{ position: 'absolute', left: '1rem', fontSize: '1rem', color: '#89726C' }}>₵</span>
                     <Select 
                       name="currency" 
                       value={formData.currency}
                       onChange={handleChange}
-                      style={{ paddingLeft: '2.75rem' }}
                     >
                       {CURRENCY_OPTIONS.map(c => (
-                        <option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>
+                        <option key={c.code} value={c.code}>{c.symbol === c.code ? c.code : `${c.symbol} (${c.code})`}</option>
                       ))}
                     </Select>
                   </InputWrapper>
                 </div>
               </Form>
-            </div>
-          )}
-
-          {step === 4 && (
-            <div>
-              <StepHeader>
-                <h2>Choose Your Plan</h2>
-                <p>Start with a free trial and upgrade anytime, or pick a paid plan now.</p>
-              </StepHeader>
-
-              <ToggleRow>
-                <ToggleLabel $active={!yearly}>Monthly</ToggleLabel>
-                <ToggleSwitch $yearly={yearly} onClick={() => setYearly(!yearly)} />
-                <ToggleLabel $active={yearly}>Yearly <SaveBadge>Save 2mo</SaveBadge></ToggleLabel>
-              </ToggleRow>
-
-              <PlanGrid>
-                {planKeys.map(key => {
-                  const p = PLANS[key];
-                  const selected = formData.subscriptionPlan === key;
-                  return (
-                    <PlanCard key={key} $selected={selected} onClick={() => setPlan(key)}>
-                      <Crown size={22} color={key === 'gold' ? '#875200' : key === 'silver' ? '#6F240A' : '#89726C'} />
-                      <PlanCardTitle>{p.label}</PlanCardTitle>
-                      {key === 'free' ? (
-                        <PlanCardPrice style={{ fontSize: '1rem', color: '#25432F' }}>{p.priceLabel}</PlanCardPrice>
-                      ) : (
-                        <>
-                          <PlanCardPrice>GH₵{getDisplayPrice(p)}</PlanCardPrice>
-                          <PlanPeriod>{getPeriod(p)}</PlanPeriod>
-                        </>
-                      )}
-                      <PlanFeatureList>
-                        {p.features.map((f, i) => (
-                          <PlanFeatureItem key={i}>
-                            <CheckCircle size={11} color="#25432F" />
-                            {f}
-                          </PlanFeatureItem>
-                        ))}
-                      </PlanFeatureList>
-                      {selected && key !== 'free' && (
-                        <InfoBox>Pay via Mobile Money to <strong>055 088 4398</strong> (Kevin Carl Asamany). Use your business name as reference.</InfoBox>
-                      )}
-                    </PlanCard>
-                  );
-                })}
-              </PlanGrid>
             </div>
           )}
 
@@ -788,7 +582,7 @@ const OnboardingWizard = () => {
           >
             {loading ? (
               'Setting up your workspace...'
-            ) : step === 4 ? (
+            ) : step === 3 ? (
               <>
                 Open KaisySales
                 <Sparkles size={16} />

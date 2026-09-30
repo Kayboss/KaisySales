@@ -345,7 +345,7 @@ const ServiceCatalog = () => {
         </DefaultsHead>
         <DefaultsRow>
           <DefaultField>
-            <DefaultLabel>Price per Sq. Foot (GH₵)</DefaultLabel>
+            <DefaultLabel>Price per Sq. Foot (GHS)</DefaultLabel>
             <Input type="number" min="0" step="0.01" value={defPrice} onChange={e => setDefPrice(e.target.value)} placeholder="e.g. 4.70" style={{ minWidth: 120, flex: 1 }} />
           </DefaultField>
           <AddBtn type="button" onClick={handleSaveDefaults} disabled={savingDefaults}>
@@ -362,7 +362,7 @@ const ServiceCatalog = () => {
       <form onSubmit={handleAdd}>
         <AddRow>
           <Input value={name} onChange={e => setName(e.target.value)} placeholder="Service name (e.g. Banner printing)" autoFocus />
-          <Input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="Price (GH₵)" style={{ minWidth: 110, maxWidth: 160 }} />
+          <Input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="Price (GHS)" style={{ minWidth: 110, maxWidth: 160 }} />
           <Input list="catalog-cat-suggestions" value={category} onChange={e => setCategory(e.target.value)} placeholder="Category (optional)" style={{ minWidth: 130 }} />
           <datalist id="catalog-cat-suggestions">
             {suggestions.map(c => <option key={c} value={c} />)}
@@ -373,7 +373,7 @@ const ServiceCatalog = () => {
         </AddRow>
         <Divider>Optional size pricing (per sq ft)</Divider>
         <AddRow>
-          <Input type="number" min="0" step="0.01" value={addAreaPrice} onChange={e => setAddAreaPrice(e.target.value)} placeholder="Price per sq ft — GH₵ (optional)" style={{ maxWidth: 260 }} />
+          <Input type="number" min="0" step="0.01" value={addAreaPrice} onChange={e => setAddAreaPrice(e.target.value)} placeholder="Price per sq ft — GHS (optional)" style={{ maxWidth: 260 }} />
         </AddRow>
       </form>
 
@@ -396,7 +396,7 @@ const ServiceCatalog = () => {
                     </Actions>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <Input type="number" min="0" step="0.01" value={editAreaPrice} onChange={e => setEditAreaPrice(e.target.value)} placeholder="Price per sq ft — GH₵ (optional)" style={{ maxWidth: 240 }} />
+                    <Input type="number" min="0" step="0.01" value={editAreaPrice} onChange={e => setEditAreaPrice(e.target.value)} placeholder="Price per sq ft — GHS (optional)" style={{ maxWidth: 240 }} />
                   </div>
                 </div>
               ) : (

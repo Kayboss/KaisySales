@@ -34,9 +34,21 @@ const SearchInput = styled.input`
   }
 `;
 
+const HeaderActions = styled.div`
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+
+  @media (max-width: 768px) {
+    width: 100%;
+    flex-direction: column;
+  }
+`;
+
 const AddButton = styled.button`
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.65rem 1.25rem;
   background: ${({ theme }) => theme.colors.primary};
@@ -107,11 +119,34 @@ const MobileCard = styled.div`
   background: white;
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
-  padding: 1rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+`;
+
+const MobileAvatar = styled.div`
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.text.onPrimary};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 700;
 `;
 
 const CustomerLink = styled(Link)`
-  display: block;
+  flex: 1;
+  /* without min-width:0 a long name refuses to shrink and pushes the
+     action buttons off the edge of a narrow screen */
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
   text-decoration: none;
   color: inherit;
   /* the whole block is the tap target, so it needs a pressed state */
@@ -123,13 +158,25 @@ const CustomerLink = styled(Link)`
 const MobileName = styled.div`
   font-weight: 600;
   font-size: 1rem;
-  color: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.text.main};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const MobilePhone = styled.div`
   font-size: 0.875rem;
   color: ${({ theme }) => theme.colors.onSurfaceVariant};
   margin-top: 0.15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const MobileActions = styled.div`
+  display: flex;
+  gap: 0.15rem;
+  flex-shrink: 0;
 `;
 
 const Label = styled.label`
@@ -168,6 +215,15 @@ const EmptyState = styled.div`
 `;
 
 const PAGE_SIZE = 20;
+
+const initials = (name) => {
+  const words = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return '?';
+  const letters = words.length > 1
+    ? words[0][0] + words[words.length - 1][0]
+    : words[0].slice(0, 2);
+  return letters.toUpperCase();
+};
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -251,10 +307,10 @@ const Customers = () => {
     <div>
       <Header>
         <Title>Customers</Title>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <HeaderActions>
           <SearchInput placeholder="Search customers..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
           <AddButton onClick={openAdd}><Plus size={18} /> Add Customer</AddButton>
-        </div>
+        </HeaderActions>
       </Header>
 
       <Table>
@@ -289,13 +345,16 @@ const Customers = () => {
         {paginated.map(c => (
           <MobileCard key={c.id}>
             <CustomerLink to={`/customers/${c.id}`}>
-              <MobileName>{c.name}</MobileName>
-              <MobilePhone>{c.phone || 'No phone number'}</MobilePhone>
+              <MobileAvatar aria-hidden="true">{initials(c.name)}</MobileAvatar>
+              <div style={{ minWidth: 0 }}>
+                <MobileName>{c.name}</MobileName>
+                <MobilePhone>{c.phone || 'No phone number'}</MobilePhone>
+              </div>
             </CustomerLink>
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', justifyContent: 'flex-end' }}>
+            <MobileActions>
               <ActionBtn onClick={() => openEdit(c)} aria-label={`Edit ${c.name}`}><Edit2 size={16} /></ActionBtn>
               <ActionBtn onClick={() => setDeleteTarget(c.id)} aria-label={`Delete ${c.name}`}><Trash2 size={16} /></ActionBtn>
-            </div>
+            </MobileActions>
           </MobileCard>
         ))}
         {paginated.length === 0 && <EmptyState>No customers found.</EmptyState>}

@@ -282,7 +282,7 @@ const ServiceExpenses = () => {
     const fee = sanitizeNumber(form.transactionFee);
     const payload = {
       title: sanitizeInput(form.title, 100),
-      amount: `GH₵${(base + fee).toFixed(2)}`,
+      amount: `GHS ${(base + fee).toFixed(2)}`,
       category: form.category,
       date: form.date || null,
       subcategory: form.subcategory,
@@ -346,7 +346,7 @@ const ServiceExpenses = () => {
     .map(i => ({
       id: `fee-${i.id}`,
       title: `Platform fee — ${i.clientName || 'Client'}`,
-      amount: `GH₵${parseFloat(i.platformFee).toFixed(2)}`,
+      amount: `GHS ${parseFloat(i.platformFee).toFixed(2)}`,
       category: 'Platform Fees',
       subcategory: 'platform_fee',
       vendor: i.platformTag || '',
@@ -387,17 +387,17 @@ const ServiceExpenses = () => {
       <StatRow>
         <StatCard>
           <h3>Total Expenses</h3>
-          <div className="value">GH₵{totalAmt.toFixed(2)}</div>
+          <div className="value">GHS {totalAmt.toFixed(2)}</div>
           <div className="sub">{expenses.length} entries</div>
         </StatCard>
         <StatCard>
           <h3>Platform Fees</h3>
-          <div className="value" style={{ color: '#C62828' }}>GH₵{totalFees.toFixed(2)}</div>
+          <div className="value" style={{ color: '#C62828' }}>GHS {totalFees.toFixed(2)}</div>
           <div className="sub">{serviceIncome.filter(i => (parseFloat(i.platformFee) || 0) > 0).length} transactions with fees</div>
         </StatCard>
         <StatCard>
           <h3>SaaS & Subscriptions</h3>
-          <div className="value">GH₵{saasTotal.toFixed(2)}</div>
+          <div className="value">GHS {saasTotal.toFixed(2)}</div>
           <div className="sub">{upcomingRenewals.length} renewals due in 30 days</div>
         </StatCard>
         <StatCard>
@@ -431,7 +431,7 @@ const ServiceExpenses = () => {
                   <SubCategoryTag $type={e.subcategory}>{e.category}</SubCategoryTag>
                   {e.isAsset && <AssetBadge style={{ marginLeft: '0.35rem' }}>Asset</AssetBadge>}
                 </Td>
-                <Td>GH₵{amt.toFixed(2)}</Td>
+                <Td>GHS {amt.toFixed(2)}</Td>
                 <Td>{e.vendor || '-'}</Td>
                 <Td>{e.date || '-'}</Td>
                 <Td>
@@ -467,7 +467,7 @@ const ServiceExpenses = () => {
                 <span>Category</span>
                 <span><SubCategoryTag $type={e.subcategory}>{e.category}</SubCategoryTag> {e.isAsset && <AssetBadge>Asset</AssetBadge>}</span>
               </MobileRow>
-              <MobileRow><span>Amount</span><span>GH₵{amt.toFixed(2)}</span></MobileRow>
+              <MobileRow><span>Amount</span><span>GHS {amt.toFixed(2)}</span></MobileRow>
               <MobileRow><span>Vendor</span><span>{e.vendor || '-'}</span></MobileRow>
               <MobileRow><span>Date</span><span>{e.date || '-'}</span></MobileRow>
               {e.renewalDate && <MobileRow><span>Renewal</span><span>{e.renewalDate}</span></MobileRow>}
@@ -505,7 +505,7 @@ const ServiceExpenses = () => {
           </Select>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
-              <Label>Amount (GH₵)</Label>
+              <Label>Amount (GHS)</Label>
               <Input type="number" step="0.01" required value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
             </div>
             <div>
@@ -556,7 +556,7 @@ const ServiceExpenses = () => {
               <Input type="number" value={form.assetLifetime} onChange={e => setForm(f => ({ ...f, assetLifetime: e.target.value }))} placeholder="3" />
             </div>
           )}
-          <Label>Transaction / Withdrawal Fee (GH₵)</Label>
+          <Label>Transaction / Withdrawal Fee (GHS)</Label>
           <Input type="number" step="0.01" value={form.transactionFee} onChange={e => setForm(f => ({ ...f, transactionFee: e.target.value }))} placeholder="0.00" />
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
             <button type="button" onClick={() => setModalOpen(false)} style={{ padding: '0.65rem 1.25rem', border: '1px solid #ddd', borderRadius: 8, background: 'white', cursor: 'pointer' }}>Cancel</button>

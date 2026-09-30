@@ -284,7 +284,7 @@ const ServiceReporting = () => {
     .sort((a, b) => b[1] - a[1])
     .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }));
 
-  const formatAmt = (v) => `GH₵${(v || 0).toFixed(2)}`;
+  const formatAmt = (v) => `GHS ${(v || 0).toFixed(2)}`;
 
   const exportReport = () => {
     const headers = { date: 'Date', client: 'Client', service: 'Service', gross: 'Gross Amount', fee: 'Platform Fee', net: 'Net Amount' };
@@ -342,7 +342,7 @@ const ServiceReporting = () => {
             <CartesianGrid strokeDasharray="3 3" stroke="#F0EEE8" />
             <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#89726C' }} tickLine={false} axisLine={{ stroke: '#E8E5DF' }} />
             <YAxis tick={{ fontSize: 11, fill: '#89726C' }} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(value, name) => [`GH₵${Number(value).toFixed(2)}`, name]} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(value, name) => [`GHS ${Number(value).toFixed(2)}`, name]} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Area type="monotone" dataKey="Income" stroke="#25432F" strokeWidth={2.5} fill="url(#rptGradIncome)" dot={{ r: 4, fill: '#25432F', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
             <Area type="monotone" dataKey="Expenses" stroke="#C62828" strokeWidth={2.5} fill="url(#rptGradExpense)" strokeDasharray="6 3" dot={{ r: 4, fill: '#C62828', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
@@ -359,7 +359,7 @@ const ServiceReporting = () => {
                 <Pie data={platformPieData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                   {platformPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={value => [`GH₵${Number(value).toFixed(2)}`]} />
+                <Tooltip contentStyle={tooltipStyle} formatter={value => [`GHS ${Number(value).toFixed(2)}`]} />
               </RPieChart>
             </ResponsiveContainer>
           ) : <EmptyState>No platform data.</EmptyState>}
@@ -373,7 +373,7 @@ const ServiceReporting = () => {
                 <Pie data={expensePieData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                   {expensePieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={value => [`GH₵${Number(value).toFixed(2)}`]} />
+                <Tooltip contentStyle={tooltipStyle} formatter={value => [`GHS ${Number(value).toFixed(2)}`]} />
               </RPieChart>
             </ResponsiveContainer>
           ) : <EmptyState>No expense data.</EmptyState>}
@@ -388,7 +388,7 @@ const ServiceReporting = () => {
               <CartesianGrid strokeDasharray="3 3" stroke="#F0EEE8" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 11, fill: '#89726C' }} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#1C1C18' }} tickLine={false} axisLine={false} width={90} />
-              <Tooltip contentStyle={tooltipStyle} formatter={value => [`GH₵${Number(value).toFixed(2)}`, 'Revenue']} />
+              <Tooltip contentStyle={tooltipStyle} formatter={value => [`GHS ${Number(value).toFixed(2)}`, 'Revenue']} />
               <Bar dataKey="revenue" fill="#6F240A" radius={[0, 6, 6, 0]} barSize={22} />
             </BarChart>
           </ResponsiveContainer>
@@ -531,7 +531,7 @@ const ServiceReporting = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#F0EEE8" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 11, fill: '#89726C' }} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#1C1C18' }} tickLine={false} axisLine={false} width={100} />
-                <Tooltip contentStyle={tooltipStyle} formatter={value => [`GH₵${Number(value).toFixed(2)}`, 'Profit']} />
+                <Tooltip contentStyle={tooltipStyle} formatter={value => [`GHS ${Number(value).toFixed(2)}`, 'Profit']} />
                 <Bar dataKey="profit" fill="#25432F" radius={[0, 6, 6, 0]} barSize={22} />
               </BarChart>
             </ResponsiveContainer>

@@ -40,6 +40,10 @@ import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, FileText, S
 const Layout = styled.div`
   display: flex;
   height: 100vh;
+  /* 100vh includes the area behind the mobile home indicator and the collapsing
+     URL bar, so the drawer and the scroll area are sized against it. 100dvh is
+     the height actually visible to the user. */
+  height: 100dvh;
   overflow: hidden;
   background-color: ${({ theme }) => theme.colors.background.main};
   position: relative;
@@ -60,6 +64,11 @@ const Sidebar = styled.nav`
   @media (max-width: 768px) {
     position: fixed;
     transform: translateX(${props => props.$isOpen ? '0' : '-100%'});
+    height: 100dvh;
+    /* Sign Out sits at the bottom of this drawer, which lands exactly where the
+       home / back / recents bar is drawn. Lift it clear of that bar. */
+    padding-top: calc(2rem + env(safe-area-inset-top));
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom));
   }
 `;
 
@@ -73,7 +82,11 @@ const Main = styled.main`
 
   @media (max-width: 768px) {
     padding: 1.5rem;
-    padding-top: 5rem;
+    /* clear the fixed header, which now grows by the status-bar inset */
+    padding-top: calc(5rem + env(safe-area-inset-top));
+    /* the last row of a table and the Sign Out button sit right at the bottom
+       edge otherwise, under the home / back / recents bar */
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom));
   }
 `;
 
@@ -88,8 +101,13 @@ const MobileHeader = styled.div`
     left: 0;
     right: 0;
     height: 4rem;
+    /* viewport-fit=cover lets the page draw under the status bar, so the header
+       has to make room for it rather than being overlapped by the notch */
+    height: calc(4rem + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
     background: ${({ theme }) => theme.colors.primary};
-    padding: 0 1.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
     border-bottom: 1px solid rgba(255,255,255,0.1);
     z-index: 90;
   }

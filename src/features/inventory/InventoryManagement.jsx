@@ -430,8 +430,8 @@ const InventoryManagement = () => {
       category: sanitizeInput(selectedCategory, 50),
       stock: stockNum,
       minStock: minStock,
-      price: `GH₵${sanitizeNumber(formData.price).toFixed(2)}`,
-      costPrice: `GH₵${sanitizeNumber(formData.costPrice).toFixed(2)}`,
+      price: `GHS ${sanitizeNumber(formData.price).toFixed(2)}`,
+      costPrice: `GHS ${sanitizeNumber(formData.costPrice).toFixed(2)}`,
       status: stockNum > minStock ? 'In Stock' : stockNum > 0 ? 'Low Stock' : 'Out of Stock'
     };
     
@@ -700,7 +700,7 @@ const InventoryManagement = () => {
                   <button type="button" disabled={adjustingId === item.id} onClick={() => adjustStock(item, 1)} style={{ background: 'none', border: '1px solid #D0C8C4', borderRadius: '4px', cursor: adjustingId === item.id ? 'not-allowed' : 'pointer', display: 'flex', padding: '2px', color: '#25432F', opacity: adjustingId === item.id ? 0.5 : 1 }} title="Increase"><Plus size={14} /></button>
                 </div>
               </Td>
-              <Td className="data-tabular" style={{ fontWeight: 600 }}>{item.price}</Td>
+              <Td className="data-tabular" style={{ fontWeight: 600 }}>{formatCurrency(item.price, currency)}</Td>
               <Td className="data-tabular">{item.costPrice || '—'}</Td>
               <Td className="data-tabular">
                 {marginOf(item) == null ? (
@@ -747,7 +747,7 @@ const InventoryManagement = () => {
               </InvStockRow>
               <InvPriceRow>
                 <InvPriceLabel>Unit Price</InvPriceLabel>
-                <InvPriceValue className="data-tabular">{item.price}</InvPriceValue>
+                <InvPriceValue className="data-tabular">{formatCurrency(item.price, currency)}</InvPriceValue>
               </InvPriceRow>
               <InvPriceRow>
                 <InvPriceLabel>Cost</InvPriceLabel>

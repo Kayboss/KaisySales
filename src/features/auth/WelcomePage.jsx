@@ -5,8 +5,13 @@ import { ArrowRight, AlertCircle, CheckCircle2, Loader, Eye, EyeOff } from 'luci
 
 const Container = styled.div`
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   background: ${({ theme }) => theme.background};
+  /* the form is vertically centred, so on a short phone it can reach both the
+     notch and the home indicator once the page is allowed to draw edge to edge */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 
   @media (max-width: 768px) {
     flex-direction: column;

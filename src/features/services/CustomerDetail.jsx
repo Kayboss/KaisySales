@@ -424,7 +424,7 @@ const MethodBadge = styled.span`
   white-space: nowrap;
 `;
 
-const fmt = (n) => `GH₵${(n || 0).toFixed(2)}`;
+const fmt = (n) => `GHS ${(n || 0).toFixed(2)}`;
 const todayISO = () => new Date().toISOString().split('T')[0];
 const moneyOf = (v) => parseFloat(String(v).replace(/[^\d.-]/g, '')) || 0;
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -693,7 +693,7 @@ const CustomerDetail = () => {
             <tr><th>Item</th><th>Size</th><th>Rate/sq ft</th><th>Sq Ft Price</th><th>Qty</th><th>Total</th><th>Formula</th></tr>
             ${rows || '<tr><td colspan="7">No items</td></tr>'}
           </table>
-          <div class="total"><span>Grand Total</span><span>GH₵${grand.toLocaleString()}</span></div>
+          <div class="total"><span>Grand Total</span><span>GHS ${grand.toLocaleString()}</span></div>
           <p class="foot">KaisySales - Know your Business, Stay in Control</p>
         </body>
       </html>`);
@@ -733,7 +733,7 @@ const CustomerDetail = () => {
         quantity: totalQty,
         unitPrice: totalQty > 0 ? +(total / totalQty) : unitPrice,
         status: isPaid ? 'paid' : 'pending',
-        amount: `GH₵${total.toFixed(2)}`,
+        amount: `GHS ${total.toFixed(2)}`,
         notes: '',
         items,
       });
@@ -948,7 +948,7 @@ const CustomerDetail = () => {
           quantity: items.length,
           unitPrice: items.length ? round2(itemTotal / items.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0)) : 0,
           status: targetPaid ? 'paid' : 'pending',
-          amount: `GH₵${finalAmount.toFixed(2)}`,
+          amount: `GHS ${finalAmount.toFixed(2)}`,
           items: [...(metaItem ? [metaItem] : []), ...items, ...markers],
         });
         if (targetPaid) {
@@ -1224,16 +1224,16 @@ const CustomerDetail = () => {
 
           {priceMode === 'flat' ? (
             <>
-              <Label>Unit Price (GH₵) *</Label>
+              <Label>Unit Price (GHS) *</Label>
               <Input required type="number" min="0" step="0.01" value={svcForm.amount} onChange={e => setSvcForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
               <Label>Quantity *</Label>
               <Input required type="number" min="1" step="1" value={svcForm.quantity} onChange={e => setSvcForm(f => ({ ...f, quantity: e.target.value }))} placeholder="1" />
               <p style={{ fontSize: '0.9rem', color: '#25432F', fontWeight: 700, marginTop: '-0.25rem' }}>
-                Total: GH₵{((moneyOf(svcForm.amount) || 0) * Math.max(1, parseInt(svcForm.quantity) || 1)).toFixed(2)}
+                Total: GHS {((moneyOf(svcForm.amount) || 0) * Math.max(1, parseInt(svcForm.quantity) || 1)).toFixed(2)}
               </p>
               {areaP > 0 && svcForm.service && (
                 <p style={{ fontSize: '0.8rem', color: '#89726C', marginTop: '-0.25rem' }}>
-                  "{svcForm.service}" is GH₵{areaP.toFixed(2)} per sq ft — switch to <strong>By Size</strong> to price by dimensions.
+                  "{svcForm.service}" is GHS {areaP.toFixed(2)} per sq ft — switch to <strong>By Size</strong> to price by dimensions.
                 </p>
               )}
             </>
@@ -1349,7 +1349,7 @@ const entry = payments[inv.id] || { amount: String(balance || ''), date: todayIS
 
               {editSizeMode ? (
                 <>
-                  <Label>Price per sq ft (GH₵)</Label>
+                  <Label>Price per sq ft (GHS)</Label>
                   <Input type="number" min="0" step="0.01" value={editSizeRate} onChange={e => setEditSizeRate(e.target.value)} />
                   <div style={{ height: '0.75rem' }} />
                   <SizePricingCalculator lines={editSizeLines} onChange={setEditSizeLines} pricePerSqFt={editSizeRate} />
@@ -1370,10 +1370,10 @@ const entry = payments[inv.id] || { amount: String(balance || ''), date: todayIS
                       <Input required value={it.name} onChange={e => setEditItems(editItems.map((x, xi) => (xi === i ? { ...x, name: e.target.value } : x)))} placeholder="e.g. Banner 10x5 ft" />
                       <Label>Quantity *</Label>
                       <Input required type="number" min="1" step="1" value={it.quantity} onChange={e => setEditItems(editItems.map((x, xi) => (xi === i ? { ...x, quantity: e.target.value } : x)))} placeholder="1" />
-                      <Label>Unit Price (GH₵) *</Label>
+                      <Label>Unit Price (GHS) *</Label>
                       <Input required type="number" min="0" step="0.01" value={it.unitPrice} onChange={e => setEditItems(editItems.map((x, xi) => (xi === i ? { ...x, unitPrice: e.target.value } : x)))} placeholder="0.00" />
                       <p style={{ fontSize: '0.9rem', color: '#25432F', fontWeight: 700, marginTop: '-0.25rem' }}>
-                        Total: GH₵{(numOf(it.unitPrice) * Math.max(1, parseInt(it.quantity) || 1)).toFixed(2)}
+                        Total: GHS {(numOf(it.unitPrice) * Math.max(1, parseInt(it.quantity) || 1)).toFixed(2)}
                       </p>
                     </div>
                   ))}
@@ -1381,7 +1381,7 @@ const entry = payments[inv.id] || { amount: String(balance || ''), date: todayIS
                     <Plus size={16} /> Add Item
                   </button>
                   <p style={{ fontSize: '0.9rem', color: '#25432F', fontWeight: 700, marginTop: '0.6rem' }}>
-                    Total: GH₵{editItems.filter(i => i.name.trim()).reduce((s, i) => s + numOf(i.unitPrice) * Math.max(1, parseInt(i.quantity) || 1), 0).toFixed(2)}
+                    Total: GHS {editItems.filter(i => i.name.trim()).reduce((s, i) => s + numOf(i.unitPrice) * Math.max(1, parseInt(i.quantity) || 1), 0).toFixed(2)}
                   </p>
                 </>
               )}
@@ -1440,7 +1440,7 @@ const entry = payments[inv.id] || { amount: String(balance || ''), date: todayIS
           )}
           {editInc?.kind !== 'invoice' && (
             <>
-              <Label>Amount (GH₵) *</Label>
+              <Label>Amount (GHS) *</Label>
               <Input required type="number" min="0" step="0.01" value={incForm.amount} onChange={e => setIncForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
             </>
           )}

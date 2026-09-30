@@ -441,7 +441,7 @@ const DailySales = () => {
       paymentMethod: formData.paymentMethod,
       date: new Date().toISOString().split('T')[0],
       time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
-      amount: `GH₵${totalAmount.toFixed(2)}`
+      amount: `GHS ${totalAmount.toFixed(2)}`
     };
     
     try {
@@ -770,7 +770,7 @@ const DailySales = () => {
               <Td style={{ fontWeight: 700, color: '#1C1C18' }}>{sale.item}</Td>
               <Td><Badge>{sale.category}</Badge></Td>
               <Td style={{ textAlign: 'right', fontWeight: 800, color: '#6F240A' }} className="data-tabular">
-                {sale.amount}
+                {formatCurrency(sale.amount, currency)}
               </Td>
               <Td style={{ textAlign: 'right', fontWeight: 700, color: profitOf(sale) >= 0 ? '#25432F' : '#BA1A1A' }} className="data-tabular">
                 {formatCurrency(profitOf(sale), currency)}
@@ -801,7 +801,7 @@ const DailySales = () => {
               <CategoryTag>{sale.category}</CategoryTag>
               <AmountRow>
                 <AmountLabel>Total</AmountLabel>
-                <AmountValue className="data-tabular">{sale.amount}</AmountValue>
+                <AmountValue className="data-tabular">{formatCurrency(sale.amount, currency)}</AmountValue>
               </AmountRow>
               <AmountRow>
                 <AmountLabel>Profit</AmountLabel>
