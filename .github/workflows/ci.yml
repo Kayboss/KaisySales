@@ -96,7 +96,7 @@ jobs:
 
       - name: Serve the built app
         run: |
-          npx --yes vite preview --port 4173 --host 127.0.0.1 &
+          npx --yes vite preview --port 4173 --host 0.0.0.0 &
           npx --yes wait-on http://127.0.0.1:4173 --timeout 90000
 
       - name: Confirm the app is actually being served
@@ -120,18 +120,29 @@ jobs:
       - name: ZAP baseline scan
         run: |
           set +e
-          # --user and --shm-size matter on CI: the image runs as its own uid and
-          # cannot write the report into the mounted workspace without the first,
-          # and its default 64MB /dev/shm makes the browser crash on startup.
-          docker run --rm --network=host --shm-size=2g --user "$(id -u):$(id -g)" \
+          # The image runs as its own uid, so the workspace has to be writable for
+          # it to drop the report in the mounted volume.
+          chmod -R a+rwX . || true
+          # Deliberately NOT --network=host: that makes ZAP bind its own API port
+          # on the runner's network, which killed the daemon ("Failed to start ZAP")
+          # before it ever scanned anything. host.docker.internal reaches the
+          # preview server across the default bridge instead, and --shm-size gives
+          # the scanner more than its default 64MB of shared memory.
+          docker run --rm --shm-size=2g --add-host=host.docker.internal:host-gateway \
             -v "$PWD:/zap/wrk" ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://127.0.0.1:4173 -J zap-report.json -l WARN -I -m 5 2>&1 | tee zap-scan.log
+            zap-baseline.py -t http://host.docker.internal:4173 -J zap-report.json -l WARN -I -m 5 2>&1 | tee zap-scan.log
           echo "scanner exit status: ${PIPESTATUS[0]} (not the security verdict)"
           set -e
           if [ ! -s zap-report.json ]; then
             echo "::error::the scanner produced no report — the scan did not run, so the app is unverified"
-            echo "last 40 lines of the scanner log:"
-            tail -40 zap-scan.log
+            echo "--- scanner log (last 20) ---"
+            tail -20 zap-scan.log
+            if [ -f zap.log ]; then
+              echo "--- ZAP daemon log (last 40) ---"
+              tail -40 zap.log
+            else
+              echo "no zap.log was written"
+            fi
             exit 1
           fi
           echo "alert breakdown:"
@@ -153,7 +164,9 @@ jobs:
           path: |
             zap-report.json
             zap-scan.log
+            zap.log
           retention-days: 7
+          if-no-files-found: ignore
 
   authz:
     name: Authorization (RLS) suite
