@@ -99,12 +99,27 @@ jobs:
           npx --yes vite preview --port 4173 --host 127.0.0.1 &
           npx --yes wait-on http://127.0.0.1:4173 --timeout 90000
 
+      - name: Confirm the app is actually being served
+        run: |
+          curl -sf http://127.0.0.1:4173 -o /dev/null && echo "preview server is up"
+          asset=$(curl -s http://127.0.0.1:4173 | grep -o '/assets/index-[^"]*\.js' | head -1)
+          echo "entry bundle: ${asset:-none found}"
+          curl -sf "http://127.0.0.1:4173${asset}" -o /dev/null && echo "entry bundle is served as JS"
+
+      # Pull in its own step so a registry failure is attributed to the pull
+      # rather than looking like a scanning failure.
+      - name: Pull the scanner
+        run: docker pull ghcr.io/zaproxy/zaproxy:stable
+
       # WARN-level findings are informational only (the preview server does not
       # apply the vercel.json headers), so only ERROR-level alerts fail the job.
       - name: ZAP baseline scan
         run: |
           docker run --rm --network=host -v "$PWD:/zap/wrk" ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://127.0.0.1:4173 -J zap-report.json -l WARN -I
+            zap-baseline.py -t http://127.0.0.1:4173 -J zap-report.json -l WARN -I \
+            || { echo "::error::the scanner failed to run — a harness problem, not a finding"; exit 1; }
+          echo "alert breakdown:"
+          grep -o '"level": *"[A-Z]*"' zap-report.json | sort | uniq -c || echo "no alerts recorded"
 
       - name: Fail on ERROR-level alerts
         run: |
@@ -141,17 +156,51 @@ jobs:
           node-version: 24
 
       # The suite is zero-dependency, so there is no npm ci here on purpose.
+      - name: Is the suite configured?
+        id: config
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            if [ -n "$AUTHZ_USER_A_PASSWORD" ] && [ -n "$AUTHZ_USER_B_PASSWORD" ]; then
+              echo "tenant=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "tenant=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "tenant=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Anonymous access must be empty, cross-tenant access must fail
+        if: steps.config.outputs.configured == 'true'
         run: npm run test:authz
 
-      - name: Warn when the cross-tenant half could not run
-        if: always()
+      - name: Warn that the suite is not protecting anything yet
+        if: steps.config.outputs.configured != 'true'
         run: |
-          if [ -z "$AUTHZ_USER_A_PASSWORD" ] || [ -z "$AUTHZ_USER_B_PASSWORD" ]; then
-            echo "::warning title=authz partially skipped::Checks C/D/E (one signed-in user reading or writing another user's rows) did not run. Add the AUTHZ_USER_*_PASSWORD secrets and the AUTHZ_USER_*_ID/EMAIL variables to make the cross-tenant suite a real gate. The anon checks (A/B/F) still ran."
-          else
-            echo "cross-tenant checks ran with credentials"
-          fi
+          {
+            echo "### Authorization suite is NOT running"
+            echo ""
+            echo "No repository variables are configured, so cross-tenant isolation is currently unverified."
+            echo ""
+            echo "| Check | What it proves |"
+            echo "| --- | --- |"
+            echo "| A, B, F | anonymous callers cannot read, insert or execute anything |"
+            echo "| C, D, E | one signed-in user cannot read, update or delete another user's rows |"
+            echo ""
+            echo "To switch it on, add these repository variables and secrets in"
+            echo "**Settings -> Secrets and variables -> Actions**:"
+            echo ""
+            echo '```'
+            echo "variables:  SUPABASE_URL  SUPABASE_ANON_KEY"
+            echo "            AUTHZ_USER_A_ID  AUTHZ_USER_A_EMAIL"
+            echo "            AUTHZ_USER_B_ID  AUTHZ_USER_B_EMAIL"
+            echo "secrets:    AUTHZ_USER_A_PASSWORD  AUTHZ_USER_B_PASSWORD"
+            echo '```'
+            echo ""
+            echo "Use two disposable test accounts. The write probe only ever aims at user B."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::warning title=authz suite not configured::Checks A/B/F and C/D/E did not run. See the job summary for the repository variables and secrets that switch this on."
 
   headers:
     name: Production security headers
