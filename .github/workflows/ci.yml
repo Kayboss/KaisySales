@@ -113,11 +113,23 @@ jobs:
 
       # WARN-level findings are informational only (the preview server does not
       # apply the vercel.json headers), so only ERROR-level alerts fail the job.
+      #
+      # The container's exit code mixes security findings with harness errors, so
+      # it is not used as the verdict. The report is the evidence: no report means
+      # the scan did not run, which is a failure, not a pass.
       - name: ZAP baseline scan
         run: |
+          set +e
           docker run --rm --network=host -v "$PWD:/zap/wrk" ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://127.0.0.1:4173 -J zap-report.json -l WARN -I \
-            || { echo "::error::the scanner failed to run — a harness problem, not a finding"; exit 1; }
+            zap-baseline.py -t http://127.0.0.1:4173 -J zap-report.json -l WARN -I 2>&1 | tee zap-scan.log
+          echo "scanner exit status: ${PIPESTATUS[0]} (not the security verdict)"
+          set -e
+          if [ ! -s zap-report.json ]; then
+            echo "::error::the scanner produced no report — the scan did not run, so the app is unverified"
+            echo "last 40 lines of the scanner log:"
+            tail -40 zap-scan.log
+            exit 1
+          fi
           echo "alert breakdown:"
           grep -o '"level": *"[A-Z]*"' zap-report.json | sort | uniq -c || echo "no alerts recorded"
 
@@ -125,6 +137,7 @@ jobs:
         run: |
           if grep -qE '"level"[[:space:]]*:[[:space:]]*"ERROR"' zap-report.json; then
             echo "::error::ZAP reported ERROR-level alerts against the built app"
+            grep -o '"alert": *"[^"]*"' zap-report.json | sort -u | head -20
             exit 1
           fi
           echo "no ERROR-level alerts"
@@ -133,7 +146,9 @@ jobs:
         if: always()
         with:
           name: zap-report
-          path: zap-report.json
+          path: |
+            zap-report.json
+            zap-scan.log
           retention-days: 7
 
   authz:
