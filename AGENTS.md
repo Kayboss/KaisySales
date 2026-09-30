@@ -16,9 +16,27 @@ A user is either retail or services — never both. Components in each mode neve
 
 - Lint: `npx eslint <file>` (must be **0 errors, 0 warnings**)
 - Build: `npm run build` (passes, ~1.2 MB bundle — chunk size warning is expected, not an error)
-- Test: none configured
-- **Deploy (IMPORTANT)**: `vercel --prod --yes` — the GitHub webhook auto-deploy does NOT fire reliably. Must always deploy manually.
+- Test: `npm test` (`node --test scripts/*.test.mjs` — unit tests for the fail-closed backend rules). Use the explicit glob; `node --test scripts/` also matches `test-authz.mjs` and will run the network suite by accident.
+- **Deploy (IMPORTANT)**: `npm run release` — this is Gate 1 (lint → unit tests → prod-dep audit → secret scan → build → bundle scan) and only deploys if every check passes. Never run a bare `vercel --prod --yes`; the GitHub webhook auto-deploy does NOT fire reliably, so deploys are always manual.
+- **Push before deploying.** CI cannot see unpushed commits, so a deploy that skips `git push` ships code no gate has ever seen.
 - Git: `git add -A`; `git commit -m "..."`; `git push origin master` (branch is `master`). Only commit when the user explicitly asks.
+
+## Security gates
+
+- `npm run verify` — Gate 1 body: `lint && test && audit && secrets && build && scan:dist`.
+- `npm run audit` — `npm audit --omit=dev --audit-level=high`; production deps must be clean. `npm run audit:all` includes the build toolchain (informational).
+- `npm run secrets` — zero-dependency scanner (`scripts/secret-scan.mjs`). Working-tree findings **fail**; `npm run secrets:history` additionally reports git-history findings as **advisory** (history is fixed by rotating credentials, not by a code change).
+- `npm run scan:dist` — inspects the built bundle. Supabase **anon** JWTs are allowed (public by design; RLS is the only protection) and are decoded to confirm `role: anon`; a `service_role` JWT, PAT, or private key fails the deploy. It also asserts the configuration-error screen is present, so the fail-closed path cannot be deleted silently.
+- `npm run test:authz` — the RLS suite (`scripts/test-authz.mjs`). See "Authorization tests" below. `npm run verify:full` = Gate 1 + authz.
+- `.github/workflows/ci.yml` — Gate 2: on every push/PR it runs the Gate 1 steps, CodeQL SAST, and an OWASP ZAP baseline DAST scan, plus the `authz` job; on push it also asserts the live site still serves all six hardened headers. `.github/dependabot.yml` opens grouped dependency PRs weekly.
+- `vercel.json` uses `rewrites` (not legacy `routes`). Legacy `routes` silently dropped the entire `headers` block, so CSP/HSTS/X-Frame-Options were never served. Keep the two in sync and re-check headers after any routing change.
+
+## No localStorage fallback in production
+
+- The localStorage fallback keeps a business's real records in one browser, unencrypted and unsynced. It is enabled **only** when `import.meta.env.DEV`.
+- The rules live in `src/services/backendConfig.js` (import-free so they are unit testable). `src/services/supabase.js` calls `assertBackendAvailable()` in every auth and data method, and `App.jsx` renders `ConfigError` instead of mounting routes when the backend is missing. A production build with no credentials therefore fails loudly instead of accepting a sign-in and losing the data later.
+- A missing `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` in production is a deploy error, not a demo mode. Check the Vercel environment variables before blaming the app.
+
 
 ## Brand Rules
 
@@ -33,7 +51,7 @@ A user is either retail or services — never both. Components in each mode neve
 
 - Live project ref: `mjrfvwtgoiukpbpdpuvq`
 - anon key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qcmZ2d3Rnb2l1a3BicGRwdXZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NzQ5OTksImV4cCI6MjA5NTA1MDk5OX0.Yk4ePMBZti2suZH7giGb1hNuJ-MRWWT6qwTdRwHsyzc`
-- PAT: stored locally in the user's environment (see SECURITY.md — never commit it).
+- PAT: stored locally in the user's environment (see SECURITY.md — never commit it). Verified absent from git history as of 2026-09-30 by `npm run secrets:history`.
 - No direct DB connection (firewall) — apply migrations via Management API:
   `POST https://api.supabase.com/v1/projects/mjrfvwtgoiukpbpdpuvq/database/query` with `Authorization: Bearer <PAT>` and `{ query: "..." }`.
 - Migrations live in `supabase/migrations/` — add a new timestamped file and apply manually.
@@ -44,7 +62,15 @@ A user is either retail or services — never both. Components in each mode neve
 - `anon` role has zero access to user data tables (only `SELECT` on `subscription_plans`).
 - REVOKE applied on internal functions, anon DML, and EXECUTE on all 9 functions.
 - Key users: admin `tripelkay@gmail.com` = `9e2b9c45-ec39-4641-a5f4-ec9b6aa4641f`; silver test user = `598e82b7-2f69-446c-b2f7-60bf6baf49c6`.
-- `SECURITY.md` exists at repo root (uncommitted, personal reference — never pushed).
+- `SECURITY.md` is gitignored and untracked (local personal reference, never pushed). The one committed version in history (`9d2a343`, 107 bytes) was a stub — `npm run secrets:history` reports 0 findings.
+
+### Authorization tests (`npm run test:authz`)
+- The anon key is public, so **database permissions are the only thing** protecting customer data. No linter, audit, SAST or DAST tool can prove that, so `scripts/test-authz.mjs` asks the live database over PostgREST exactly like an attacker would, using only the public anon key.
+- It discovers tables and functions from `supabase/migrations/*.sql` and `src/**` (`.from('x')`, `UserRecords(…, 'x')`, `.rpc('x')`), so a table added in a future migration is covered automatically.
+- Checks: **A** anon reads nothing, **B** anon inserts nothing, **F** anon executes no function (probed with 4 argument shapes), **C** user A cannot read user B's rows, **D** user A can read their own (liveness), **E** user A cannot update/delete user B's.
+- A skip is reported as SKIP, never PASS. `subscription_plans` is the one intentional exception (public pricing catalogue) and the suite fails if it ever gains a `user_id`.
+- The PostgREST schema endpoint is **service_role-only**, so the suite must never depend on it.
+- Needs `SUPABASE_URL` + `SUPABASE_ANON_KEY` for A/B/F. C/D/E need two disposable test accounts; the write probe aims only at user B — **never point it at a customer's account.**
 
 ### Key tables
 - `service_income`: id, user_id, client_name, amount, platform_fee, net_amount, platform_tag, milestone_label, payment_date, notes, **category** (TEXT, added by migration), created_at
@@ -56,7 +82,7 @@ A user is either retail or services — never both. Components in each mode neve
 ## Architecture Map
 
 - `src/App.jsx` — routing, Layout (`height: 100vh` + `overflow: hidden`), Main (`overflow-y: auto`), sidebar (logo text only, no icon), mobile header. Renders retail vs services route trees based on `businessType`.
-- `src/services/api.js` — all API functions: `fetchServiceIncome`, `createServiceIncome`, `fetchExpenses`, `createExpense`, `fetchCategories(type)`, `createCategory`, `updateCategory`, `deleteCategory`, recurring income CRUD, etc. Uses `dbService` generic CRUD wrappers scoped by `user_id`, falls back to localStorage when Supabase unconfigured.
+- `src/services/api.js` — all API functions: `fetchServiceIncome`, `createServiceIncome`, `fetchExpenses`, `createExpense`, `fetchCategories(type)`, `createCategory`, `updateCategory`, `deleteCategory`, recurring income CRUD, etc. Uses `dbService` generic CRUD wrappers scoped by `user_id`; the localStorage fallback is dev-only (see above).
 - `src/services/supabase.js` — dbService (generic user-record CRUD, camelCase↔snake_case conversion).
 - `src/store/settingsStore.js` — zustand store; `businessType`, `businessName`, `currency`, `logoUrl`, `avatarColor`, `loadSettings(uid)`, `updateSettings`.
 - `src/store/authStore.js` — auth state, login/logout.

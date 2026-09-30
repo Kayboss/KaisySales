@@ -1,0 +1,175 @@
+name: Security CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, audit, secrets, build
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth 0 so the advisory git-history secret scan can see every commit
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests (fail-closed backend rules)
+        run: npm test
+
+      - name: Dependency audit (production deps must be free of high+)
+        run: npm run audit
+
+      - name: Secret scan (working tree fails, history is advisory)
+        run: npm run secrets:history
+
+      - name: Build
+        run: npm run build
+
+      - name: Production bundle must not contain privileged secrets
+        run: npm run scan:dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 3
+
+  codeql:
+    name: CodeQL (SAST)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - uses: github/codeql-action/autobuild@v3
+
+      - uses: github/codeql-action/analyze@v3
+
+  zap:
+    name: DAST (OWASP ZAP baseline)
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Serve the built app
+        run: |
+          npx --yes vite preview --port 4173 --host 127.0.0.1 &
+          npx --yes wait-on http://127.0.0.1:4173 --timeout 90000
+
+      # WARN-level findings are informational only (the preview server does not
+      # apply the vercel.json headers), so only ERROR-level alerts fail the job.
+      - name: ZAP baseline scan
+        run: |
+          docker run --rm --network=host -v "$PWD:/zap/wrk" ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://127.0.0.1:4173 -J zap-report.json -l WARN -I
+
+      - name: Fail on ERROR-level alerts
+        run: |
+          if grep -qE '"level"[[:space:]]*:[[:space:]]*"ERROR"' zap-report.json; then
+            echo "::error::ZAP reported ERROR-level alerts against the built app"
+            exit 1
+          fi
+          echo "no ERROR-level alerts"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report
+          path: zap-report.json
+          retention-days: 7
+
+  authz:
+    name: Authorization (RLS) suite
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+      AUTHZ_USER_A_ID: ${{ vars.AUTHZ_USER_A_ID }}
+      AUTHZ_USER_A_EMAIL: ${{ vars.AUTHZ_USER_A_EMAIL }}
+      AUTHZ_USER_A_PASSWORD: ${{ secrets.AUTHZ_USER_A_PASSWORD }}
+      AUTHZ_USER_B_ID: ${{ vars.AUTHZ_USER_B_ID }}
+      AUTHZ_USER_B_EMAIL: ${{ vars.AUTHZ_USER_B_EMAIL }}
+      AUTHZ_USER_B_PASSWORD: ${{ secrets.AUTHZ_USER_B_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # The suite is zero-dependency, so there is no npm ci here on purpose.
+      - name: Anonymous access must be empty, cross-tenant access must fail
+        run: npm run test:authz
+
+      - name: Warn when the cross-tenant half could not run
+        if: always()
+        run: |
+          if [ -z "$AUTHZ_USER_A_PASSWORD" ] || [ -z "$AUTHZ_USER_B_PASSWORD" ]; then
+            echo "::warning title=authz partially skipped::Checks C/D/E (one signed-in user reading or writing another user's rows) did not run. Add the AUTHZ_USER_*_PASSWORD secrets and the AUTHZ_USER_*_ID/EMAIL variables to make the cross-tenant suite a real gate. The anon checks (A/B/F) still ran."
+          else
+            echo "cross-tenant checks ran with credentials"
+          fi
+
+  headers:
+    name: Production security headers
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert hardened headers are still served
+        env:
+          TARGET: ${{ vars.PRODUCTION_URL || 'https://kaisy-sales.vercel.app' }}
+        run: |
+          headers=$(curl -sSI "$TARGET/invoices")
+          status=0
+          for h in content-security-policy strict-transport-security x-frame-options x-content-type-options referrer-policy permissions-policy; do
+            if echo "$headers" | grep -qi "^$h:"; then
+              echo "ok   $h"
+            else
+              echo "::error::missing response header: $h"
+              status=1
+            fi
+          done
+          exit $status

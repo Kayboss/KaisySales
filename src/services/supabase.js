@@ -2,7 +2,9 @@
  * KaisySales Supabase Client
  *
  * Provides authService and dbService matching the app's expected interface.
- * Falls back to localStorage mock when Supabase is unreachable.
+ * Falls back to a localStorage mock ONLY in a dev build, so the UI can be built
+ * without credentials. A production build with no credentials refuses to start
+ * instead — see backendConfig.js.
  *
  * Setup:
  *   1. Create a Supabase project at https://supabase.com
@@ -15,6 +17,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { parseAmount } from '../utils/currency';
+import { resolveBackend, createAssertBackendAvailable, CONFIG_ERROR_MESSAGE } from './backendConfig';
 
 // ----------------------------------------------------------------
 // Configuration
@@ -23,12 +26,31 @@ import { parseAmount } from '../utils/currency';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const isConfigured = !!(SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_URL.includes('your-'));
+// The localStorage fallback keeps a business's real financial records in one
+// browser profile, unencrypted and unsynced. It exists so the UI can be built
+// without credentials, so it is only ever enabled in a dev build. In a
+// production build a missing Supabase config throws instead of pretending the
+// data was saved — a loud failure is recoverable, silent data loss is not.
+// The rules live in backendConfig.js so they can be unit tested.
+const { isConfigured, isMockFallbackEnabled } = resolveBackend({
+  url: SUPABASE_URL,
+  anonKey: SUPABASE_ANON_KEY,
+  isDev: import.meta.env.DEV,
+});
 
 let supabase = null;
 if (isConfigured) {
   supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
+
+/**
+ * Refuses to serve mock data in a production build, so a misconfigured deploy
+ * cannot silently divert a user's records into localStorage.
+ */
+const assertBackendAvailable = createAssertBackendAvailable({ isConfigured, isMockFallbackEnabled });
+
+// Lets the UI fail loudly (and early) on a production build with no backend.
+export const isSupabaseConfigured = isConfigured;
 
 // ----------------------------------------------------------------
 // Auth helpers
@@ -132,6 +154,7 @@ export const authService = {
       return mapUser(data.user);
     }
     // Mock
+    assertBackendAvailable();
     await new Promise(r => setTimeout(r, 300));
     const user = { id: mockUid(), email };
     notifyListeners(mapUser(user));
@@ -156,6 +179,7 @@ export const authService = {
       return mapUser(data.user);
     }
     // Mock
+    assertBackendAvailable();
     await new Promise(r => setTimeout(r, 300));
     const user = { id: mockUid(), email };
     notifyListeners(mapUser(user));
@@ -163,6 +187,7 @@ export const authService = {
   },
 
   async signOut() {
+    assertBackendAvailable();
     if (supabase) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
@@ -183,7 +208,10 @@ export const authService = {
       });
       return () => subscription.unsubscribe();
     }
-    // Mock — emit null immediately so isInitialized becomes true
+    // Mock — emit null immediately so isInitialized becomes true.
+    // Deliberately does not throw: this runs at import time (authStore registers
+    // the listener when the module is evaluated), and a throw here would blank
+    // the app before it can render the configuration error screen.
     setTimeout(() => callback(null), 0);
     return () => { authListeners = authListeners.filter(fn => fn !== callback); };
   },
@@ -243,6 +271,7 @@ const toCamelCase = (obj) => {
 
 export const dbService = {
   async getUserProfile(uid) {
+    assertBackendAvailable();
     if (supabase) {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
       if (error && error.code !== 'PGRST116') throw error;
@@ -253,6 +282,7 @@ export const dbService = {
   },
 
   async saveUserProfile(uid, profileData) {
+    assertBackendAvailable();
     if (supabase) {
       const { data, error } = await supabase.from('profiles').upsert({
         id: uid,
@@ -273,6 +303,7 @@ export const dbService = {
   // ---------------------------------------------------
 
   async fetchAllProfiles() {
+    assertBackendAvailable();
     if (supabase) {
       const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
       if (error) throw error;
@@ -423,6 +454,7 @@ export const dbService = {
   },
 
   async fetchUserRecords(uid, collection) {
+    assertBackendAvailable();
     if (supabase) {
       const { data, error } = await supabase
         .from(collection)
@@ -436,6 +468,7 @@ export const dbService = {
   },
 
   async createUserRecord(uid, collection, recordData) {
+    assertBackendAvailable();
     if (supabase) {
       const { data, error } = await supabase
         .from(collection)
@@ -453,6 +486,7 @@ export const dbService = {
   },
 
   async updateUserRecord(uid, collection, recordId, recordData) {
+    assertBackendAvailable();
     if (supabase) {
       const { data, error } = await supabase
         .from(collection)
@@ -473,6 +507,7 @@ export const dbService = {
   },
 
   async deleteUserRecord(uid, collection, recordId) {
+    assertBackendAvailable();
     if (supabase) {
       const { error } = await supabase
         .from(collection)
@@ -783,4 +818,4 @@ export const logClientError = async (error, page) => {
   }
 };
 
-export { supabase };
+export { supabase, isMockFallbackEnabled, CONFIG_ERROR_MESSAGE };

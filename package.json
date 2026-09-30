@@ -7,14 +7,24 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "audit": "npm audit --omit=dev --audit-level=high",
+    "audit:all": "npm audit --audit-level=high",
+    "secrets": "node scripts/secret-scan.mjs",
+    "secrets:history": "node scripts/secret-scan.mjs --history",
+    "scan:dist": "node scripts/scan-dist.mjs",
+    "test": "node --test scripts/*.test.mjs",
+    "test:authz": "node scripts/test-authz.mjs",
+    "verify": "npm run lint && npm test && npm run audit && npm run secrets && npm run build && npm run scan:dist",
+    "verify:full": "npm run verify && npm run test:authz",
+    "release": "npm run verify && vercel --prod --yes"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",
     "lucide-react": "^1.14.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-router-dom": "^7.15.0",
+    "react-router-dom": "^7.18.4",
     "recharts": "^3.10.1",
     "styled-components": "^6.4.1",
     "zustand": "^5.0.13"

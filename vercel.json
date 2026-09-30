@@ -12,11 +12,10 @@
       ]
     }
   ],
-  "routes": [
-    { "src": "/", "dest": "/landing/index.html" },
-    { "src": "/landing/(.*)", "dest": "/landing/$1" },
-    { "src": "/pages/(.*)", "dest": "/landing/pages/$1" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/", "destination": "/landing/index.html" },
+    { "source": "/landing/:path*", "destination": "/landing/:path*" },
+    { "source": "/pages/:path*", "destination": "/landing/pages/:path*" },
+    { "source": "/:path*", "destination": "/index.html" }
   ]
 }

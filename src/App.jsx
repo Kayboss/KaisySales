@@ -6,11 +6,12 @@ import { getThemeForColor } from './styles/colorThemes';
 import { GlobalStyles } from './styles/GlobalStyles';
 import { useAuthStore } from './store/authStore';
 import { useSettingsStore } from './store/settingsStore';
-import { dbService } from './services/supabase';
+import { dbService, isSupabaseConfigured, isMockFallbackEnabled } from './services/supabase';
 import { detectDevice, detectLocation } from './utils/visitTracking';
 import CheckAuth from './middleware/CheckAuth';
 import AdminCheck from './middleware/AdminCheck';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import ConfigError from './components/common/ConfigError';
 import IdleTimer from './components/common/IdleTimer';
 
 // Features
@@ -199,6 +200,13 @@ const App = () => {
   ];
 
   const navLinks = isServices ? serviceNavLinks : retailNavLinks;
+
+  // A production build without Supabase credentials must not run. Falling back to
+  // localStorage would accept a sign-in and keep real records in one browser, so
+  // the routes are never mounted and no component can read or write data.
+  if (!isSupabaseConfigured && !isMockFallbackEnabled) {
+    return <ConfigError />;
+  }
 
   return (
     <ThemeProvider theme={theme}>
