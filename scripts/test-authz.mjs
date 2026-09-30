@@ -236,7 +236,23 @@ async function signIn(user) {
     headers: { apikey: anonKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: user.email, password: user.password }),
   });
-  return res.ok ? (await res.json()).access_token || null : null;
+  if (!res.ok) return null;
+  const token = (await res.json()).access_token || null;
+  return token ? { token, id: subjectOf(token) } : null;
+}
+
+// The id is read from the token the server just issued, so it cannot drift from
+// the account actually signed in. The signature is not verified on purpose: the
+// value only ever narrows a row filter in a test, and the token is already trusted
+// for every request made with it.
+function subjectOf(token) {
+  const part = token.split('.')[1];
+  if (!part) return '';
+  try {
+    return JSON.parse(Buffer.from(part, 'base64url').toString('utf8')).sub || '';
+  } catch {
+    return '';
+  }
 }
 
 // ------------------------------------------------------------------ suite
@@ -338,12 +354,31 @@ async function main() {
   }
 
   // ---- C + D + E: cross-tenant, needs two real accounts
-  const [tokenA, tokenB] = [await signIn(users.A), await signIn(users.B)];
+  const [sessionA, sessionB] = [await signIn(users.A), await signIn(users.B)];
+
+  // A supplied id that disagrees with the account that actually signed in would
+  // quietly turn these checks into a comparison against nobody's rows, so it is
+  // a hard error rather than something to prefer one side of.
+  for (const [label, session, expected] of [['A', sessionA, users.A.id], ['B', sessionB, users.B.id]]) {
+    if (session && expected && session.id !== expected) {
+      throw new ConfigError(
+        `AUTHZ_USER_${label}_ID (${expected}) is not user ${label} (${session.email}), which is ${session.id}`,
+      );
+    }
+  }
+  if (sessionA && sessionB) users.A.id = sessionA.id;
+  if (sessionB) users.B.id = sessionB.id;
+  const tokenA = sessionA && sessionA.token;
+  const tokenB = sessionB && sessionB.token;
   const ready = Boolean(tokenA && tokenB && users.A.id && users.B.id && users.A.id !== users.B.id);
 
   console.log('\nC/D/E. cross-tenant access between two real users');
+  if (ready) {
+    console.log(`         user A: ${users.A.email} (${users.A.id})`);
+    console.log(`         user B: ${users.B.email} (${users.B.id})`);
+  }
   if (!ready) {
-    const missing = [!tokenA ? 'user A' : null, !tokenB ? 'user B' : null, !users.A.id ? 'AUTHZ_USER_A_ID' : null, !users.B.id ? 'AUTHZ_USER_B_ID' : null]
+    const missing = [!tokenA ? 'AUTHZ_USER_A_EMAIL + AUTHZ_USER_A_PASSWORD' : null, !tokenB ? 'AUTHZ_USER_B_EMAIL + AUTHZ_USER_B_PASSWORD' : null]
       .filter(Boolean)
       .join(', ');
     for (const table of tables) {

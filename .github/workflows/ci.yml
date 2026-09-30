@@ -174,10 +174,8 @@ jobs:
     env:
       SUPABASE_URL: ${{ vars.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
-      AUTHZ_USER_A_ID: ${{ vars.AUTHZ_USER_A_ID }}
       AUTHZ_USER_A_EMAIL: ${{ vars.AUTHZ_USER_A_EMAIL }}
       AUTHZ_USER_A_PASSWORD: ${{ secrets.AUTHZ_USER_A_PASSWORD }}
-      AUTHZ_USER_B_ID: ${{ vars.AUTHZ_USER_B_ID }}
       AUTHZ_USER_B_EMAIL: ${{ vars.AUTHZ_USER_B_EMAIL }}
       AUTHZ_USER_B_PASSWORD: ${{ secrets.AUTHZ_USER_B_PASSWORD }}
     steps:
@@ -225,8 +223,7 @@ jobs:
             echo ""
             echo '```'
             echo "variables:  SUPABASE_URL  SUPABASE_ANON_KEY"
-            echo "            AUTHZ_USER_A_ID  AUTHZ_USER_A_EMAIL"
-            echo "            AUTHZ_USER_B_ID  AUTHZ_USER_B_EMAIL"
+            echo "            AUTHZ_USER_A_EMAIL  AUTHZ_USER_B_EMAIL"
             echo "secrets:    AUTHZ_USER_A_PASSWORD  AUTHZ_USER_B_PASSWORD"
             echo '```'
             echo ""

@@ -28,3 +28,6 @@ supabase/.temp/
 
 # Personal reference (may contain secrets - never commit)
 SECURITY.md
+
+# Disposable test-account credentials for the authz suite (never commit)
+.env.authz
