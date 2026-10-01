@@ -5,6 +5,7 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchServiceIncome, fetchCategories, createCategory, fetchCustomers } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
+import { formatCurrency } from '../../utils/currency';
 
 const Header = styled.div`
   display: flex;
@@ -282,7 +283,7 @@ const ServiceExpenses = () => {
     const fee = sanitizeNumber(form.transactionFee);
     const payload = {
       title: sanitizeInput(form.title, 100),
-      amount: `GHS ${(base + fee).toFixed(2)}`,
+      amount: `${formatCurrency((base + fee))}`,
       category: form.category,
       date: form.date || null,
       subcategory: form.subcategory,
@@ -346,7 +347,7 @@ const ServiceExpenses = () => {
     .map(i => ({
       id: `fee-${i.id}`,
       title: `Platform fee — ${i.clientName || 'Client'}`,
-      amount: `GHS ${parseFloat(i.platformFee).toFixed(2)}`,
+      amount: `${formatCurrency(parseFloat(i.platformFee))}`,
       category: 'Platform Fees',
       subcategory: 'platform_fee',
       vendor: i.platformTag || '',
@@ -387,17 +388,17 @@ const ServiceExpenses = () => {
       <StatRow>
         <StatCard>
           <h3>Total Expenses</h3>
-          <div className="value">GHS {totalAmt.toFixed(2)}</div>
+          <div className="value">{formatCurrency(totalAmt)}</div>
           <div className="sub">{expenses.length} entries</div>
         </StatCard>
         <StatCard>
           <h3>Platform Fees</h3>
-          <div className="value" style={{ color: '#C62828' }}>GHS {totalFees.toFixed(2)}</div>
+          <div className="value" style={{ color: '#C62828' }}>{formatCurrency(totalFees)}</div>
           <div className="sub">{serviceIncome.filter(i => (parseFloat(i.platformFee) || 0) > 0).length} transactions with fees</div>
         </StatCard>
         <StatCard>
           <h3>SaaS & Subscriptions</h3>
-          <div className="value">GHS {saasTotal.toFixed(2)}</div>
+          <div className="value">{formatCurrency(saasTotal)}</div>
           <div className="sub">{upcomingRenewals.length} renewals due in 30 days</div>
         </StatCard>
         <StatCard>
@@ -431,7 +432,7 @@ const ServiceExpenses = () => {
                   <SubCategoryTag $type={e.subcategory}>{e.category}</SubCategoryTag>
                   {e.isAsset && <AssetBadge style={{ marginLeft: '0.35rem' }}>Asset</AssetBadge>}
                 </Td>
-                <Td>GHS {amt.toFixed(2)}</Td>
+                <Td>{formatCurrency(amt)}</Td>
                 <Td>{e.vendor || '-'}</Td>
                 <Td>{e.date || '-'}</Td>
                 <Td>
@@ -467,7 +468,7 @@ const ServiceExpenses = () => {
                 <span>Category</span>
                 <span><SubCategoryTag $type={e.subcategory}>{e.category}</SubCategoryTag> {e.isAsset && <AssetBadge>Asset</AssetBadge>}</span>
               </MobileRow>
-              <MobileRow><span>Amount</span><span>GHS {amt.toFixed(2)}</span></MobileRow>
+              <MobileRow><span>Amount</span><span>{formatCurrency(amt)}</span></MobileRow>
               <MobileRow><span>Vendor</span><span>{e.vendor || '-'}</span></MobileRow>
               <MobileRow><span>Date</span><span>{e.date || '-'}</span></MobileRow>
               {e.renewalDate && <MobileRow><span>Renewal</span><span>{e.renewalDate}</span></MobileRow>}

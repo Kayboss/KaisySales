@@ -6,6 +6,7 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers, fetchExpenses, fetchCategories, createCategory, fetchServices } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
+import { formatCurrency } from '../../utils/currency';
 import CatalogPicker from './CatalogPicker';
 
 const Header = styled.div`
@@ -460,22 +461,22 @@ const IncomeTracking = () => {
       <StatRow>
         <StatCard>
           <h3>Gross Income</h3>
-          <div className="value">GHS {totalGross.toFixed(2)}</div>
+          <div className="value">{formatCurrency(totalGross)}</div>
           <div className="sub">Before fees</div>
         </StatCard>
         <StatCard>
           <h3>Total Expenses</h3>
-          <div className="value" style={{ color: '#C62828' }}>GHS {totalExpenses.toFixed(2)}</div>
+          <div className="value" style={{ color: '#C62828' }}>{formatCurrency(totalExpenses)}</div>
           <div className="sub">{expenses.length} expense entries</div>
         </StatCard>
         <StatCard>
           <h3>Net Income</h3>
-          <div className="value" style={{ color: '#2E7D32' }}>GHS {totalNet.toFixed(2)}</div>
+          <div className="value" style={{ color: '#2E7D32' }}>{formatCurrency(totalNet)}</div>
           <div className="sub">Gross income minus expenses</div>
         </StatCard>
         <StatCard>
           <h3>Monthly Recurring</h3>
-          <div className="value">GHS {monthlyRecurring.toFixed(2)}</div>
+          <div className="value">{formatCurrency(monthlyRecurring)}</div>
           <div className="sub">From {activeRecurring.length} active item(s)</div>
         </StatCard>
       </StatRow>
@@ -499,7 +500,7 @@ const IncomeTracking = () => {
             <YAxis tick={{ fontSize: 11, fill: '#89726C' }} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
             <Tooltip
               contentStyle={{ borderRadius: 8, border: '1px solid #E8E5DF', fontSize: 13 }}
-              formatter={(value, name) => [`GHS ${Number(value).toFixed(2)}`, name]}
+              formatter={(value, name) => [`${formatCurrency(Number(value))}`, name]}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Area type="monotone" dataKey="Income" stroke="#25432F" strokeWidth={2.5} fill="url(#gradIncome)" dot={{ r: 4, fill: '#25432F', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
@@ -538,9 +539,9 @@ const IncomeTracking = () => {
                 <tr key={i.id}>
                   <Td><strong>{i.clientName || '-'}</strong></Td>
                   <Td>{i.milestoneLabel || '-'}</Td>
-                  <Td>GHS {parseFloat(i.amount || 0).toFixed(2)}</Td>
-                  <Td><FeeTag>-GHS {parseFloat(i.platformFee || 0).toFixed(2)}</FeeTag></Td>
-                  <Td><NetTag>GHS {parseFloat(i.netAmount || 0).toFixed(2)}</NetTag></Td>
+                  <Td>{formatCurrency(parseFloat(i.amount || 0))}</Td>
+                  <Td><FeeTag>-{formatCurrency(parseFloat(i.platformFee || 0))}</FeeTag></Td>
+                  <Td><NetTag>{formatCurrency(parseFloat(i.netAmount || 0))}</NetTag></Td>
                   <Td><PlatformTag>{i.platformTag}</PlatformTag></Td>
                   <Td>{i.category || '-'}</Td>
                   <Td>{i.paymentDate || '-'}</Td>
@@ -560,9 +561,9 @@ const IncomeTracking = () => {
               <MobileCard key={i.id}>
                 <MobileRow><span>Client</span><span><strong>{i.clientName || '-'}</strong></span></MobileRow>
                 <MobileRow><span>Milestone</span><span>{i.milestoneLabel || '-'}</span></MobileRow>
-                <MobileRow><span>Gross</span><span>GHS {parseFloat(i.amount || 0).toFixed(2)}</span></MobileRow>
-                <MobileRow><span>Fee</span><span><FeeTag>-GHS {parseFloat(i.platformFee || 0).toFixed(2)}</FeeTag></span></MobileRow>
-                <MobileRow><span>Net</span><span><NetTag>GHS {parseFloat(i.netAmount || 0).toFixed(2)}</NetTag></span></MobileRow>
+                <MobileRow><span>Gross</span><span>{formatCurrency(parseFloat(i.amount || 0))}</span></MobileRow>
+                <MobileRow><span>Fee</span><span><FeeTag>-{formatCurrency(parseFloat(i.platformFee || 0))}</FeeTag></span></MobileRow>
+                <MobileRow><span>Net</span><span><NetTag>{formatCurrency(parseFloat(i.netAmount || 0))}</NetTag></span></MobileRow>
                 <MobileRow><span>Platform</span><span><PlatformTag>{i.platformTag}</PlatformTag></span></MobileRow>
                 <MobileRow><span>Date</span><span>{i.paymentDate || '-'}</span></MobileRow>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', justifyContent: 'flex-end' }}>
@@ -615,7 +616,7 @@ const IncomeTracking = () => {
               </div>
               {incomeForm.netAmount && (
                 <FeeCalcBox>
-                  Net payout: <strong>GHS {incomeForm.netAmount}</strong>
+                  Net payout: <strong>{formatCurrency(incomeForm.netAmount)}</strong>
                   {parseFloat(incomeForm.platformFee) > 0 && (
                     <span> ({(parseFloat(incomeForm.platformFee) / parseFloat(incomeForm.amount) * 100).toFixed(1)}% in fees)</span>
                   )}
@@ -685,7 +686,7 @@ const IncomeTracking = () => {
               {recurring.map(r => (
                 <tr key={r.id}>
                   <Td><strong>{r.clientName}</strong></Td>
-                  <Td>GHS {parseFloat(r.amount || 0).toFixed(2)}</Td>
+                  <Td>{formatCurrency(parseFloat(r.amount || 0))}</Td>
                   <Td style={{ textTransform: 'capitalize' }}>{r.frequency}</Td>
                   <Td>{r.nextDueDate || '-'}</Td>
                   <Td>{r.category || '-'}</Td>
@@ -705,7 +706,7 @@ const IncomeTracking = () => {
             {recurring.map(r => (
               <MobileCard key={r.id}>
                 <MobileRow><span>Client</span><span><strong>{r.clientName}</strong></span></MobileRow>
-                <MobileRow><span>Amount</span><span>GHS {parseFloat(r.amount || 0).toFixed(2)}</span></MobileRow>
+                <MobileRow><span>Amount</span><span>{formatCurrency(parseFloat(r.amount || 0))}</span></MobileRow>
                 <MobileRow><span>Frequency</span><span style={{ textTransform: 'capitalize' }}>{r.frequency}</span></MobileRow>
                 <MobileRow><span>Next Due</span><span>{r.nextDueDate || '-'}</span></MobileRow>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', justifyContent: 'flex-end' }}>

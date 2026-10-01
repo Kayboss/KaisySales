@@ -1,5 +1,6 @@
 import styled from 'styled-components';
 import { Plus, Trash2, Printer } from 'lucide-react';
+import { formatCurrency } from '../../utils/currency';
 import { SQFT_DIVISOR, freshSizeLine, numOf, solveSizeLines, solvedTotal } from './sizePricing';
 
 const CalcCard = styled.div`
@@ -175,7 +176,7 @@ const SizePricingCalculator = ({ lines, onChange, pricePerSqFt, onPrint, emptyRa
   return (
     <div>
       <CalcScaleRow>
-        <UnitLabel>Price per sq ft: GHS {numOf(pricePerSqFt).toFixed(2)}</UnitLabel>
+        <UnitLabel>Price per sq ft: {formatCurrency(numOf(pricePerSqFt))}</UnitLabel>
         <ScaleNote>Feet: (L×H)×P×Q • Inches/CM: (L×H÷{SQFT_DIVISOR})×P×Q • Total rounds up to whole cedis</ScaleNote>
       </CalcScaleRow>
       {numOf(pricePerSqFt) === 0 && (
@@ -220,7 +221,7 @@ const SizePricingCalculator = ({ lines, onChange, pricePerSqFt, onPrint, emptyRa
             <ItemResultRow><span>Quantity ×</span><b>{c.Q}</b></ItemResultRow>
             <ItemResultRow style={{ fontWeight: 800, color: '#1C1C18', fontSize: '0.95rem' }}>
               <span>Item {idx + 1} total</span>
-              <b style={{ color: '#25432F' }}>{c.valid ? `GHS ${c.total.toFixed(2)}` : '—'}</b>
+              <b style={{ color: '#25432F' }}>{c.valid ? `${formatCurrency(c.total)}` : '—'}</b>
             </ItemResultRow>
           </div>
         </CalcCard>
@@ -230,7 +231,7 @@ const SizePricingCalculator = ({ lines, onChange, pricePerSqFt, onPrint, emptyRa
 
       <CalcTotal>
         <span>Grand Total</span>
-        <span>GHS {total.toLocaleString()}</span>
+        <span>{formatCurrency(total)}</span>
       </CalcTotal>
 
       {onPrint && (

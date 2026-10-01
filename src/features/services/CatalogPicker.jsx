@@ -1,4 +1,5 @@
 import styled from 'styled-components';
+import { formatCurrency } from '../../utils/currency';
 
 const Select = styled.select`
   width: 100%;
@@ -16,9 +17,9 @@ const label = (s) => {
   const flat = num(s.price);
   const perSqFt = num(s.areaPrice);
   const cat = s.category ? ` (${s.category})` : '';
-  if (perSqFt > 0 && flat > 0) return `${s.name} — GHS ${flat.toFixed(2)} or GHS ${perSqFt.toFixed(2)}/sq ft${cat}`;
-  if (perSqFt > 0) return `${s.name} — GHS ${perSqFt.toFixed(2)}/sq ft${cat}`;
-  return `${s.name} — GHS ${flat.toFixed(2)}${cat}`;
+  if (perSqFt > 0 && flat > 0) return `${s.name} — ${formatCurrency(flat)} or ${formatCurrency(perSqFt)}/sq ft${cat}`;
+  if (perSqFt > 0) return `${s.name} — ${formatCurrency(perSqFt)}/sq ft${cat}`;
+  return `${s.name} — ${formatCurrency(flat)}${cat}`;
 };
 
 const CatalogPicker = ({ services, onPick }) => (

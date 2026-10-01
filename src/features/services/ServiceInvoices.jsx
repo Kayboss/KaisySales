@@ -591,7 +591,7 @@ const ServiceInvoices = () => {
       quantity: totalQty,
       unitPrice: items[0]?.unitPrice || '',
       status: formData.status,
-      amount: `GHS ${totalAmount.toFixed(2)}`,
+      amount: `${formatCurrency(totalAmount)}`,
       notes: sanitizeInput(formData.notes, 500),
       items: [
         ...items.filter(i => i.name).map(i => (sizeMode
@@ -623,7 +623,7 @@ const ServiceInvoices = () => {
             paymentMethod: 'Invoice',
             date: formData.date || new Date().toISOString().split('T')[0],
             time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
-            amount: `GHS ${totalAmount.toFixed(2)}`
+            amount: `${formatCurrency(totalAmount)}`
           });
           if (invoiceId && saleResult?.id) {
             const allInvs = await fetchInvoices();
@@ -862,7 +862,7 @@ const ServiceInvoices = () => {
       customer: selectedCustomer,
       customerLocation: selectedInvoices[0].customerLocation || '',
       date: new Date().toISOString().slice(0, 10),
-      amount: `GHS ${mergedTotal.toFixed(2)}`,
+      amount: `${formatCurrency(mergedTotal)}`,
       quantity: mergedItems.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0),
       unitPrice: mergedTotal,
       status: selectedInvoices.every(i => i.status === 'paid') ? 'paid' : 'pending',
@@ -1066,7 +1066,7 @@ const ServiceInvoices = () => {
             <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>
               {selectedInvoices.length} selected for {selectedCustomer}
             </span>
-            <span style={{ fontSize: '0.9rem', opacity: 0.85 }}>Total: GHS {mergedTotal.toFixed(2)}</span>
+            <span style={{ fontSize: '0.9rem', opacity: 0.85 }}>Total: {formatCurrency(mergedTotal)}</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button onClick={() => setSelectedIds([])} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.5)', background: 'transparent', color: 'white', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Clear</button>
@@ -1192,7 +1192,7 @@ const ServiceInvoices = () => {
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.78rem', color: '#55423D' }}>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {l.name}
-                          {l.size ? <span style={{ color: '#89726C' }}> — {l.size.length}×{l.size.height} {unitLabel(l.size.unit)} @ GHS {numOf(l.size.rate).toFixed(2)}/sq ft</span> : null}
+                          {l.size ? <span style={{ color: '#89726C' }}> — {l.size.length}×{l.size.height} {unitLabel(l.size.unit)} @ {formatCurrency(numOf(l.size.rate))}/sq ft</span> : null}
                         </span>
                         <span style={{ whiteSpace: 'nowrap', color: '#1C1C18', fontWeight: 600 }}>×{l.quantity || 1}</span>
                       </div>
