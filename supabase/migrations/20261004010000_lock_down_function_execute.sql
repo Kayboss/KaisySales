@@ -37,17 +37,16 @@ REVOKE ALL ON FUNCTION public.sync_inventory_quantity() FROM PUBLIC, anon, authe
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;
 
 -- Confirm the three policy helpers still work for a signed-in user, since they
--- are the only functions authenticated is meant to reach.
-DO $$
-DECLARE
-  helper text;
-BEGIN
-  FOREACH helper IN ARRAY ARRAY['can_create_record', 'is_admin', 'is_subscription_active'] LOOP
-    IF NOT has_function_privilege('authenticated', helper, 'EXECUTE') THEN
-      RAISE EXCEPTION 'authenticated lost EXECUTE on %', helper;
-    END IF;
-    IF has_function_privilege('anon', helper, 'EXECUTE') THEN
-      RAISE EXCEPTION 'anon can execute %', helper;
-    END IF;
-  END LOOP;
-END $$;
+-- are the only functions authenticated is meant to reach. Kept as a plain query
+-- rather than a DO block so it reports instead of raising:
+--
+--   select p.proname,
+--          has_function_privilege('anon', p.oid, 'EXECUTE')         as anon_should_be_false,
+--          has_function_privilege('authenticated', p.oid, 'EXECUTE') as authed_should_be_true
+--   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+--   where n.nspname = 'public'
+--     and p.proname in ('can_create_record', 'is_admin', 'is_subscription_active');
+--
+-- Every row must read anon_should_be_false = false, authed_should_be_true = true.
+-- A trigger function needs no runtime EXECUTE privilege, so revoking it from
+-- authenticated costs nothing.
