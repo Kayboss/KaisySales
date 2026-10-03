@@ -7,7 +7,7 @@ const Container = styled.div`
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
-  background: ${({ theme }) => theme.background};
+  background: ${({ theme }) => theme.colors.background.main};
   /* the form is vertically centred, so on a short phone it can reach both the
      notch and the home indicator once the page is allowed to draw edge to edge */
   padding-top: env(safe-area-inset-top);

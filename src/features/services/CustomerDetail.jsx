@@ -418,7 +418,7 @@ const MethodBadge = styled.span`
   display: inline-block;
   padding: 0.2rem 0.6rem;
   border-radius: ${({ theme }) => theme.borderRadius.sm};
-  background: ${({ theme }) => theme.colors.primarySoft || '#F3E9E4'};
+  background: ${({ theme }) => theme.colors.background.surfaceVariant};
   color: ${({ theme }) => theme.colors.primary};
   font-size: 0.75rem;
   font-weight: 700;

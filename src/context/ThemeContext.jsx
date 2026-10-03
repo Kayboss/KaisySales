@@ -11,13 +11,15 @@ export const ThemeContextProvider = ({ children }) => {
     setIsDarkMode(prev => !prev);
   };
 
+  // Only token keys that actually exist are exposed. This previously read
+  // dark/light variants of the background group, which the design tokens never
+  // defined, so theme.background resolved to undefined for everything this
+  // provider wraps.
   const theme = {
     ...themeTokens,
     mode: isDarkMode ? 'dark' : 'light',
-    background: isDarkMode ? themeTokens.colors.background.dark : themeTokens.colors.background.light,
+    background: themeTokens.colors.background.main,
     surface: isDarkMode ? themeTokens.colors.background.surface : '#FFFFFF',
-    text: isDarkMode ? themeTokens.colors.text.main : '#1A1A1A',
-    textMuted: isDarkMode ? themeTokens.colors.text.muted : '#666666',
   };
 
   return (

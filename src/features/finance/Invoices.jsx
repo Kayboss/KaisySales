@@ -96,7 +96,7 @@ const FormGroup = styled.div`
     display: block;
     margin-bottom: 0.5rem;
     font-weight: 600;
-    color: ${({ theme }) => theme.colors.text.primary};
+    color: ${({ theme }) => theme.colors.text.main};
   }
   
   input, select, textarea {
@@ -193,7 +193,7 @@ const ModalActions = styled.div`
   .cancel {
     background: white;
     border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
-    color: ${({ theme }) => theme.colors.text.primary};
+    color: ${({ theme }) => theme.colors.text.main};
   }
 
   .save {

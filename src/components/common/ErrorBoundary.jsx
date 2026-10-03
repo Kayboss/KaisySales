@@ -1,35 +1,52 @@
 import { Component } from 'react';
 import styled from 'styled-components';
+import { themeTokens } from '../../styles/themeTokens';
 import { logClientError } from '../../services/supabase';
 
+// This screen renders from main.jsx, outside any styled-components ThemeProvider,
+// and it may be showing precisely because rendering failed. So it reads the
+// token object directly instead of a theme from context, which would leave every
+// colour undefined here.
 const ErrorContainer = styled.div`
   height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: ${({ theme }) => theme.background};
-  color: ${({ theme }) => theme.text};
+  background: ${themeTokens.colors.background.main};
+  color: ${themeTokens.colors.text.main};
+  font-family: ${themeTokens.fonts.main};
   text-align: center;
   padding: 2rem;
 `;
 
 const ErrorTitle = styled.h1`
-  font-size: 3rem;
+  font-family: ${themeTokens.fonts.display};
+  font-size: ${themeTokens.fontSizes['3xl']};
   margin-bottom: 1rem;
+  color: ${themeTokens.colors.primary};
+`;
+
+const ErrorMessage = styled.p`
+  color: ${themeTokens.colors.text.muted};
+  max-width: 34rem;
+  margin-bottom: 0.5rem;
 `;
 
 const RefreshButton = styled.button`
-  background: ${({ theme }) => theme.colors.primary};
-  color: ${({ theme }) => theme.colors.text.contrast};
+  background: ${themeTokens.colors.primary};
+  color: ${themeTokens.colors.text.onPrimary};
   padding: 0.75rem 2rem;
-  border-radius: ${({ theme }) => theme.borderRadius.md};
+  border: none;
+  border-radius: ${themeTokens.borderRadius.md};
   font-weight: 600;
+  font-family: ${themeTokens.fonts.main};
+  cursor: pointer;
   margin-top: 2rem;
-  transition: ${({ theme }) => theme.transitions.fast};
+  transition: ${themeTokens.transitions.fast};
 
   &:hover {
-    background: ${({ theme }) => theme.colors.primaryHover};
+    background: ${themeTokens.colors.primaryContainer};
     transform: translateY(-2px);
   }
 `;
@@ -53,10 +70,14 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <ErrorContainer>
-          <ErrorTitle>System Anomaly Detected</ErrorTitle>
-          <p>The Anti-Gravity engine encountered an unexpected instability.</p>
+          <ErrorTitle>Something went wrong</ErrorTitle>
+          <ErrorMessage>
+            KaisySales ran into a problem loading this page. Your sales, expenses and
+            inventory are stored safely and have not been lost.
+          </ErrorMessage>
+          <ErrorMessage>Reload the page to carry on.</ErrorMessage>
           <RefreshButton onClick={() => window.location.reload()}>
-            Reboot Application
+            Reload page
           </RefreshButton>
         </ErrorContainer>
       );

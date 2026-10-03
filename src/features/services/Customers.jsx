@@ -166,7 +166,7 @@ const MobileName = styled.div`
 
 const MobilePhone = styled.div`
   font-size: 0.875rem;
-  color: ${({ theme }) => theme.colors.onSurfaceVariant};
+  color: ${({ theme }) => theme.colors.text.muted};
   margin-top: 0.15rem;
   overflow: hidden;
   text-overflow: ellipsis;
