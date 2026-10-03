@@ -314,12 +314,6 @@ const IncomeTracking = () => {
     return (a - f).toFixed(2);
   };
 
-  const openAddIncome = () => {
-    setEditId(null);
-    setIncomeForm({ clientName: '', amount: '', platformFee: '', netAmount: '', platformTag: 'direct', milestoneLabel: '', paymentDate: '', notes: '', category: '' });
-    setModalOpen(true);
-  };
-
   const openEditIncome = (item) => {
     setEditId(item.id);
     setIncomeForm({
@@ -453,8 +447,7 @@ const IncomeTracking = () => {
         <Title>Dashboard</Title>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <SearchInput placeholder="Search..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
-          {tab === 'income' && <AddButton onClick={openAddIncome}><Plus size={18} /> Add Income</AddButton>}
-          {tab === 'recurring' && <AddButton onClick={openAddRecur}><Plus size={18} /> Add Recurring</AddButton>}
+{tab === 'recurring' && <AddButton onClick={openAddRecur}><Plus size={18} /> Add Recurring</AddButton>}
         </div>
       </Header>
 
@@ -584,7 +577,7 @@ const IncomeTracking = () => {
           )}
 
           <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
-            <h2 style={{ marginBottom: '1.5rem', color: '#6F240A' }}>{editId ? 'Edit Income' : 'Add Income'}</h2>
+            <h2 style={{ marginBottom: '1.5rem', color: '#6F240A' }}>Edit Income</h2>
             <form onSubmit={handleSaveIncome}>
               <Label>Client</Label>
               {customers.length > 0 ? (
