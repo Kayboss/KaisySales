@@ -35,10 +35,11 @@ AS $$
   END
 $$;
 
--- The function is a formatting helper, not part of the data model, so it is
--- not callable by a client. Matches how the other internal functions are locked
--- down.
-REVOKE ALL ON FUNCTION public.normalize_amount(text) FROM PUBLIC;
+-- The function is a formatting helper, not part of the data model, so it is not
+-- callable by a client. PUBLIC is not enough here: this database has a default
+-- ACL granting EXECUTE on every new function to anon and authenticated, so both
+-- roles have to be named or they keep the ability to call it.
+REVOKE ALL ON FUNCTION public.normalize_amount(text) FROM PUBLIC, anon, authenticated;
 
 UPDATE inventory SET price      = public.normalize_amount(price)      WHERE price      IS DISTINCT FROM public.normalize_amount(price);
 UPDATE inventory SET cost_price = public.normalize_amount(cost_price) WHERE cost_price IS DISTINCT FROM public.normalize_amount(cost_price);

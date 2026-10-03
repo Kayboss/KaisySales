@@ -140,6 +140,22 @@ function discover() {
     for (const c of columns || []) tables.get(key).add(c);
   };
 
+  // The declared parameter names of a CREATE FUNCTION argument list. Probing a
+  // function requires sending the names it actually declares: PostgREST resolves
+  // the overload by argument name and replies 404 to anything it does not
+  // recognise, which is indistinguishable from "not exposed" unless the names
+  // were read from the migration.
+  const paramNames = (list) => {
+    if (!list || !list.trim()) return '';
+    return list
+      .split(',')
+      .map((part) => part.trim().replace(/^(IN|OUT|INOUT|VARIADIC)\s+/i, ''))
+      .map((part) => /"?([a-z_][a-z0-9_]*)"?\s+[a-z]/i.exec(part))
+      .filter(Boolean)
+      .map((m) => m[1].toLowerCase())
+      .join(',');
+  };
+
   for (const file of walk('supabase/migrations').filter((f) => f.endsWith('.sql'))) {
     const sql = readFileSync(file, 'utf8');
 
@@ -160,10 +176,13 @@ function discover() {
       addTable(m[1], []);
     }
 
-    // Deliberately loose: requiring a full signature drops trigger functions and
-    // RETURNS TABLE(...) bodies, which are the ones worth probing.
-    for (const m of sql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?([a-z_][a-z0-9_]*)/gi)) {
-      functions.set(m[1].toLowerCase(), '');
+    // Deliberately loose on the return type: requiring a full signature drops
+    // trigger functions and RETURNS TABLE(...) bodies, which are the ones worth
+    // probing. The parameter list is captured though, because PostgREST answers
+    // 404 to an argument name it does not recognise, and a probe that cannot
+    // form an accepted request proves nothing about permissions.
+    for (const m of sql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?([a-z_][a-z0-9_]*)\s*\(([^)]*)\)/gi)) {
+      functions.set(m[1].toLowerCase(), paramNames(m[2]));
     }
   }
 
@@ -324,12 +343,25 @@ async function main() {
     // A function PostgREST cannot match to a signature (PGRST202) or a malformed
     // call (PGRST102) proves nothing about permissions, so every probed shape is
     // classified and only a real permission decision counts as a pass.
-    const shapes = [
+    //
+    // The declared parameter names come first, because PostgREST resolves a call
+    // by argument name and answers 404 to a name it does not know. Probing only
+    // `user_id` meant a function with any other parameter was reported as "not
+    // exposed" on the strength of a 404 caused by the probe's own bad argument
+    // name — normalize_amount(text) was reachable and the suite reported PASS.
+    const declared = String(signature || '').split(',').filter(Boolean);
+    const shapes = [];
+    if (declared.length) {
+      const all = Object.fromEntries(declared.map((p) => [p, '00000000-0000-0000-0000-0000000000ff']));
+      shapes.push({ label: `declared args ${declared.join(',')}`, body: all });
+      for (const p of declared) shapes.push({ label: `declared arg ${p}`, body: { [p]: '00000000-0000-0000-0000-0000000000ff' } });
+    }
+    shapes.push(
       { label: 'no args', body: {} },
       { label: 'one uuid', body: ['00000000-0000-0000-0000-0000000000ff'] },
       { label: 'named arg', body: { user_id: '00000000-0000-0000-0000-0000000000ff' } },
       { label: 'uuid arg', body: '00000000-0000-0000-0000-0000000000ff' },
-    ];
+    );
     const seen = { denied: null, notExposed: false, executed: null, other: [] };
     for (const shape of shapes) {
       const res = await rest(`/rpc/${fn}`, { method: 'POST', body: shape.body });

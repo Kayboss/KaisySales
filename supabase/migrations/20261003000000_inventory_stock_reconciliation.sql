@@ -50,9 +50,15 @@ $$;
 DROP TRIGGER IF EXISTS inventory_sync_quantity ON inventory;
 
 CREATE TRIGGER inventory_sync_quantity
-BEFORE INSERT OR UPDATE OF stock ON inventory
-FOR EACH ROW
-EXECUTE FUNCTION public.sync_inventory_quantity();
+  BEFORE INSERT OR UPDATE OF stock ON inventory
+  FOR EACH ROW
+  EXECUTE FUNCTION public.sync_inventory_quantity();
+
+-- This database carries a default ACL that grants EXECUTE on every new function
+-- in `public` to anon and authenticated, so revoking from PUBLIC alone leaves
+-- both roles able to call it. Name them explicitly. A trigger function needs
+-- no runtime EXECUTE privilege, so this costs nothing.
+REVOKE ALL ON FUNCTION public.sync_inventory_quantity() FROM PUBLIC, anon, authenticated;
 
 -- A quantity of zero is not a meaningful threshold, so fall back to 5 as the
 -- rest of the application does.

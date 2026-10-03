@@ -70,6 +70,8 @@ A user is either retail or services — never both. Components in each mode neve
 - Checks: **A** anon reads nothing, **B** anon inserts nothing, **F** anon executes no function (probed with 4 argument shapes), **C** user A cannot read user B's rows, **D** user A can read their own (liveness), **E** user A cannot update/delete user B's.
 - A skip is reported as SKIP, never PASS. `subscription_plans` is the one intentional exception (public pricing catalogue) and the suite fails if it ever gains a `user_id`.
 - The PostgREST schema endpoint is **service_role-only**, so the suite must never depend on it.
+- The live database carries a **default ACL** (`pg_default_acl`) granting `EXECUTE` on every new function in `public` to `anon` and `authenticated`. `REVOKE ... FROM PUBLIC` is therefore **never sufficient** — name `anon, authenticated` explicitly, or the function stays callable with the public anon key. Migration `20261004010000` fixes this and sets `ALTER DEFAULT PRIVILEGES` for future functions.
+- The authz suite probes each function with the **declared parameter names** parsed from the migration. This matters: PostgREST resolves a call by argument name and answers **404** to a name it does not recognise, so a probe that sends only `user_id` gets 404 for a function with any other parameter and would misreport it as "not exposed". `normalize_amount(text)` was reachable (HTTP 200) while the suite reported PASS. If you add a function with parameters, confirm the suite reports a real permission decision (42501), never a bare 404.
 - Needs `SUPABASE_URL` + `SUPABASE_ANON_KEY` for A/B/F. C/D/E need two disposable test accounts; the write probe aims only at user B — **never point it at a customer's account.**
 
 ### Key tables
