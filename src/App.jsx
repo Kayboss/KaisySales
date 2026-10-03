@@ -21,6 +21,7 @@ import InventoryManagement from './features/inventory/InventoryManagement';
 import ExpenseTracking from './features/finance/ExpenseTracking';
 import Invoices from './features/finance/Invoices';
 import DailySales from './features/finance/DailySales';
+import SalesHistory from './features/finance/SalesHistory';
 import AutomatedReporting from './features/reporting/AutomatedReporting';
 import RetailStores from './features/partners/RetailStores';
 import SettingsPage from './features/settings/SettingsPage';
@@ -35,7 +36,7 @@ import ServiceInvoices from './features/services/ServiceInvoices';
 import ServiceReporting from './features/services/ServiceReporting';
 
 // Icons
-import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, FileText, Store, Settings, Receipt, Menu, X, Users, BarChart3, Shield } from 'lucide-react';
+import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, FileText, Store, Settings, Receipt, Menu, X, Users, BarChart3, Shield, History } from 'lucide-react';
 
 const Layout = styled.div`
   display: flex;
@@ -209,6 +210,7 @@ const App = () => {
   const retailNavLinks = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/sales', icon: ShoppingCart, label: 'Daily Sales' },
+    { to: '/sales-history', icon: History, label: 'Sales History' },
     { to: '/retail-stores', icon: Store, label: 'Retail Stores' },
     { to: '/expenses', icon: CreditCard, label: 'Expenses' },
     { to: '/invoices', icon: Receipt, label: 'Invoices' },
@@ -314,6 +316,7 @@ const App = () => {
                         <Route index element={<BusinessOverview />} />
                         <Route path="inventory" element={<InventoryManagement />} />
                         <Route path="sales" element={<DailySales />} />
+          <Route path="sales-history" element={<SalesHistory />} />
                         <Route path="invoices" element={<Invoices />} />
                         <Route path="expenses" element={<ExpenseTracking />} />
                         <Route path="reporting" element={<AutomatedReporting />} />

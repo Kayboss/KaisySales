@@ -126,6 +126,10 @@ CREATE TABLE IF NOT EXISTS inventory (
   name TEXT NOT NULL,
   category TEXT DEFAULT '',
   quantity INTEGER DEFAULT 0,
+  -- `stock` is what the application actually reads and writes. `quantity` is
+  -- kept as a mirrored legacy column; see
+  -- supabase/migrations/20261003000000_inventory_stock_reconciliation.sql.
+  stock INTEGER DEFAULT 0,
   unit TEXT DEFAULT 'pcs',
   min_stock INTEGER DEFAULT 5,
   price TEXT DEFAULT '',

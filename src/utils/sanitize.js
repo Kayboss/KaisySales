@@ -11,9 +11,17 @@ export const sanitizeInput = (value, maxLength = 200) => {
 
 export const sanitizeNumber = (value) => {
   if (typeof value === 'number') return value;
-  const s = String(value).replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
+  const raw = String(value).trim();
+  // Preserve a minus wherever the currency prefix put it ("-5.50" or
+  // "GHS -5.50"). Stripping it turned every credit, return or negative
+  // adjustment into a positive number, which then silently overstated revenue
+  // and inventory value. Everything else non-numeric (currency symbols, spaces,
+  // thousands separators) is still removed.
+  const negative = raw.includes('-');
+  const s = raw.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
   const num = parseFloat(s);
-  return isNaN(num) ? 0 : num;
+  if (isNaN(num)) return 0;
+  return negative && num !== 0 ? -num : num;
 };
 
 export const VALIDATION = {

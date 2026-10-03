@@ -12,6 +12,7 @@ import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
+import { applyStockDelta, resolveMinStock, resolveStock } from '../../utils/inventory';
 
 const Header = styled.div`
   display: flex;
@@ -380,6 +381,9 @@ const DailySales = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  // The sale being edited is retained so its original item and quantity can be
+  // used to work out the stock correction an edit actually requires.
+  const [editingSale, setEditingSale] = useState(null);
   
   const [deleteTarget, setDeleteTarget] = useState(null);
 
@@ -423,7 +427,30 @@ const DailySales = () => {
       }
     }
 
-    const subtotal = sanitizeNumber(formData.quantity) * sanitizeNumber(formData.unitPrice);
+    if (!formData.item) {
+      alert('Please choose an item before saving the sale.');
+      setSaving(false);
+      return;
+    }
+
+    // A sale must move at least one unit. Previously the stock code fell back to
+    // 1 for any unparseable or zero quantity, which invented units that were
+    // never sold and quietly drained inventory.
+    const quantity = sanitizeNumber(formData.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      alert('Quantity must be at least 1.');
+      setSaving(false);
+      return;
+    }
+
+    const unitPrice = sanitizeNumber(formData.unitPrice);
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      alert('Unit price must be greater than 0.');
+      setSaving(false);
+      return;
+    }
+
+    const subtotal = quantity * unitPrice;
     const discountPct = sanitizeNumber(formData.discount) || 0;
     const totalAmount = subtotal * (1 - discountPct / 100);
     
@@ -435,8 +462,8 @@ const DailySales = () => {
     const salePayload = {
       item: sanitizeInput(formData.item, 100),
       category: invMatch?.category || '',
-      quantity: sanitizeNumber(formData.quantity),
-      unitPrice: sanitizeNumber(formData.unitPrice),
+      quantity: quantity,
+      unitPrice: unitPrice,
       cost: isEditing ? undefined : unitCost,
       paymentMethod: formData.paymentMethod,
       date: new Date().toISOString().split('T')[0],
@@ -451,18 +478,48 @@ const DailySales = () => {
         await createSale(salePayload);
       }
 
-      // Auto-deduct from inventory if item name matches
+      // Keep inventory in step with the sale that was just recorded.
+      //
+      // On create the movement is the quantity sold. On edit the movement is the
+      // difference against what the sale previously recorded, because the old
+      // quantity is already reflected in stock: deducting the new quantity again
+      // silently destroyed extra units on every edit. When the item itself is
+      // changed, the original item is returned in full and the new one is taken
+      // out.
       try {
         const inventory = await fetchInventory();
+        const previousQty = parseInt(editingSale?.quantity) || 0;
+        const previousItem = editingSale?.item || '';
+        const sameItem = !isEditing || previousItem.toLowerCase() === formData.item.toLowerCase();
+        const qty = parseInt(formData.quantity) || 0;
+
+        const movements = [];
+        if (isEditing && !sameItem && previousItem) {
+          const previousRow = inventory.find(i => i.name.toLowerCase() === previousItem.toLowerCase());
+          if (previousRow) movements.push({ row: previousRow, delta: -previousQty });
+        }
         const match = inventory.find(i => i.name.toLowerCase() === formData.item.toLowerCase());
         if (match) {
-          const qty = parseInt(formData.quantity) || 1;
-          const newStock = Math.max(0, (parseInt(match.stock) || 0) - qty);
-          await updateInventoryItem(match.id, {
-            ...match,
-            stock: newStock,
-            status: newStock > 5 ? 'In Stock' : newStock > 0 ? 'Low Stock' : 'Out of Stock'
+          // Units leaving stock: on a same-item edit that is the increase in
+          // quantity, so shrinking a sale hands the difference back.
+          movements.push({ row: match, delta: sameItem ? qty - previousQty : qty });
+        }
+
+        const shortfalls = [];
+        for (const { row, delta } of movements) {
+          if (delta === 0) continue;
+          const applied = applyStockDelta(resolveStock(row), delta, resolveMinStock(row));
+          await updateInventoryItem(row.id, {
+            ...row,
+            stock: applied.stock,
+            status: applied.status
           });
+          if (applied.shortfall > 0) {
+            shortfalls.push(`${row.name} is short by ${applied.shortfall} unit(s)`);
+          }
+        }
+        if (shortfalls.length > 0) {
+          alert(`Stock was set to 0 for the affected item(s) because there were not enough units:\n\n${shortfalls.join('\n')}`);
         }
       } catch (invErr) {
         console.warn('Inventory auto-deduct skipped:', invErr);
@@ -488,6 +545,7 @@ const DailySales = () => {
       discount: 0
     });
     setEditId(sale.id);
+    setEditingSale(sale);
     setIsEditing(true);
     setIsModalOpen(true);
   };
@@ -495,7 +553,30 @@ const DailySales = () => {
   const handleDelete = async (id) => {
     setDeleting(true);
     try {
+      const target = deleteTarget;
       await deleteSale(id);
+
+      // Deleting a sale must give the units back. Without this, every deletion
+      // left inventory permanently short and the shop slowly sold stock it did
+      // not actually have.
+      if (target?.item) {
+        try {
+          const inventory = await fetchInventory();
+          const match = inventory.find(i => i.name.toLowerCase() === target.item.toLowerCase());
+          if (match) {
+            const returned = parseInt(target.quantity) || 0;
+            const applied = applyStockDelta(resolveStock(match), -returned, resolveMinStock(match));
+            await updateInventoryItem(match.id, {
+              ...match,
+              stock: applied.stock,
+              status: applied.status
+            });
+          }
+        } catch (invErr) {
+          console.warn('Stock restore on sale delete skipped:', invErr);
+        }
+      }
+
       await loadData();
     } catch (error) {
       console.error('Failed to delete sale', error);
@@ -509,6 +590,7 @@ const DailySales = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
+    setEditingSale(null);
     setFormData({ item: '', quantity: 1, unitPrice: '', paymentMethod: 'Cash', discount: 0 });
   };
 
@@ -520,10 +602,17 @@ const DailySales = () => {
   const totalPages = Math.ceil(filteredSales.length / PAGE_SIZE);
   const paginatedSales = filteredSales.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const todayRevenue = sales.reduce((acc, sale) => acc + parseAmount(sale.amount || sale.totalAmount), 0);
-  const itemsSold = sales.reduce((acc, sale) => acc + (parseInt(sale.quantity) || 1), 0);
+  // These four cards are labelled "Today", so they must actually be scoped to
+  // today. They previously summed every sale ever recorded, which made them
+  // grow forever and disagree with the row list below them. Sales from previous
+  // days are browsable on the Sales History page.
+  const today = new Date().toISOString().split('T')[0];
+  const todaySales = sales.filter(s => s.date === today);
+
+  const todayRevenue = todaySales.reduce((acc, sale) => acc + parseAmount(sale.amount || sale.totalAmount), 0);
+  const itemsSold = todaySales.reduce((acc, sale) => acc + (parseInt(sale.quantity) || 1), 0);
   
-  const categoryCounts = sales.reduce((acc, sale) => {
+  const categoryCounts = todaySales.reduce((acc, sale) => {
     acc[sale.category] = (acc[sale.category] || 0) + 1;
     return acc;
   }, {});
@@ -531,7 +620,7 @@ const DailySales = () => {
 
   const costByItem = {};
   inventoryItems.forEach(i => {
-    costByItem[i.name] = i.costPrice ? parseFloat(String(i.costPrice).replace(/[^\d.-]/g, '')) || 0 : 0;
+    costByItem[i.name] = parseAmount(i.costPrice);
   });
 
   const profitOf = (sale) => {
@@ -542,7 +631,7 @@ const DailySales = () => {
     const totalCost = unitCost * (parseInt(sale.quantity) || 1);
     return amt - totalCost;
   };
-  const todayProfit = sales.reduce((acc, sale) => acc + profitOf(sale), 0);
+  const todayProfit = todaySales.reduce((acc, sale) => acc + profitOf(sale), 0);
 
   const handleExport = () => {
     const headers = {
@@ -703,9 +792,9 @@ const DailySales = () => {
           </div>
         </StatCard>
         <StatCard>
-          <StatLabel>Today's Profit</StatLabel>
+          <StatLabel>Today's Gross Profit</StatLabel>
           <StatValue className="data-tabular" style={{ color: todayProfit >= 0 ? '#25432F' : '#BA1A1A' }}>{formatCurrency(todayProfit, currency)}</StatValue>
-          <div style={{ color: '#89726C', fontSize: '0.75rem', fontWeight: 600 }}>After cost of goods</div>
+          <div style={{ color: '#89726C', fontSize: '0.75rem', fontWeight: 600 }}>Revenue minus cost of goods</div>
         </StatCard>
         <StatCard>
           <StatLabel>Items Sold</StatLabel>

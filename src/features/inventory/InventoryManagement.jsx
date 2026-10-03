@@ -10,8 +10,9 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
-import { formatCurrency, getCurrencySymbol } from '../../utils/currency';
+import { formatCurrency, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
+import { applyStockDelta, resolveMinStock, resolveStock, resolveStockStatus, stockValueAtCost, stockRetailValue, countUnitsInStock, countItemsMissingCost } from '../../utils/inventory';
 
 const PAGE_SIZE = 20;
 
@@ -424,7 +425,7 @@ const InventoryManagement = () => {
     }
 
     const stockNum = sanitizeNumber(formData.stock);
-    const minStock = sanitizeNumber(formData.minStock) || 5;
+    const minStock = resolveMinStock({ minStock: sanitizeNumber(formData.minStock) });
     const itemPayload = {
       name: sanitizeInput(formData.name, 100),
       category: sanitizeInput(selectedCategory, 50),
@@ -432,7 +433,7 @@ const InventoryManagement = () => {
       minStock: minStock,
       price: `GHS ${sanitizeNumber(formData.price).toFixed(2)}`,
       costPrice: `GHS ${sanitizeNumber(formData.costPrice).toFixed(2)}`,
-      status: stockNum > minStock ? 'In Stock' : stockNum > 0 ? 'Low Stock' : 'Out of Stock'
+      status: resolveStockStatus(stockNum, minStock)
     };
     
     try {
@@ -491,12 +492,14 @@ const InventoryManagement = () => {
   const adjustStock = async (item, delta) => {
     setAdjustingId(item.id);
     try {
-      const newStock = Math.max(0, (parseInt(item.stock) || 0) + delta);
-      const minStock = parseInt(item.minStock) || 5;
+      const applied = applyStockDelta(resolveStock(item), -delta, resolveMinStock(item));
       await updateInventoryItem(item.id, {
-        stock: newStock,
-        status: newStock > minStock ? 'In Stock' : newStock > 0 ? 'Low Stock' : 'Out of Stock'
+        stock: applied.stock,
+        status: applied.status
       });
+      if (applied.shortfall > 0) {
+        alert(`${item.name} only has ${resolveStock(item)} units in stock. Stock has been set to 0, removing ${applied.shortfall} more than were available.`);
+      }
       await loadData();
     } catch (error) {
       console.error('Failed to adjust stock', error);
@@ -519,26 +522,28 @@ const InventoryManagement = () => {
     downloadCSV(csv, `Inventory_${new Date().toISOString().split('T')[0]}.csv`);
   };
 
-  const parsePrice = (price) => {
-    if (typeof price === 'number') return price;
-    if (typeof price !== 'string') return 0;
-    return parseFloat(price.replace(/[^\d.]/g, '')) || 0;
-  };
-
   const marginOf = (item) => {
-    const sell = parsePrice(item.price);
-    const cost = parsePrice(item.costPrice);
+    const sell = parseAmount(item.price);
+    const cost = parseAmount(item.costPrice);
     if (sell <= 0 || cost <= 0) return null;
     return ((sell - cost) / sell) * 100;
   };
 
-  const totalPages = Math.ceil(inventory.length / PAGE_SIZE);
   const filteredInventory = searchTerm
     ? inventory.filter(i => i.name?.toLowerCase().includes(searchTerm.toLowerCase()) || i.category?.toLowerCase().includes(searchTerm.toLowerCase()))
     : inventory;
+  // Page count must follow the filtered set, otherwise searching shrinks the
+  // result to one page but leaves the pager offering empty extra pages.
+  const totalPages = Math.ceil(filteredInventory.length / PAGE_SIZE);
   const paginated = filteredInventory.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const totalValue = paginated.reduce((sum, i) => sum + (parseInt(i.stock) || 0) * parsePrice(i.price), 0);
+  const unitsInStock = countUnitsInStock(filteredInventory);
+  // Stock value is what the business actually has tied up, so it is valued at
+  // cost. It is also summed over every matching item, not just the rows on the
+  // visible page, which made the figure change when you paged.
+  const itemsMissingCost = countItemsMissingCost(filteredInventory);
+  const stockValueAtCostValue = stockValueAtCost(filteredInventory);
+  const retailValue = stockRetailValue(filteredInventory);
 
   return (
     <div>
@@ -548,8 +553,15 @@ const InventoryManagement = () => {
           <p style={{ color: '#55423D' }}>Manage your inventory stock.</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <div style={{ fontSize: '0.9rem', color: '#55423D' }}>
-            Value: <strong style={{ color: '#6F240A' }}>{formatCurrency(totalValue, currency)}</strong>
+          <div style={{ fontSize: '0.9rem', color: '#55423D', textAlign: 'right' }}>
+            <div>
+              Stock value (at cost):{' '}
+              <strong style={{ color: '#6F240A' }}>{formatCurrency(stockValueAtCostValue, currency)}</strong>
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#89726C' }}>
+              {unitsInStock} units · retail value {formatCurrency(retailValue, currency)}
+              {itemsMissingCost > 0 && ` · ${itemsMissingCost} item(s) missing a cost price`}
+            </div>
           </div>
           <ActionButton onClick={exportToCSV} style={{ background: 'white', color: '#6F240A', border: '1px solid #D0C8C4' }}>
             <Download size={18} />

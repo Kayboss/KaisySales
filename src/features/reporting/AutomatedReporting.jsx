@@ -5,7 +5,7 @@ import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContaine
 import { fetchSales, fetchExpenses, fetchInvoices, fetchInventory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
-import { formatCurrency, formatCurrencyShort } from '../../utils/currency';
+import { formatCurrency, formatCurrencyShort, parseAmount } from '../../utils/currency';
 
 const Header = styled.div`
   display: flex;
@@ -256,16 +256,12 @@ const AutomatedReporting = () => {
     loadData();
   }, []);
 
-  const parseAmount = (amt) => {
-    if (typeof amt === 'number') return amt;
-    if (typeof amt !== 'string') return 0;
-    return parseFloat(amt.replace(/[^\d.]/g, '')) || 0;
-  };
-
   const formatCurrencyLocal = (value) => formatCurrency(value, currency);
 
-  const revenue = data.sales.reduce((acc, s) => acc + parseAmount(s.totalAmount || s.amount), 0) +
-                  data.invoices.filter(inv => inv.status?.toLowerCase() === 'paid').reduce((acc, inv) => acc + parseAmount(inv.amount || inv.totalAmount), 0);
+  // Revenue counts the `sales` table ONLY. A paid invoice already writes a mirrored
+  // `sales` row (Invoices.jsx), so adding paid invoices here counted every
+  // invoice-driven sale twice and inflated net profit by the whole invoiced amount.
+  const revenue = data.sales.reduce((acc, s) => acc + parseAmount(s.totalAmount || s.amount), 0);
   
   const totalExpenses = data.expenses.reduce((acc, e) => acc + parseAmount(e.amount || e.totalAmount), 0);
   const netProfit = revenue - totalExpenses;
@@ -303,11 +299,15 @@ const AutomatedReporting = () => {
 
   const profitByCustomer = useMemo(() => {
     const grouped = {};
-    data.invoices.forEach(inv => {
+    // Only paid invoices represent realised revenue. Counting pending/draft ones
+    // here made this table's totals exceed the page's own Total Revenue.
+    data.invoices.filter(inv => inv.status?.toLowerCase() === 'paid').forEach(inv => {
       const name = (inv.customer || '').trim() || 'Unknown';
       if (!grouped[name]) grouped[name] = { name, revenue: 0, cost: 0, invoices: 0 };
+      // Metadata markers written by Invoices.jsx carry no name or quantity and
+      // contribute no cost, but they must not be priced as real line items.
       const lineCost = Array.isArray(inv.items)
-        ? inv.items.reduce((acc, li) => acc + (inventoryCost[li.name] || 0) * (parseInt(li.quantity) || 1), 0)
+        ? inv.items.reduce((acc, li) => acc + (li.type ? 0 : (inventoryCost[li.name] || 0) * (parseInt(li.quantity) || 1)), 0)
         : 0;
       grouped[name].revenue += parseAmount(inv.amount || inv.totalAmount);
       grouped[name].cost += lineCost;

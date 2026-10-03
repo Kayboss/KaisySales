@@ -5,7 +5,7 @@ import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircl
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
-import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory, updateInventoryItem, createSale, deleteSale, createServiceIncome, deleteServiceIncome } from '../../services/api';
+import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory, updateInventoryItem, createSale, deleteSale, deleteServiceIncome } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../services/supabase';
@@ -13,6 +13,7 @@ import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { formatCurrency, getCurrencySymbol } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
+import { applyStockDelta, resolveMinStock, resolveStock } from '../../utils/inventory';
 
 const Header = styled.div`
   display: flex;
@@ -411,6 +412,9 @@ const Invoices = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  // Retained so an edit can correct the stock movement the original save made,
+  // rather than deducting the whole invoice a second time.
+  const [editingInvoice, setEditingInvoice] = useState(null);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [previewInvoice, setPreviewInvoice] = useState(null);
@@ -562,20 +566,48 @@ const Invoices = () => {
         invoiceId = created?.id;
       }
 
-      // Deduct inventory
+      // Deduct inventory.
+      //
+      // On create each line is taken out of stock. On edit only the difference
+      // is applied: the original save already deducted those units, so
+      // deducting the whole invoice again silently lost stock every time an
+      // invoice was corrected. Lines removed by an edit are returned in full.
       try {
         const inv = await fetchInventory();
-        for (const item of items) {
-          const match = inv.find(i => i.name.toLowerCase() === item.name.toLowerCase());
-          if (match) {
-            const qty = parseInt(item.quantity) || 1;
-            const newStock = Math.max(0, (parseInt(match.stock) || 0) - qty);
-            await updateInventoryItem(match.id, {
-              ...match,
-              stock: newStock,
-              status: newStock > 5 ? 'In Stock' : newStock > 0 ? 'Low Stock' : 'Out of Stock'
-            });
+        const previousLines = (Array.isArray(editingInvoice?.items) ? editingInvoice.items : [])
+          .filter(i => !i.type);
+        const nextLines = items.filter(i => i.name);
+
+        const movementFor = (name) => {
+          const nextQty = parseInt(nextLines.find(i => i.name.toLowerCase() === name.toLowerCase())?.quantity) || 0;
+          const previousQty = isEditing
+            ? (parseInt(previousLines.find(i => i.name?.toLowerCase() === name.toLowerCase())?.quantity) || 0)
+            : 0;
+          // Units leaving stock: the increase against what was already deducted.
+          return { delta: nextQty - previousQty };
+        };
+
+        const touchedNames = new Set(nextLines.map(i => i.name));
+        if (isEditing) previousLines.forEach(i => touchedNames.add(i.name));
+
+        const shortfalls = [];
+        for (const name of touchedNames) {
+          const match = inv.find(i => i.name.toLowerCase() === name.toLowerCase());
+          if (!match) continue;
+          const { delta } = movementFor(name);
+          if (delta === 0) continue;
+          const applied = applyStockDelta(resolveStock(match), delta, resolveMinStock(match));
+          await updateInventoryItem(match.id, {
+            ...match,
+            stock: applied.stock,
+            status: applied.status
+          });
+          if (applied.shortfall > 0) {
+            shortfalls.push(`${match.name} is short by ${applied.shortfall} unit(s)`);
           }
+        }
+        if (shortfalls.length > 0) {
+          alert(`Stock was set to 0 for the affected item(s) because there were not enough units:\n\n${shortfalls.join('\n')}`);
         }
       } catch (invErr) {
         console.warn('Inventory auto-deduct skipped:', invErr);
@@ -611,29 +643,10 @@ const Invoices = () => {
           console.warn('Sale creation from invoice skipped:', saleErr);
         }
 
-        try {
-          const incomeResult = await createServiceIncome({
-            client_name: sanitizeInput(formData.customer, 100),
-            amount: totalAmount,
-            platform_fee: 0,
-            net_amount: totalAmount,
-            platform_tag: 'invoice',
-            milestone_label: items[0]?.name || `Invoice #${invoiceId || ''}`,
-            payment_date: formData.date || new Date().toISOString().split('T')[0],
-            notes: `Auto from invoice #${invoiceId || ''}`,
-          });
-          if (invoiceId && incomeResult?.id) {
-            const allInvs = await fetchInvoices();
-            const current = allInvs.find(i => String(i.id) === String(invoiceId));
-            if (current) {
-              const rawItems = Array.isArray(current.items) ? current.items : [];
-              const updatedItems = [...rawItems.filter(i => i.type !== '_incomeId'), { type: '_incomeId', incomeId: incomeResult.id }];
-              await updateInvoice(invoiceId, { items: updatedItems });
-            }
-          }
-        } catch (incomeErr) {
-          console.warn('Service income creation from invoice skipped:', incomeErr);
-        }
+        // No `service_income` row here. A retail invoice already writes its own
+        // `sales` row above, and writing a third row into the services-mode
+        // income table leaked retail revenue into Income Tracking and double
+        // counted it in the admin overview.
       }
 
       await loadData();
@@ -665,6 +678,7 @@ const Invoices = () => {
       notes: invoice.notes || ''
     });
     setEditId(invoice.id);
+    setEditingInvoice(invoice);
     setIsEditing(true);
     setIsModalOpen(true);
   };
@@ -681,6 +695,27 @@ const Invoices = () => {
           if (saleRef?.saleId) await deleteSale(saleRef.saleId);
           const incomeRef = rawItems.find(i => i.type === '_incomeId');
           if (incomeRef?.incomeId) await deleteServiceIncome(incomeRef.incomeId);
+
+          // Return the units this invoice took out of stock. Metadata markers are
+          // skipped so the discount row is never treated as a stock line.
+          const soldLines = rawItems.filter(i => !i.type && i.name);
+          if (soldLines.length > 0) {
+            const inv = await fetchInventory();
+            for (const line of soldLines) {
+              const match = inv.find(i => i.name.toLowerCase() === line.name.toLowerCase());
+              if (!match) continue;
+              const applied = applyStockDelta(
+                resolveStock(match),
+                -(parseInt(line.quantity) || 0),
+                resolveMinStock(match)
+              );
+              await updateInventoryItem(match.id, {
+                ...match,
+                stock: applied.stock,
+                status: applied.status
+              });
+            }
+          }
         }
       } catch (saleErr) {
         console.warn('Associated sale/income delete skipped:', saleErr);
@@ -698,7 +733,6 @@ const Invoices = () => {
 
   const handleMarkPaid = async (invoice) => {
     const rawItems = Array.isArray(invoice.items) ? invoice.items : [];
-    const amountNum = parseFloat(invoice.amount?.replace(/[^\d.-]/g, '')) || 0;
     const firstItem = rawItems.find(i => !i.type) || {};
     try {
       await updateInvoice(invoice.id, { status: 'paid' });
@@ -722,29 +756,8 @@ const Invoices = () => {
         console.warn('Quick mark paid: sale creation skipped', e);
       }
 
-      try {
-        const incomeResult = await createServiceIncome({
-          client_name: invoice.customer || '',
-          amount: amountNum,
-          platform_fee: 0,
-          net_amount: amountNum,
-          platform_tag: 'invoice',
-          milestone_label: firstItem.name || `Invoice #${invoice.id}`,
-          payment_date: invoice.date || new Date().toISOString().split('T')[0],
-          notes: `Auto from invoice #${invoice.id}`,
-        });
-        if (incomeResult?.id) {
-          const allInvs = await fetchInvoices();
-          const current = allInvs.find(i => String(i.id) === String(invoice.id));
-          if (current) {
-            const curRaw = Array.isArray(current.items) ? current.items : [];
-            const updatedItems = [...curRaw.filter(i => i.type !== '_incomeId'), { type: '_incomeId', incomeId: incomeResult.id }];
-            await updateInvoice(invoice.id, { items: updatedItems });
-          }
-        }
-      } catch (e) {
-        console.warn('Quick mark paid: income creation skipped', e);
-      }
+      // No `service_income` row here either, for the same reason as the save
+      // path: the mirrored `sales` row above is the retail record of this sale.
 
       await loadData();
     } catch (error) {
@@ -757,6 +770,7 @@ const Invoices = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
+    setEditingInvoice(null);
     prevStatus.current = 'pending';
     setFormData({ customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0, notes: '' });
   };

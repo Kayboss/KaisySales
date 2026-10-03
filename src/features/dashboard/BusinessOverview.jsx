@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriangle, ArrowRight, BookOpen, Clock } from 'lucide-react';
-import { fetchSales, fetchExpenses, fetchInvoices, fetchInventory } from '../../services/api';
+import { fetchSales, fetchExpenses, fetchInventory } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
-import { formatCurrencyShort } from '../../utils/currency';
+import { formatCurrencyShort, parseAmount } from '../../utils/currency';
 import TutorialModal, { STORAGE_KEY } from '../../components/tutorial/TutorialModal';
 
 const Grid = styled.div`
@@ -191,13 +191,7 @@ const getBezierPath = (points) => {
   return d;
 };
 
-const getMonthlyData = (sales, invoices) => {
-  const parseAmount = (amt) => {
-    if (typeof amt === 'number') return amt;
-    if (typeof amt !== 'string') return 0;
-    return parseFloat(amt.replace(/[^\d.]/g, '')) || 0;
-  };
-
+const getMonthlyData = (sales) => {
   const months = [];
   const now = new Date();
   for (let i = 5; i >= 0; i--) {
@@ -208,22 +202,15 @@ const getMonthlyData = (sales, invoices) => {
     months.push({ key: `${year}-${month}`, label, amount: 0 });
   }
 
+  // Sales only. Paid invoices already write a mirrored `sales` row, so adding
+  // invoices here counted invoice-driven revenue twice and made this chart
+  // disagree with the Net Profit card rendered directly above it.
   sales.forEach(s => {
     if (s.date) {
       const key = s.date.substring(0, 7);
       const match = months.find(m => m.key === key);
       if (match) {
         match.amount += parseAmount(s.totalAmount || s.amount);
-      }
-    }
-  });
-
-  invoices.forEach(inv => {
-    if (inv.date && inv.status?.toLowerCase() === 'paid') {
-      const key = inv.date.substring(0, 7);
-      const match = months.find(m => m.key === key);
-      if (match) {
-        match.amount += parseAmount(inv.amount || inv.totalAmount);
       }
     }
   });
@@ -364,18 +351,11 @@ const BusinessOverview = () => {
     loading: true
   });
 
-  const parseAmount = (amt) => {
-    if (typeof amt === 'number') return amt;
-    if (typeof amt !== 'string') return 0;
-    return parseFloat(amt.replace(/[^\d.]/g, '')) || 0;
-  };
-
   const loadStats = async () => {
     try {
-      const [sales, expenses, invoices, inventory] = await Promise.all([
+      const [sales, expenses, inventory] = await Promise.all([
         fetchSales(),
         fetchExpenses(),
-        fetchInvoices(),
         fetchInventory()
       ]);
 
@@ -384,9 +364,10 @@ const BusinessOverview = () => {
       // Revenue: All sales (paid invoices already create sale records)
       const totalRevenue = sales.reduce((acc, s) => acc + parseAmount(s.totalAmount || s.amount), 0);
 
-      // Sales Today: Count of sales + invoices today
-      const salesTodayCount = sales.filter(s => s.date === today).length + 
-                             invoices.filter(inv => inv.date === today).length;
+      // Sales Today: count of sales rows only. Paid invoices are already
+      // represented by their mirrored `sales` row, and pending invoices are not
+      // completed sales, so adding invoices here double-counted and over-reported.
+      const salesTodayCount = sales.filter(s => s.date === today).length;
 
       // Net Profit: Total Revenue - Total Expenses
       const totalExpenses = expenses.reduce((acc, e) => acc + parseAmount(e.amount || e.totalAmount), 0);
@@ -396,7 +377,7 @@ const BusinessOverview = () => {
       const lowStockCount = inventory.filter(item => item.status === 'Low Stock' || item.status === 'Out of Stock').length;
 
       // Compute monthly dynamic performance trends
-      const monthlyData = getMonthlyData(sales, invoices);
+      const monthlyData = getMonthlyData(sales);
 
       // Recent sales (top 5, already newest-first from API)
       const recentSales = sales.slice(0, 5).map(s => ({
