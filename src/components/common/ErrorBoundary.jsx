@@ -33,6 +33,14 @@ const ErrorMessage = styled.p`
   margin-bottom: 0.5rem;
 `;
 
+const ButtonRow = styled.div`
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 2rem;
+`;
+
 const RefreshButton = styled.button`
   background: ${themeTokens.colors.primary};
   color: ${themeTokens.colors.text.onPrimary};
@@ -42,11 +50,32 @@ const RefreshButton = styled.button`
   font-weight: 600;
   font-family: ${themeTokens.fonts.main};
   cursor: pointer;
-  margin-top: 2rem;
   transition: ${themeTokens.transitions.fast};
 
   &:hover {
     background: ${themeTokens.colors.primaryContainer};
+    transform: translateY(-2px);
+  }
+`;
+
+// This screen sits outside BrowserRouter in main.jsx, so react-router's Link
+// and useNavigate are unavailable here. A plain anchor does a full page load,
+// which is what you want after a crash anyway.
+const DashboardButton = styled.a`
+  display: inline-block;
+  background: ${themeTokens.colors.background.surface};
+  color: ${themeTokens.colors.primary};
+  padding: 0.75rem 2rem;
+  border: 1px solid ${themeTokens.colors.primary};
+  border-radius: ${themeTokens.borderRadius.md};
+  font-weight: 600;
+  font-family: ${themeTokens.fonts.main};
+  text-decoration: none;
+  cursor: pointer;
+  transition: ${themeTokens.transitions.fast};
+
+  &:hover {
+    background: ${themeTokens.colors.background.surfaceVariant};
     transform: translateY(-2px);
   }
 `;
@@ -75,10 +104,13 @@ class ErrorBoundary extends Component {
             KaisySales ran into a problem loading this page. Your sales, expenses and
             inventory are stored safely and have not been lost.
           </ErrorMessage>
-          <ErrorMessage>Reload the page to carry on.</ErrorMessage>
-          <RefreshButton onClick={() => window.location.reload()}>
-            Reload page
-          </RefreshButton>
+          <ErrorMessage>Reload the page, or head back to your dashboard.</ErrorMessage>
+          <ButtonRow>
+            <RefreshButton onClick={() => window.location.reload()}>
+              Reload page
+            </RefreshButton>
+            <DashboardButton href="/dashboard">Return to dashboard</DashboardButton>
+          </ButtonRow>
         </ErrorContainer>
       );
     }
