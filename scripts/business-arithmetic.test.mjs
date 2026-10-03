@@ -6,7 +6,9 @@ import {
   DEFAULT_MIN_STOCK,
   applyStockDelta,
   countItemsMissingCost,
+  countItemsWithCost,
   countUnitsInStock,
+  grossMarginPercent,
   resolveMinStock,
   resolveStock,
   resolveStockStatus,
@@ -163,4 +165,35 @@ test('net profit subtracts every expense from sales exactly once', () => {
 test('a credit line reduces net profit instead of increasing it', () => {
   const revenue = parseAmount('GHS 500.00') + parseAmount('GHS -50.00');
   assert.equal(revenue, 450);
+});
+test('cost price stays optional: retail value is complete without any costs', () => {
+  const items = [
+    { name: 'ChinChin', stock: 10, price: 'GHS 5.00' },
+    { name: 'Sardine', stock: 4, price: 'GHS 20.00' },
+  ];
+  // The maker knows what they sell for, so this figure is always trustworthy.
+  assert.equal(stockRetailValue(items), 130);
+  assert.equal(countItemsWithCost(items), 0);
+  assert.equal(countItemsMissingCost(items), 2);
+});
+
+test('margin is withheld until every item has a cost, not estimated from a part', () => {
+  const partial = [
+    { name: 'ChinChin', stock: 10, price: 'GHS 5.00', costPrice: 'GHS 2.00' },
+    { name: 'Sardine', stock: 4, price: 'GHS 20.00' },
+  ];
+  // Mixing costed and uncosted stock would understate the margin, so it stays hidden.
+  assert.equal(grossMarginPercent(partial), null);
+
+  const complete = [
+    { name: 'ChinChin', stock: 10, price: 'GHS 5.00', costPrice: 'GHS 2.00' },
+    { name: 'Sardine', stock: 4, price: 'GHS 20.00', costPrice: 'GHS 10.00' },
+  ];
+assert.equal(countItemsWithCost(complete), 2);
+  // 130 retail against 60 cost.
+  assert.equal(Number(grossMarginPercent(complete).toFixed(2)), 53.85);
+});
+
+test('margin refuses to divide by an empty shelf', () => {
+  assert.equal(grossMarginPercent([]), null);
 });

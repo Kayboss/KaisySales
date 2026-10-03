@@ -12,7 +12,7 @@ import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { formatCurrency, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
-import { applyStockDelta, resolveMinStock, resolveStock, resolveStockStatus, stockValueAtCost, stockRetailValue, countUnitsInStock, countItemsMissingCost } from '../../utils/inventory';
+import { applyStockDelta, resolveMinStock, resolveStock, resolveStockStatus, stockValueAtCost, stockRetailValue, countUnitsInStock, countItemsMissingCost, countItemsWithCost, grossMarginPercent } from '../../utils/inventory';
 
 const PAGE_SIZE = 20;
 
@@ -67,9 +67,27 @@ const ValueNote = styled.div`
   white-space: nowrap;
 `;
 
-const CostWarning = styled.span`
-  color: #BA1A1A;
+// Deliberately muted. Cost price is optional, so this note informs rather than
+// warns, and it only appears for someone already using cost tracking.
+const ValueHint = styled.span`
+  font-weight: 600;
+  font-size: 0.75rem;
+`;
+
+// Marks a field the app never requires. Most makers do not know what their
+// materials cost, so the field has to read as a genuine choice rather than a
+// gap in a form they are failing to complete.
+const OptionalTag = styled.span`
+  font-size: 0.65rem;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: ${({ theme }) => theme.colors.text.muted};
+  background: ${({ theme }) => theme.colors.background.surfaceVariant};
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  margin-left: 0.35rem;
+  vertical-align: middle;
 `;
 
 const SearchBar = styled.div`
@@ -585,12 +603,19 @@ const InventoryManagement = () => {
   const paginated = filteredInventory.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const unitsInStock = countUnitsInStock(filteredInventory);
-  // Stock value is what the business actually has tied up, so it is valued at
-  // cost. It is also summed over every matching item, not just the rows on the
-  // visible page, which made the figure change when you paged.
+  // Every figure is summed over every matching item, not just the rows on the
+  // visible page, which made the totals change when you paged.
+  //
+  // Retail value leads because it is the one number every maker can state: what
+  // their shelf is worth at the price they sell. Cost and margin are opt-in
+  // extras that appear only once a cost price has actually been entered, so
+  // someone who has never tracked costs is never shown a half-empty figure or
+  // told they are missing something.
   const itemsMissingCost = countItemsMissingCost(filteredInventory);
+  const itemsWithCost = countItemsWithCost(filteredInventory);
   const stockValueAtCostValue = stockValueAtCost(filteredInventory);
   const retailValue = stockRetailValue(filteredInventory);
+  const marginPercent = grossMarginPercent(filteredInventory);
 
   return (
     <div>
@@ -602,19 +627,20 @@ const InventoryManagement = () => {
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <ValueSummary>
             <ValueTile>
-              <ValueLabel>Stock value (at cost)</ValueLabel>
-              <ValueFigure $tone="cost">{formatCurrency(stockValueAtCostValue, currency)}</ValueFigure>
-            </ValueTile>
-            <ValueTile>
               <ValueLabel>Retail value</ValueLabel>
               <ValueFigure $tone="retail">{formatCurrency(retailValue, currency)}</ValueFigure>
             </ValueTile>
+            {itemsWithCost > 0 && (
+              <ValueTile>
+                <ValueLabel>Value at cost</ValueLabel>
+                <ValueFigure $tone="cost">{formatCurrency(stockValueAtCostValue, currency)}</ValueFigure>
+              </ValueTile>
+            )}
             <ValueNote>
               {unitsInStock} unit(s) in stock
-              {itemsMissingCost > 0 && (
-                <CostWarning>
-                  {itemsMissingCost} item(s) missing a cost price
-                </CostWarning>
+              {marginPercent !== null && <ValueHint>Margin {marginPercent.toFixed(0)}%</ValueHint>}
+              {itemsWithCost > 0 && itemsMissingCost > 0 && (
+                <ValueHint>Cost price added to {itemsWithCost} of {filteredInventory.length} item(s)</ValueHint>
               )}
             </ValueNote>
           </ValueSummary>
@@ -712,13 +738,16 @@ const InventoryManagement = () => {
               />
             </FormGroup>
             <FormGroup>
-              <label>Cost Price ({getCurrencySymbol(currency)})</label>
+              <label>
+                Cost Price ({getCurrencySymbol(currency)}){' '}
+                <OptionalTag>optional</OptionalTag>
+              </label>
               <input 
                 type="number" 
                 step="0.01" 
                 value={formData.costPrice}
                 onChange={e => setFormData({...formData, costPrice: e.target.value})}
-                placeholder="0.00" 
+                placeholder="Leave blank if you don't track it" 
               />
             </FormGroup>
           </FormRow>

@@ -48,5 +48,21 @@ export const stockRetailValue = (items) =>
 export const countUnitsInStock = (items) =>
   items.reduce((sum, item) => sum + resolveStock(item), 0);
 
+// Cost price is optional. Most makers know what they sell for but not what the
+// materials cost, so a missing cost is a normal state and never blocks anything.
 export const countItemsMissingCost = (items) =>
   items.filter(item => parseAmount(item.costPrice) <= 0).length;
+
+export const countItemsWithCost = (items) =>
+  items.filter(item => parseAmount(item.costPrice) > 0).length;
+
+// Margin is only meaningful once every item in view has a cost, otherwise the
+// figure silently mixes costed and uncosted stock. Returns null when incomplete.
+export const grossMarginPercent = (items) => {
+  if (items.length === 0) return null;
+  if (countItemsMissingCost(items) > 0) return null;
+  const retail = stockRetailValue(items);
+  if (retail <= 0) return null;
+  const cost = stockValueAtCost(items);
+  return ((retail - cost) / retail) * 100;
+};
