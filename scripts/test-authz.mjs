@@ -60,7 +60,12 @@ const writeProbes = [
   'notes', 'description', 'name', 'title', 'vendor', 'milestone_label',
   'client_name', 'customer', 'item', 'business_name', 'owner_name', 'category',
   'status', 'message', 'content', 'platform_tag', 'location', 'phone',
+  'error', 'page',
 ];
+// admin_audit_log is deliberately absent: its policy is `using: is_admin()`, so it
+// has no per-user access at all. Both fixture accounts are non-admin, so C/D/E
+// cannot be framed against it — a SKIP is the honest verdict, not a missing
+// column. Its actor_id is not an owner column in the RLS sense.
 const ownerCandidates = ['user_id', 'owner_id', 'created_by'];
 
 // Tables that are deliberately world-readable. subscription_plans is the pricing
@@ -436,7 +441,7 @@ async function main() {
         }
       }
       if (!owner) {
-        skip(`C read others' ${table}`, 'no ownership column found (user_id/owner_id/id)');
+        skip(`C read others' ${table}`, `no per-user RLS on this table (no ${ownerCandidates.join('/')} column), so there is no cross-tenant question to ask`);
         continue;
       }
 
