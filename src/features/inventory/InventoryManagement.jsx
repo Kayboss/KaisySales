@@ -25,6 +25,53 @@ const Header = styled.div`
   gap: 1rem;
 `;
 
+const ValueSummary = styled.div`
+  display: flex;
+  align-items: stretch;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+`;
+
+const ValueTile = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+`;
+
+const ValueLabel = styled.div`
+  color: ${({ theme }) => theme.colors.text.muted};
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+`;
+
+const ValueFigure = styled.div`
+  font-family: ${({ theme }) => theme.fonts.display};
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: ${({ theme, $tone }) => ($tone === 'retail' ? theme.colors.text.main : theme.colors.primary)};
+`;
+
+const ValueNote = styled.div`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text.muted};
+  white-space: nowrap;
+`;
+
+const CostWarning = styled.span`
+  color: #BA1A1A;
+  font-weight: 700;
+`;
+
 const SearchBar = styled.div`
   display: flex;
   align-items: center;
@@ -306,7 +353,7 @@ const FormGroup = styled.div`
     display: block;
     margin-bottom: 0.5rem;
     font-weight: 600;
-    color: ${({ theme }) => theme.colors.text.primary};
+    color: ${({ theme }) => theme.colors.text.main};
   }
   
   input, select {
@@ -349,7 +396,7 @@ const ModalActions = styled.div`
   .cancel {
     background: white;
     border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
-    color: ${({ theme }) => theme.colors.text.primary};
+    color: ${({ theme }) => theme.colors.text.main};
   }
 
   .save {
@@ -552,17 +599,25 @@ const InventoryManagement = () => {
           <h1 style={{ fontSize: '2rem' }}>Inventory</h1>
           <p style={{ color: '#55423D' }}>Manage your inventory stock.</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <div style={{ fontSize: '0.9rem', color: '#55423D', textAlign: 'right' }}>
-            <div>
-              Stock value (at cost):{' '}
-              <strong style={{ color: '#6F240A' }}>{formatCurrency(stockValueAtCostValue, currency)}</strong>
-            </div>
-            <div style={{ fontSize: '0.78rem', color: '#89726C' }}>
-              {unitsInStock} units · retail value {formatCurrency(retailValue, currency)}
-              {itemsMissingCost > 0 && ` · ${itemsMissingCost} item(s) missing a cost price`}
-            </div>
-          </div>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <ValueSummary>
+            <ValueTile>
+              <ValueLabel>Stock value (at cost)</ValueLabel>
+              <ValueFigure $tone="cost">{formatCurrency(stockValueAtCostValue, currency)}</ValueFigure>
+            </ValueTile>
+            <ValueTile>
+              <ValueLabel>Retail value</ValueLabel>
+              <ValueFigure $tone="retail">{formatCurrency(retailValue, currency)}</ValueFigure>
+            </ValueTile>
+            <ValueNote>
+              {unitsInStock} unit(s) in stock
+              {itemsMissingCost > 0 && (
+                <CostWarning>
+                  {itemsMissingCost} item(s) missing a cost price
+                </CostWarning>
+              )}
+            </ValueNote>
+          </ValueSummary>
           <ActionButton onClick={exportToCSV} style={{ background: 'white', color: '#6F240A', border: '1px solid #D0C8C4' }}>
             <Download size={18} />
             Export

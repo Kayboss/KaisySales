@@ -76,7 +76,7 @@ const DateInput = styled.input`
   border-radius: 6px;
   font-size: 0.85rem;
   background: white;
-  color: ${({ theme }) => theme.colors.text.primary};
+  color: ${({ theme }) => theme.colors.text.main};
 `;
 
 const SearchBox = styled.div`
@@ -94,7 +94,7 @@ const SearchBox = styled.div`
     font-size: 0.85rem;
     width: 100%;
     background: transparent;
-    color: ${({ theme }) => theme.colors.text.primary};
+    color: ${({ theme }) => theme.colors.text.main};
   }
 `;
 
@@ -171,7 +171,7 @@ const DayHeader = styled.button`
   border: none;
   cursor: pointer;
   text-align: left;
-  color: ${({ theme }) => theme.colors.text.primary};
+  color: ${({ theme }) => theme.colors.text.main};
 
   &:hover { background: ${({ theme }) => theme.colors.background.surface}; }
 `;
