@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseAmount } from '../src/utils/currency.js';
+import {
+  serviceProfit, serviceGross, serviceFees, serviceReceived, serviceRowReceived,
+} from '../src/utils/serviceFinance.js';
 import { sanitizeNumber } from '../src/utils/sanitize.js';
 import {
   DEFAULT_MIN_STOCK,
@@ -195,5 +198,65 @@ assert.equal(countItemsWithCost(complete), 2);
 });
 
 test('margin refuses to divide by an empty shelf', () => {
-  assert.equal(grossMarginPercent([]), null);
+    assert.equal(grossMarginPercent([]), null);
+  });
+
+// The services dashboard used to compute Net as gross - expenses, ignoring the
+// platform fees entirely, while the P&L computed net-of-fees - expenses. The two
+// pages therefore disagreed by exactly the fees. These tests pin the shared basis.
+test('platform fees are deducted from income, not ignored', () => {
+  const income = [
+    { amount: 1000, platformFee: 150, netAmount: 850 },
+    { amount: 500, platformFee: 0, netAmount: 500 },
+  ];
+  assert.equal(serviceGross(income), 1500);
+  assert.equal(serviceFees(income), 150);
+  assert.equal(serviceReceived(income), 1350);
+});
+
+test('a row whose net_amount was never computed falls back to its gross amount', () => {
+  assert.equal(serviceRowReceived({ amount: 250, platformFee: 10 }), 250);
+  assert.equal(serviceRowReceived({ amount: 250, netAmount: null }), 250);
+  assert.equal(serviceRowReceived({ amount: 250, netAmount: '' }), 250);
+  // net_amount is a nullable column with DEFAULT 0, so a stored 0 means
+  // "never computed". Two real rows have amount=1.00, fee=0, net_amount=0.
+  assert.equal(serviceRowReceived({ amount: 1, platformFee: 0, netAmount: 0 }), 1);
+  assert.equal(serviceReceived([{ amount: 1, platformFee: 0, netAmount: 0 }, { amount: 99, platformFee: 0, netAmount: 99 }]), 100);
+});
+
+test('profit is income received minus expenses, never gross minus expenses', () => {
+  const income = [
+    { amount: 1000, platformFee: 150, netAmount: 850 },
+    { amount: 500, platformFee: 0, netAmount: 500 },
+  ];
+  const expenses = [{ amount: 'GHS 200.00' }, { amount: 'GHS 50.50' }];
+
+  const result = serviceProfit(income, expenses);
+  assert.equal(result.gross, 1500);
+  assert.equal(result.fees, 150);
+  assert.equal(result.received, 1350);
+  assert.equal(result.expenses, 250.5);
+  assert.equal(result.profit, 1099.5);
+
+  // The old, wrong dashboard figure. It must never be presented as profit.
+  const wrongOldDashboardNumber = result.gross - result.expenses;
+  assert.equal(wrongOldDashboardNumber, 1249.5);
+  assert.notEqual(result.profit, wrongOldDashboardNumber);
+  assert.equal(result.profit, wrongOldDashboardNumber - result.fees);
+});
+
+test('prefixed and legacy expense strings parse through the shared helper', () => {
+  const expenses = [{ amount: 'GHS 1,240.00' }, { amount: 'GH₵ 100.00' }, { amount: '' }, { amount: null }];
+  assert.equal(serviceProfit([], expenses).expenses, 1340);
+});
+
+test('negative amounts keep their sign through profit', () => {
+  const income = [{ amount: 500, platformFee: 0, netAmount: 500 }];
+  const expenses = [{ amount: 'GHS -200.00' }];
+  assert.equal(serviceProfit(income, expenses).profit, 700);
+});
+
+test('margin is null with no income rather than a misleading zero', () => {
+  assert.equal(serviceProfit([], [{ amount: 'GHS 100.00' }]).margin, null);
+  assert.equal(serviceProfit([{ amount: 400, netAmount: 400 }], [{ amount: 'GHS 100.00' }]).margin, '75.0');
 });

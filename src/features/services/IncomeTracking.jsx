@@ -7,6 +7,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers, fetchExpenses, fetchCategories, createCategory, fetchServices } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 import { formatCurrency } from '../../utils/currency';
+import { serviceProfit, serviceRowReceived } from '../../utils/serviceFinance';
 import CatalogPicker from './CatalogPicker';
 
 const Header = styled.div`
@@ -402,9 +403,7 @@ const IncomeTracking = () => {
   const totalPages = Math.ceil(filteredIncome.length / PAGE_SIZE);
   const paginated = filteredIncome.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const totalGross = income.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
-  const totalExpenses = expenses.reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
-  const totalNet = totalGross - totalExpenses;
+  const { gross: totalGross, fees: totalFees, expenses: totalExpenses, profit: totalNet } = serviceProfit(income, expenses);
   const activeRecurring = recurring.filter(r => r.active !== false);
   const monthlyRecurring = activeRecurring.reduce((s, r) => {
     if (r.frequency === 'monthly') return s + (parseFloat(r.amount) || 0);
@@ -425,7 +424,7 @@ const IncomeTracking = () => {
     if (!pd) return;
     const d = new Date(pd);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    if (monthlyData[key]) monthlyData[key].income += parseFloat(i.amount) || 0;
+    if (monthlyData[key]) monthlyData[key].income += serviceRowReceived(i);
   });
   expenses.forEach(e => {
     const ed = e.date;
@@ -465,7 +464,11 @@ const IncomeTracking = () => {
         <StatCard>
           <h3>Net Income</h3>
           <div className="value" style={{ color: '#2E7D32' }}>{formatCurrency(totalNet)}</div>
-          <div className="sub">Gross income minus expenses</div>
+          <div className="sub">
+            {totalFees > 0
+              ? `After ${formatCurrency(totalFees)} platform fees, minus expenses`
+              : 'Income minus expenses'}
+          </div>
         </StatCard>
         <StatCard>
           <h3>Monthly Recurring</h3>
@@ -475,7 +478,7 @@ const IncomeTracking = () => {
       </StatRow>
 
       <ChartBox>
-        <ChartTitle>Monthly Revenue (Last 6 Months)</ChartTitle>
+        <ChartTitle>Monthly Revenue After Platform Fees (Last 6 Months)</ChartTitle>
         <ResponsiveContainer width="100%" height={260}>
           <AreaChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
             <defs>

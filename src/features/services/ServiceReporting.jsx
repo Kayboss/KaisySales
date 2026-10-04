@@ -5,6 +5,7 @@ import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart as RPieCh
 import { fetchServiceIncome, fetchRecurringIncome, fetchExpenses, fetchCustomers, fetchInvoices } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { formatCurrency } from '../../utils/currency';
+import { serviceProfit } from '../../utils/serviceFinance';
 
 const Container = styled.div`
   display: flex;
@@ -72,6 +73,12 @@ const StatLabel = styled.div`
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.text.muted};
   letter-spacing: 0.05em;
+`;
+
+const StatNote = styled.div`
+  font-size: 0.7rem;
+  color: ${({ theme }) => theme.colors.text.muted};
+  margin-top: 0.15rem;
 `;
 
 const ReportSection = styled.div`
@@ -221,10 +228,9 @@ const ServiceReporting = () => {
   const filteredExpenses = filterByDate(expenses, 'date');
   const filteredInvoices = filterByDate(invoices, 'date');
 
-  const totalNet = filteredIncome.reduce((s, i) => s + (parseFloat(i.netAmount || i.amount) || 0), 0);
-  const totalExpenses = filteredExpenses.reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
-  const netProfit = totalNet - totalExpenses;
-  const netMargin = totalNet > 0 ? ((netProfit / totalNet) * 100).toFixed(1) : '0.0';
+  // Same helper the services dashboard uses, so the two pages cannot disagree.
+  const { received: totalNet, expenses: totalExpenses, profit: netProfit, fees: totalFees, margin: netMargin } =
+    serviceProfit(filteredIncome, filteredExpenses);
 
   const platformBreakdown = {};
   filteredIncome.forEach(i => {
@@ -308,6 +314,7 @@ const ServiceReporting = () => {
           <StatIcon $bg="#E8F5E9" $color="#2E7D32"><DollarSign size={18} /></StatIcon>
           <StatLabel>Net Income</StatLabel>
           <StatValue>{formatAmt(totalNet)}</StatValue>
+          {totalFees > 0 && <StatNote>After {formatAmt(totalFees)} platform fees</StatNote>}
         </StatCard>
         <StatCard $accent="#C62828">
           <StatIcon $bg="#FFEBEE" $color="#C62828"><TrendingDown size={18} /></StatIcon>
@@ -322,7 +329,7 @@ const ServiceReporting = () => {
         <StatCard $accent="#875200">
           <StatIcon $bg="#FFF3E0" $color="#875200"><PieChart size={18} /></StatIcon>
           <StatLabel>Net Margin</StatLabel>
-          <StatValue>{netMargin}%</StatValue>
+          <StatValue>{netMargin === null ? '—' : `${netMargin}%`}</StatValue>
         </StatCard>
       </StatGrid>
 
