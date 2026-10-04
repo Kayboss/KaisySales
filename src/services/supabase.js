@@ -741,14 +741,23 @@ export const dbService = {
 
   async trackPageVisit(userId, page, deviceType, location) {
     if (!supabase) return;
+    // The RLS policy is WITH CHECK (auth.uid() = user_id). A missing id makes
+    // that comparison NULL, not false, so an undefined userId would fail the
+    // insert rather than being ignored.
+    if (!userId) return;
     try {
-      await supabase.from('page_visits').insert({
+      const { error } = await supabase.from('page_visits').insert({
         user_id: userId,
         page,
         device_type: deviceType,
         location,
       });
-    } catch { /* silently fail */ }
+      // supabase-js resolves with { error } instead of throwing, so a bare
+      // try/catch never sees a failed insert.
+      if (error) console.warn('trackPageVisit insert failed:', error.message);
+    } catch (err) {
+      console.warn('trackPageVisit insert failed:', err?.message || err);
+    }
   },
 
   async fetchVisitStats() {

@@ -194,7 +194,11 @@ const App = () => {
       const page = location.pathname;
       const deviceType = detectDevice();
       const loc = detectLocation();
-      dbService.trackPageVisit(user.id, page, deviceType, loc);
+      // authStore stores the session as { uid, email } - there is no `id` field.
+      // Passing user.id sent user_id: undefined, which the RLS check
+      // `auth.uid() = user_id` evaluates to NULL, so every visit insert failed
+      // with 42501 and nothing was ever recorded.
+      dbService.trackPageVisit(user.uid, page, deviceType, loc);
     }
   }, [user, location.pathname]);
 
