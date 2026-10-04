@@ -11,6 +11,7 @@ import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
+import IconAction from '../../components/ui/IconAction';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 import { applyStockDelta, resolveMinStock, resolveStock } from '../../utils/inventory';
 
@@ -867,8 +868,12 @@ const DailySales = () => {
               <Td style={{ color: '#55423D', fontWeight: 600 }}>{sale.paymentMethod}</Td>
               <Td style={{ textAlign: 'right' }}>
                 <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                  <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(sale)} />
-                  <Trash2 size={16} color="#BA1A1A" cursor="pointer" onClick={() => setDeleteTarget(sale)} />
+                  <IconAction label={`Edit sale of ${sale.item}`} onClick={() => handleEdit(sale)}>
+                    <Edit2 size={16} color="#89726C" />
+                  </IconAction>
+                  <IconAction label={`Delete sale of ${sale.item}`} onClick={() => setDeleteTarget(sale)}>
+                    <Trash2 size={16} color="#BA1A1A" />
+                  </IconAction>
                 </div>
               </Td>
             </tr>

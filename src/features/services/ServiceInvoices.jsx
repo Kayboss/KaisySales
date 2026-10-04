@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircle, DollarSign, Layers, LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import IconAction from '../../components/ui/IconAction';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
 import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchCustomers, createSale, deleteSale, createServiceIncome, deleteServiceIncome } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -1147,9 +1148,15 @@ const ServiceInvoices = () => {
                         <DollarSign size={13} /> Mark Paid
                       </MarkPaidMini>
                     )}
-                    <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(invoice)} aria-label={`Edit invoice ${invoice.id}`} />
-                    <Download size={16} color="#6F240A" cursor="pointer" onClick={() => setPreviewInvoice(invoice)} aria-label={`Download invoice ${invoice.id}`} />
-                    <Trash2 size={16} color="#BA1A1A" cursor="pointer" onClick={() => setDeleteTarget(invoice)} aria-label={`Delete invoice ${invoice.id}`} />
+                    <IconAction label={`Edit invoice ${invoice.id} for ${invoice.customer}`} onClick={() => handleEdit(invoice)}>
+                      <Edit2 size={16} color="#89726C" />
+                    </IconAction>
+                    <IconAction label={`Download invoice ${invoice.id} for ${invoice.customer}`} onClick={() => setPreviewInvoice(invoice)}>
+                      <Download size={16} color="#6F240A" />
+                    </IconAction>
+                    <IconAction label={`Delete invoice ${invoice.id} for ${invoice.customer}`} onClick={() => setDeleteTarget(invoice)}>
+                      <Trash2 size={16} color="#BA1A1A" />
+                    </IconAction>
                   </RowActions>
                 </Cell>
               </ListRow>
@@ -1178,8 +1185,12 @@ const ServiceInvoices = () => {
                     </StatusBadge>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(invoice)} />
-                    <Trash2 size={16} color="#BA1A1A" cursor="pointer" onClick={() => setDeleteTarget(invoice)} />
+                    <IconAction label={`Edit invoice ${invoice.id} for ${invoice.customer}`} onClick={() => handleEdit(invoice)}>
+                      <Edit2 size={16} color="#89726C" />
+                    </IconAction>
+                    <IconAction label={`Delete invoice ${invoice.id} for ${invoice.customer}`} onClick={() => setDeleteTarget(invoice)}>
+                      <Trash2 size={16} color="#BA1A1A" />
+                    </IconAction>
                   </div>
                 </div>
                 <div style={{ color: '#55423D', fontSize: '0.75rem', fontWeight: 600 }}>{invoice.id}</div>
@@ -1209,7 +1220,9 @@ const ServiceInvoices = () => {
                         Mark Paid
                       </button>
                     )}
-                    <Download size={18} color="#6F240A" cursor="pointer" onClick={() => setPreviewInvoice(invoice)} />
+                    <IconAction label={`Download invoice ${invoice.id} for ${invoice.customer}`} onClick={() => setPreviewInvoice(invoice)}>
+                      <Download size={18} color="#6F240A" />
+                    </IconAction>
                   </div>
                 </div>
               </InvoiceCard>

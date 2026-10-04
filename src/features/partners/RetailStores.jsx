@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Store, MapPin, Phone, Search, Plus, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
+import IconAction from '../../components/ui/IconAction';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchStores, createStore, updateStore, deleteStore, fetchInvoices } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -430,8 +431,12 @@ const RetailStores = () => {
                 </div>
               </div>
               <div>
-                <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(store)} />
-                <Trash2 size={16} color="#BA1A1A" cursor="pointer" onClick={() => setDeleteTarget(store)} />
+                <IconAction label={`Edit ${store.name}`} onClick={() => handleEdit(store)}>
+                  <Edit2 size={16} color="#89726C" />
+                </IconAction>
+                <IconAction label={`Delete ${store.name}`} onClick={() => setDeleteTarget(store)}>
+                  <Trash2 size={16} color="#BA1A1A" />
+                </IconAction>
               </div>
             </StoreHeader>
             <InfoRow>

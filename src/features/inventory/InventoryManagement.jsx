@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Search, Plus, Minus, Edit2, Trash2, Download } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
+import IconAction from '../../components/ui/IconAction';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchInventory, createInventoryItem, updateInventoryItem, deleteInventoryItem, fetchCategories, createCategory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
@@ -814,8 +815,12 @@ const InventoryManagement = () => {
               </Td>
               <Td style={{ textAlign: 'right' }}>
                 <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                  <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(item)} />
-                  <Trash2 size={16} color="#BA1A1A" cursor="pointer" onClick={() => setDeleteTarget(item)} />
+                  <IconAction label={`Edit ${item.name}`} onClick={() => handleEdit(item)}>
+                    <Edit2 size={16} color="#89726C" />
+                  </IconAction>
+                  <IconAction label={`Delete ${item.name}`} onClick={() => setDeleteTarget(item)}>
+                    <Trash2 size={16} color="#BA1A1A" />
+                  </IconAction>
                 </div>
               </Td>
             </tr>
