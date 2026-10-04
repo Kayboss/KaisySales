@@ -8,6 +8,7 @@ import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
+import IconAction from '../../components/ui/IconAction';
 
 const Header = styled.div`
   display: flex;
@@ -292,6 +293,15 @@ const FormRow = styled.div`
   gap: 1rem;
 `;
 
+const FormError = styled.p`
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  color: ${({ theme }) => theme.colors.status.error};
+  background: ${({ theme }) => theme.colors.background.surfaceVariant};
+`;
+
 const ModalActions = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -333,10 +343,28 @@ const ExpenseTracking = () => {
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [formError, setFormError] = useState('');
 
-  const [formData, setFormData] = useState({
-    title: '', category: '', quantity: 1, unitPrice: '', date: '', newCategory: ''
-  });
+  const emptyForm = { title: '', category: '', quantity: 1, unitPrice: '', totalAmount: '', date: '', newCategory: '' };
+
+  const [formData, setFormData] = useState(emptyForm);
+
+  // Total Amount is the field people actually know: "I spent 120". Unit price
+  // only matters for multi-unit purchases. Keeping both required meant typing
+  // the amount into Quantity left Unit Price blank, native validation blocked
+  // the submit, and the form appeared to do nothing.
+  const setField = (key, value) => {
+    setFormError('');
+    setFormData((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === 'quantity' || key === 'unitPrice') {
+        const q = parseFloat(next.quantity);
+        const p = parseFloat(next.unitPrice);
+        next.totalAmount = q > 0 && p >= 0 ? (q * p).toFixed(2) : '';
+      }
+      return next;
+    });
+  };
 
   const loadData = async () => {
     try {
@@ -361,8 +389,9 @@ const ExpenseTracking = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setFormError('');
     let selectedCategory = formData.category;
-    
+
     // Handle new category creation
     if (selectedCategory === 'new_category' && formData.newCategory) {
       try {
@@ -374,13 +403,33 @@ const ExpenseTracking = () => {
       }
     }
 
-    const totalAmount = sanitizeNumber(formData.quantity) * sanitizeNumber(formData.unitPrice);
+    const quantity = Math.max(1, sanitizeNumber(formData.quantity) || 1);
+    let unitPrice = sanitizeNumber(formData.unitPrice);
+    let totalAmount = sanitizeNumber(formData.totalAmount);
+
+    if (unitPrice > 0) {
+      totalAmount = quantity * unitPrice;
+    } else if (totalAmount > 0) {
+      // A single lump sum was entered - back-fill the unit price so the stored
+      // columns always agree with the stored amount.
+      unitPrice = totalAmount / quantity;
+    } else {
+      setFormError('Enter a unit price, or type the total amount you spent.');
+      setSaving(false);
+      return;
+    }
+
+    if (!formData.date) {
+      setFormError('Pick the date of the expense.');
+      setSaving(false);
+      return;
+    }
 
     const expensePayload = {
       title: sanitizeInput(formData.title, 100),
       category: sanitizeInput(selectedCategory, 50),
-      quantity: sanitizeNumber(formData.quantity),
-      unitPrice: sanitizeNumber(formData.unitPrice),
+      quantity,
+      unitPrice,
       date: formData.date,
       amount: `GHS ${totalAmount.toFixed(2)}`,
       trend: 'up' // default
@@ -405,13 +454,15 @@ const ExpenseTracking = () => {
   const handleEdit = (expense) => {
     const parsedAmt = expense.amount ? parseFloat(String(expense.amount).replace(/[^\d.-]/g, '')) : 0;
     setFormData({
+      ...emptyForm,
       title: expense.title,
       category: expense.category,
       quantity: expense.quantity || 1,
       unitPrice: expense.unitPrice || parsedAmt,
+      totalAmount: parsedAmt > 0 ? parsedAmt.toFixed(2) : '',
       date: expense.date,
-      newCategory: ''
     });
+    setFormError('');
     setEditId(expense.id);
     setIsEditing(true);
     setIsModalOpen(true);
@@ -434,7 +485,8 @@ const ExpenseTracking = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
-    setFormData({ title: '', category: '', quantity: 1, unitPrice: '', date: '', newCategory: '' });
+    setFormError('');
+    setFormData({ ...emptyForm });
   };
 
   const handleExport = () => {
@@ -493,18 +545,19 @@ const ExpenseTracking = () => {
       <Modal isOpen={isModalOpen} onClose={closeModal} title={isEditing ? "Edit Expense" : "Log New Expense"}>
         <form onSubmit={handleSave}>
           <FormGroup>
-            <label>Expense Title</label>
-            <input 
-              type="text" 
-              required 
+            <label htmlFor="expense-title">Expense Title</label>
+            <input
+              id="expense-title"
+              type="text"
+              required
               value={formData.title}
-              onChange={e => setFormData({...formData, title: e.target.value})}
-              placeholder="e.g. Indigo Dye Procurement" 
+              onChange={e => setField('title', e.target.value)}
+              placeholder="e.g. Indigo Dye Procurement"
             />
           </FormGroup>
           <FormGroup>
-            <label>Category</label>
-            <select required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+            <label htmlFor="expense-category">Category</label>
+            <select id="expense-category" required value={formData.category} onChange={e => setField('category', e.target.value)}>
               <option value="">Select Category</option>
               {categories.map(cat => (
                 <option key={cat.id} value={cat.name}>{cat.name}</option>
@@ -526,47 +579,54 @@ const ExpenseTracking = () => {
           )}
           <FormRow>
             <FormGroup>
-              <label>Quantity</label>
-              <input 
-                type="number" 
+              <label htmlFor="expense-quantity">Quantity</label>
+              <input
+                id="expense-quantity"
+                type="number"
                 min="1"
-                required 
+                required
                 value={formData.quantity}
-                onChange={e => setFormData({...formData, quantity: e.target.value})}
+                onChange={e => setField('quantity', e.target.value)}
               />
             </FormGroup>
             <FormGroup>
-              <label>Unit Price ({getCurrencySymbol(currency)})</label>
-              <input 
-                type="number" 
-                step="0.01" 
-                required 
+              <label htmlFor="expense-unit-price">Unit Price ({getCurrencySymbol(currency)})</label>
+              <input
+                id="expense-unit-price"
+                type="number"
+                step="0.01"
+                min="0"
                 value={formData.unitPrice}
-                onChange={e => setFormData({...formData, unitPrice: e.target.value})}
-                placeholder="0.00" 
+                onChange={e => setField('unitPrice', e.target.value)}
+                placeholder="0.00"
               />
             </FormGroup>
           </FormRow>
           <FormRow>
             <FormGroup>
-              <label>Total Amount ({getCurrencySymbol(currency)})</label>
-              <input 
-                type="text" 
-                readOnly 
-                value={(formData.quantity && formData.unitPrice) ? (parseFloat(formData.quantity) * parseFloat(formData.unitPrice)).toFixed(2) : '0.00'}
-                style={{ background: '#f5f5f5', cursor: 'not-allowed' }}
+              <label htmlFor="expense-total">Total Amount ({getCurrencySymbol(currency)})</label>
+              <input
+                id="expense-total"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.totalAmount}
+                onChange={e => setField('totalAmount', e.target.value)}
+                placeholder="0.00"
               />
             </FormGroup>
             <FormGroup>
-              <label>Date</label>
-              <input 
-                type="date" 
-                required 
+              <label htmlFor="expense-date">Date</label>
+              <input
+                id="expense-date"
+                type="date"
+                required
                 value={formData.date}
-                onChange={e => setFormData({...formData, date: e.target.value})}
+                onChange={e => setField('date', e.target.value)}
               />
             </FormGroup>
           </FormRow>
+          {formError && <FormError role="alert">{formError}</FormError>}
           <ModalActions>
             <button type="button" className="cancel" onClick={closeModal}>Cancel</button>
             <button type="submit" className="save" disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update Expense" : "Save Expense")}</button>
@@ -628,8 +688,12 @@ const ExpenseTracking = () => {
                 {formatCurrency(expense.amount, currency)}
               </div>
               <div style={{ whiteSpace: 'nowrap' }}>
-                <Edit2 size={16} color="#89726C" cursor="pointer" onClick={() => handleEdit(expense)} />
-                <Trash2 size={16} color="#BA1A1A" cursor="pointer" onClick={() => setDeleteTarget(expense)} />
+                <IconAction label={`Edit expense ${expense.title}`} onClick={() => handleEdit(expense)}>
+                  <Edit2 size={16} color="#89726C" />
+                </IconAction>
+                <IconAction label={`Delete expense ${expense.title}`} onClick={() => setDeleteTarget(expense)}>
+                  <Trash2 size={16} color="#BA1A1A" />
+                </IconAction>
               </div>
             </ListItem>
           ))}
