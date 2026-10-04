@@ -515,9 +515,7 @@ const SettingsPage = () => {
                 onChange={handleChange}
                 required
               >
-                <option value="Food & Beverage">Food & Beverage</option>
                 <option value="Retail & Sales">Retail & Sales</option>
-                <option value="Agriculture">Agriculture</option>
                 <option value="Services">Services</option>
               </Select>
             </InputWrapper>

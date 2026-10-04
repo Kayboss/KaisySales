@@ -318,7 +318,7 @@ const OnboardingWizard = () => {
     businessName: '',
     phone: '',
     location: 'Accra, Greater Accra',
-    category: 'Food & Beverage',
+    category: 'Retail & Sales',
     avatarColor: '#6F240A',
     currency: 'GHS'
   });
@@ -481,9 +481,7 @@ const OnboardingWizard = () => {
                   <Label>Business Category</Label>
                   <CategoryGrid>
                     {[
-                      { name: 'Food & Beverage', desc: 'Juices, pastries, cereals & more' },
                       { name: 'Retail & Sales', desc: 'General merchandise & products' },
-                      { name: 'Agriculture', desc: 'Farming, produce & supplies' },
                       { name: 'Services', desc: 'Consulting, logistics & other' }
                     ].map(cat => (
                       <CategoryOption 
