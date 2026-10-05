@@ -1,0 +1,67 @@
+-- ---------------------------------------------------------------------------
+-- Fix: audit triggers cannot call log_admin_action (42501)
+--
+-- SYMPTOM
+--   Any UPDATE that touches a trigger-audited column, made by a signed-in user,
+--   failed with:
+--       42501  permission denied for function log_admin_action
+--   and the whole UPDATE was rolled back.
+--
+-- CAUSE
+--   audit_profile_changes and audit_payment_changes were SECURITY INVOKER, so on
+--   a write from the app they ran as `authenticated`. That role holds no EXECUTE
+--   on log_admin_action -- its ACL is `postgres=X/postgres,service_role=X/postgres`
+--   only. That is deliberate: the public schema's default ACL is fail-closed and
+--   grants EXECUTE on a new function to postgres + service_role, never to anon or
+--   authenticated. log_admin_action is SECURITY DEFINER, so it must be reached by a
+--   role that already holds EXECUTE, and `authenticated` does not.
+--
+-- BLAST RADIUS
+--   Audited columns:
+--     profiles                role, status, subscription_plan,
+--                             subscription_status, subscription_expires_at
+--     subscription_payments   status, admin_id
+--   Which silently broke, in src/services/supabase.js:
+--     ensureFreeTrial        (called on every signup)
+--     assignSubscription     (admin screen)
+--     cancelSubscription     (admin screen)
+--     confirmPayment         (admin screen)
+--   It also made dead code of the branch in prevent_privilege_escalation that
+--   explicitly permits a user to accept the free trial (NULL/'none' -> 'free',
+--   NULL/'none' -> 'active'): the allow succeeded, then the audit trigger aborted
+--   the transaction anyway.
+--
+--   The authz suite could not see this. Checks A and B probe the anon key and F
+--   probes anon function execution; the anon key is denied either way, so the
+--   broken path stayed green. See the new check G.
+--
+-- FIX
+--   Make the two trigger functions SECURITY DEFINER. Both are owned by postgres,
+--   which does hold EXECUTE on log_admin_action.
+--
+--   The audit trail does not become forgeable: log_admin_action records
+--   auth.uid(), which reads the request's JWT claim rather than the current
+--   database role, so actor_id is still the real acting user even though the
+--   surrounding function now runs as postgres.
+--
+-- DELIBERATELY NOT DONE
+--   GRANT EXECUTE ON FUNCTION public.log_admin_action(text,uuid,jsonb)
+--     TO authenticated;
+--   That also fixes the symptom, but log_admin_action is SECURITY DEFINER, so the
+--   grant would let any signed-in user call POST /rest/v1/rpc/log_admin_action
+--   with an arbitrary action and target_id and forge audit rows. Widening
+--   EXECUTE is the wrong direction for a function whose only purpose is to be an
+--   append-only record. Fix the caller instead.
+--
+--   search_path is pinned on the two functions this migration turns into
+--   SECURITY DEFINER (the standard mitigation for that privilege change). Both
+--   bodies are already safe with an empty search_path: audit_profile_changes
+--   touches only jsonb_build_object (pg_catalog) and schema-qualified
+--   public.log_admin_action.
+-- ---------------------------------------------------------------------------
+
+ALTER FUNCTION public.audit_profile_changes() SECURITY DEFINER;
+ALTER FUNCTION public.audit_payment_changes() SECURITY DEFINER;
+
+ALTER FUNCTION public.audit_profile_changes() SET search_path = '';
+ALTER FUNCTION public.audit_payment_changes() SET search_path = '';

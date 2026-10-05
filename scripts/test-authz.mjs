@@ -15,6 +15,8 @@
  *   C. userA -> cannot read userB's rows
  *   D. userA -> can read their own rows      (liveness: proves A is not blanket-denied)
  *   E. userA -> cannot update or delete userB's rows
+ *   G. userA -> CAN update an audited column on their own row (liveness: the
+ *              audit triggers must not reject a legitimate write)
  *
  * A skipped check is reported as SKIP, never as PASS, so a suite that cannot
  * prove something never looks like it did.
@@ -504,6 +506,56 @@ async function main() {
       } else {
         fail(`E delete others' ${table}`, `user A DELETED ${del.count} of user B's rows (${column})`);
       }
+    }
+  }
+
+  // ---- G: an audited column is still writable by the account that owns it
+  //
+  // audit_profile_changes and audit_payment_changes call log_admin_action. Those
+  // two trigger functions were SECURITY INVOKER, so on a write from the app they
+  // ran as `authenticated`, which holds no EXECUTE on log_admin_action (its ACL
+  // is postgres + service_role only). Every UPDATE that touched an audited column
+  // therefore died with 42501 and rolled back, which silently broke
+  // ensureFreeTrial, assignSubscription, cancelSubscription and confirmPayment.
+  //
+  // Checks A, B and F cannot catch it: they probe the anon key, and the anon key
+  // is refused either way. The defect is only visible to a signed-in user, which
+  // is exactly why it survived a green suite.
+  //
+  // The probe writes subscription_expires_at because the trigger audits it but
+  // prevent_privilege_escalation deliberately does not guard it (it guards only
+  // role, subscription_plan and subscription_status), so the account owner is
+  // supposed to be able to write it. The current value is read first and written
+  // back afterwards, so the fixture ends exactly as it started.
+  console.log('\nG. audit trigger does not reject a legitimate write by the owner');
+  if (!ready) {
+    skip('G owner updates an audited column', 'needs a signed-in user A');
+  } else if (process.env.AUTHZ_NO_WRITE === '1') {
+    skip('G owner updates an audited column', 'AUTHZ_NO_WRITE=1');
+  } else {
+    const readBack = await rest(`/profiles?select=subscription_expires_at&id=eq.${users.A.id}&limit=1`, { token: tokenA });
+    const original = readBack.json?.[0]?.subscription_expires_at ?? null;
+    const probeValue = '2099-01-01T00:00:00+00:00';
+    const restore = () => rest(`/profiles?id=eq.${users.A.id}`, {
+      method: 'PATCH',
+      token: tokenA,
+      body: { subscription_expires_at: original },
+    });
+
+    const upd = await rest(`/profiles?id=eq.${users.A.id}`, {
+      method: 'PATCH',
+      token: tokenA,
+      body: { subscription_expires_at: probeValue },
+      prefer: 'return=representation',
+    });
+    if (upd.status === 200 || upd.status === 204) {
+      pass('G owner updates an audited column', `subscription_expires_at accepted (${original} -> ${probeValue})`);
+      await restore();
+    } else {
+      fail(
+        'G owner updates an audited column',
+        `user A cannot write their own audited column (${codeOf(upd)}) — an audit trigger is rejecting a legitimate write, so subscription and free-trial writes are broken`,
+      );
     }
   }
 
