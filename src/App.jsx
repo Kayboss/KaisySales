@@ -34,9 +34,11 @@ import IncomeTracking from './features/services/IncomeTracking';
 import ServiceExpenses from './features/services/ServiceExpenses';
 import ServiceInvoices from './features/services/ServiceInvoices';
 import ServiceReporting from './features/services/ServiceReporting';
+import RevenueHistory from './features/services/RevenueHistory';
+import ServiceOutstanding from './features/services/ServiceOutstanding';
 
 // Icons
-import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, FileText, Store, Settings, Receipt, Menu, X, Users, BarChart3, Shield, History } from 'lucide-react';
+import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, FileText, Store, Settings, Receipt, Menu, X, Users, BarChart3, Shield, History, AlertCircle } from 'lucide-react';
 
 const Layout = styled.div`
   display: flex;
@@ -208,6 +210,8 @@ const App = () => {
     { to: '/service-expenses', icon: CreditCard, label: 'Expenses' },
     { to: '/service-invoices', icon: Receipt, label: 'Invoices' },
     { to: '/service-reporting', icon: BarChart3, label: 'Reports' },
+    { to: '/service-revenue-history', icon: History, label: 'Revenue History' },
+    { to: '/service-outstanding', icon: AlertCircle, label: 'Outstanding' },
     { to: '/settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -312,6 +316,8 @@ const App = () => {
                         <Route path="service-expenses" element={<ServiceExpenses />} />
                         <Route path="service-invoices" element={<ServiceInvoices />} />
                         <Route path="service-reporting" element={<ServiceReporting />} />
+                        <Route path="service-revenue-history" element={<RevenueHistory />} />
+      <Route path="service-outstanding" element={<ServiceOutstanding />} />
                         <Route path="settings" element={<SettingsPage />} />
                         <Route path="*" element={<IncomeTracking />} />
                       </>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
-import { Download, DollarSign, TrendingUp, TrendingDown, PieChart, Users, Wallet, AlertCircle, Search } from 'lucide-react';
+import { Download, DollarSign, TrendingUp, TrendingDown, PieChart, Users, Search } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart as RPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { fetchServiceIncome, fetchRecurringIncome, fetchExpenses, fetchCustomers, fetchInvoices } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
@@ -42,11 +42,11 @@ const StatGrid = styled.div`
 `;
 
 const StatCard = styled.div`
-  background: white;
+  background: ${({ theme }) => theme.colors.background.surface};
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   border-radius: 12px;
   padding: 1.5rem;
-  border-left: 4px solid ${({ $accent }) => $accent || '#6F240A'};
+  border-left: 4px solid ${({ $accent }) => $accent};
 `;
 
 const StatIcon = styled.div`
@@ -363,13 +363,6 @@ const ServiceReporting = () => {
     [expenses, startDate, endDate, searchTerm],
   );
 
-  const filteredInvoices = useMemo(
-    () => inRange(invoices, 'date')
-      .filter(i => matches(i, ['customer', 'id', 'status', 'notes'])),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [invoices, startDate, endDate, searchTerm],
-  );
-
   const filteredCustomers = useMemo(
     () => customers.filter(c => matches(c, ['name', 'company', 'email', 'phone', 'notes'])),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -435,36 +428,7 @@ const ServiceReporting = () => {
 
   const customerRevenueTotal = customerRows.rows.reduce((s, r) => s + r.revenue, 0) + customerRows.unassigned;
 
-  /* Outstanding balances. Invoice payments are matched against ALL income, not
-     the filtered set: an invoice raised last year and settled today is still
-     settled, and must not resurface as overdue inside a narrower date range. */
-  const outstandingRows = useMemo(() => {
-    const paymentsFor = (inv) => income.filter(i =>
-      (i.platformTag === 'invoice' || i.platformTag === 'payment') &&
-      new RegExp('invoice #' + String(inv.id) + '(?!\\d)', 'i').test(String(i.notes || ''))
-    );
-    const paidAmountOf = (inv) => {
-      if (inv.status === 'paid') return parseAmount(inv.amount);
-      const paid = paymentsFor(inv).reduce((s, i) => s + serviceRowReceived(i), 0);
-      return Math.min(paid, parseAmount(inv.amount));
-    };
-    return filteredInvoices.map(inv => {
-      const amount = parseAmount(inv.amount);
-      const paid = paidAmountOf(inv);
-      const items = Array.isArray(inv.items) ? inv.items.filter(i => !i.type) : [];
-      return {
-        customer: inv.customer || 'Unknown',
-        invoiceId: inv.id,
-        service: items[0]?.name || `Invoice #${inv.id}`,
-        date: inv.date || '',
-        amount,
-        paid,
-        balance: Math.max(0, amount - paid),
-      };
-    })
-      .filter(r => r.balance > 0)
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  }, [filteredInvoices, income]);
+  
 
   // Same helper the services dashboard uses, so the two pages cannot disagree.
   const { received: totalNet, expenses: totalExpenses, profit: netProfit, fees: totalFees, margin: netMargin } =
@@ -598,20 +562,6 @@ const ServiceReporting = () => {
   })), {
     client: 'Client', income: 'Income Received', expenses: 'Expenses', profit: 'Profit', margin: 'Margin %',
   }, 'Service_Client_PL');
-
-  const exportOutstanding = () => save(outstandingRows.map(r => ({
-    customer: r.customer,
-    service: r.service,
-    invoice: r.invoiceId,
-    date: r.date || '',
-    billed: r.amount.toFixed(2),
-    paid: r.paid.toFixed(2),
-    balance: r.balance.toFixed(2),
-    status: r.date && r.date < todayISO() ? 'Overdue' : 'Open',
-  })), {
-    customer: 'Customer', service: 'Service', invoice: 'Invoice #', date: 'Date',
-    billed: 'Billed', paid: 'Paid', balance: 'Balance', status: 'Status',
-  }, 'Service_Outstanding');
 
   const exportCustomers = () => save(customerRows.rows.map(c => ({
     name: c.name,
@@ -930,96 +880,6 @@ const ServiceReporting = () => {
     );
   };
 
-  const renderOutstanding = () => {
-    const totalOutstanding = outstandingRows.reduce((s, r) => s + r.balance, 0);
-    const grouped = {};
-    outstandingRows.forEach(r => {
-      if (!grouped[r.customer]) grouped[r.customer] = [];
-      grouped[r.customer].push(r);
-    });
-    const customerSummary = Object.entries(grouped).map(([name, rs]) => ({
-      name,
-      count: rs.length,
-      total: rs.reduce((s, r) => s + r.balance, 0),
-      oldest: rs.map(r => r.date).filter(Boolean).sort()[0] || '',
-    })).sort((a, b) => b.total - a.total);
-
-    const todayIso = todayISO();
-    const overdueCount = outstandingRows.filter(r => r.date && r.date < todayIso).length;
-
-    return (
-      <>
-        <StatGrid>
-          <StatCard $accent="#C62828">
-            <StatIcon $bg="#FFEBEE" $color="#C62828"><Wallet size={18} /></StatIcon>
-            <StatLabel>Total Outstanding</StatLabel>
-            <StatValue>{formatAmt(totalOutstanding)}</StatValue>
-          </StatCard>
-          <StatCard $accent="#875200">
-            <StatIcon $bg="#FFF3E0" $color="#875200"><AlertCircle size={18} /></StatIcon>
-            <StatLabel>Open Items</StatLabel>
-            <StatValue>{outstandingRows.length}</StatValue>
-          </StatCard>
-          <StatCard $accent="#BA1A1A">
-            <StatIcon $bg="#FFF0F0" $color="#BA1A1A"><TrendingDown size={18} /></StatIcon>
-            <StatLabel>Overdue</StatLabel>
-            <StatValue>{overdueCount}</StatValue>
-          </StatCard>
-        </StatGrid>
-
-        <ReportSection>
-          <ReportTitle>By Customer</ReportTitle>
-          {customerSummary.length > 0 ? (
-            <Table>
-              <thead>
-                <tr><Th>Customer</Th><Th style={{ textAlign: 'right' }}>Open Items</Th><Th>Oldest Due</Th><Th style={{ textAlign: 'right' }}>Outstanding</Th></tr>
-              </thead>
-              <tbody>
-                {customerSummary.map(c => (
-                  <tr key={c.name}>
-                    <Td><strong>{c.name}</strong></Td>
-                    <Td style={{ textAlign: 'right' }}>{c.count}</Td>
-                    <Td>{c.oldest || '-'}</Td>
-                    <Td style={{ textAlign: 'right', fontWeight: 700, color: '#C62828' }}>{formatAmt(c.total)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : <EmptyState>Nothing outstanding â€” all invoices are settled.</EmptyState>}
-        </ReportSection>
-
-        <ReportSection>
-          <SubHeader>
-            <ReportTitle>Outstanding Items</ReportTitle>
-            <ExportBtn onClick={exportOutstanding} disabled={outstandingRows.length === 0}>
-              <Download size={14} /> Export CSV
-            </ExportBtn>
-          </SubHeader>
-          {outstandingRows.length > 0 ? (
-            <Table>
-              <thead>
-                <tr><Th>Customer</Th><Th>Service</Th><Th>Invoice #</Th><Th>Date</Th><Th style={{ textAlign: 'right' }}>Billed</Th><Th style={{ textAlign: 'right' }}>Paid</Th><Th style={{ textAlign: 'right' }}>Balance</Th></tr>
-              </thead>
-              <tbody>
-                {outstandingRows.map(r => (
-                  <tr key={r.invoiceId}>
-                    <Td><strong>{r.customer}</strong></Td>
-                    <Td>{r.service}</Td>
-                    <Td>{r.invoiceId}</Td>
-                    <Td>{r.date || '-'}</Td>
-                    <Td style={{ textAlign: 'right' }}>{formatAmt(r.amount)}</Td>
-                    <Td style={{ textAlign: 'right' }}>{formatAmt(r.paid)}</Td>
-                    <Td style={{ textAlign: 'right', fontWeight: 700, color: '#C62828' }}>{formatAmt(r.balance)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : <EmptyState>No outstanding items.</EmptyState>}
-        </ReportSection>
-      </>
-    );
-  };
-
   return (
     <Container>
       <Title>Reports</Title>
@@ -1027,7 +887,7 @@ const ServiceReporting = () => {
       <Tabs>
         <Tab $active={tab === 'overview'} onClick={() => setTab('overview')}>P&L Overview</Tab>
         <Tab $active={tab === 'clients'} onClick={() => setTab('clients')}>Per Client P&L</Tab>
-        <Tab $active={tab === 'outstanding'} onClick={() => setTab('outstanding')}>Outstanding</Tab>
+        
         <Tab $active={tab === 'customers'} onClick={() => setTab('customers')}>Customers</Tab>
       </Tabs>
 
@@ -1076,7 +936,7 @@ const ServiceReporting = () => {
 
       {tab === 'overview' && renderOverview()}
       {tab === 'clients' && renderClients()}
-      {tab === 'outstanding' && renderOutstanding()}
+      
       {tab === 'customers' && renderCustomers()}
     </Container>
   );
