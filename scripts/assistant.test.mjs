@@ -139,6 +139,22 @@ test('classifyIntent: data import beats the generic help intent', () => {
   assert.equal(classifyIntent('where can i upload a spreadsheet').intent, 'dataImport');
 });
 
+test('classifyIntent: a reported sale is guidance, not an income question', () => {
+  assert.equal(classifyIntent('i made a sale today for classic touch').intent, 'recordOne');
+  assert.equal(classifyIntent('i sold to classic touch').intent, 'recordOne');
+  assert.equal(classifyIntent('we got paid by classic touch').intent, 'recordOne');
+  assert.equal(classifyIntent('just received a payment from amma').intent, 'recordOne');
+  assert.equal(classifyIntent('i took in 500 today').intent, 'recordOne');
+  assert.equal(classifyIntent('how much did i make').intent, 'income');
+  assert.equal(classifyIntent('i made a profit last month').intent, 'profit');
+});
+
+test('classifyIntent: guide me is a howto, not unknown', () => {
+  assert.equal(classifyIntent('can you guide me to input it').intent, 'howto');
+  assert.equal(classifyIntent('show me how to record a sale').intent, 'howto');
+  assert.equal(classifyIntent('walk me through adding income').intent, 'howto');
+});
+
 test('classifyIntent: unknown falls through', () => {
   assert.equal(classifyIntent('what is your favorite color').intent, 'unknown');
   assert.equal(classifyIntent('tell me a joke').intent, 'unknown');
@@ -424,6 +440,28 @@ test('answer: data import points at Settings to Import Data', () => {
   assert.match(text, /Settings/);
   assert.match(text, /Import Data/);
   assert.match(text, /CSV/);
+});
+
+test('answer: a reported sale points at the entry screen and names the client', () => {
+  const { text, intent } = answer('i made a sale today for Classic Touch', services({}));
+  assert.equal(intent, 'recordOne');
+  assert.match(text, /Classic Touch/);
+  assert.match(text, /Add Income/);
+  const retailText = answer('i made a sale today for Classic Touch', retail({})).text;
+  assert.match(retailText, /Record sale/);
+  assert.match(retailText, /Classic Touch/);
+});
+
+test('answer: a reported sale without a client name still guides the entry', () => {
+  const { text } = answer('i took in 500 today', services({}));
+  assert.match(text, /Add Income/);
+});
+
+test('answer: guidance to input routes to the income walkthrough', () => {
+  const { text, intent } = answer('can you guide me to input it', services({}));
+  assert.equal(intent, 'howto');
+  assert.match(text, /Income Tracking/);
+  assert.match(text, /Income tab/);
 });
 
 test('suggestedQuestions returns different prompts per mode', () => {

@@ -66,7 +66,7 @@ const HOWTO_TOPICS = [
   },
   {
     key: 'income',
-    re: /\bincome\b|\bpay(ment)?\b|\breceiv|\bmoney (\bin|coming)/,
+    re: /\bincome\b|\bpay(ment)?\b|\breceiv|\bmoney (\bin|coming)|(input|enter|log|record) (it|this|the (payment|income|sale))\b/,
     text:
       'In Income Tracking, add one-off payments on the Income tab, or ongoing amounts under Recurring.\n\u2022 Net income is worked out as amount minus any platform fee.',
   },
@@ -104,6 +104,31 @@ const unknownSuggestionsFor = (mode) =>
 
 const money = (value, currency) => formatCurrency(parseAmount(value), currency);
 const countText = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+const titleCase = (value) =>
+  String(value || '')
+    .split(' ')
+    .filter((word) => !/^\d+$/.test(word))
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+/**
+ * Lifts a client/customer name out of a recording statement like
+ * "I made a sale today for Classic Touch" or "we got paid by Classic Touch".
+ * Returns '' when there isn't one, so the caller can drop the mention.
+ */
+const clientFrom = (raw) => {
+  const text = String(raw || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const match = text.match(/\b(?:for|from|paid by|at) ([a-z0-9&'-]{2,40}(?: [a-z0-9&'-]{2,40}){0,3})$/i);
+  if (!match) return '';
+  let name = match[1].trim();
+  name = name
+    .replace(/\b(today|yesterday|just now|now|this (morning|afternoon|evening)|a while ago|earlier)\b.*$/i, '')
+    .trim();
+  return /\d/.test(name) && !/[a-z]/i.test(name) ? '' : titleCase(name);
+};
 
 const HORIZON_PATTERNS = [
   { re: /next (\d+) months?|(\d+) months? (ahead|from now)|(\d+) months? out/, months: (n) => n },
@@ -303,6 +328,22 @@ const intentAnswerers = {
   dataImport: () =>
     "Yes — you don\u2019t have to type everything in. Open Settings \u2192 Import Data, pick what you\u2019re bringing in (inventory, sales, expenses, one-off income, recurring income or customers), upload the CSV and map the columns.\n\u2022 Nothing saves until you review the rows I flag for a second look.",
 
+  recordOne: (meta) => {
+    const { mode } = meta;
+    const client = clientFrom(meta.matchedText);
+    const who = client ? ` for ${client}` : '';
+    if (mode === 'services') {
+      return (
+        `Nice — quick to enter. In Income Tracking, open the Income tab and tap \u2018Add Income\u2019${who}. ` +
+        `Fill in the amount and save; it counts under today. Want me to walk you through the payment form?`
+      );
+    }
+    return (
+      `Good — log it in Sales: tap \u2018Record sale\u2019${who}, pick or type the item, set the quantity and price, then save. ` +
+      `If the name matches an inventory item, stock moves automatically.`
+    );
+  },
+
   projection: (meta) => {
     const { currency, mode } = meta;
     const projectionData = (meta.context && meta.context.projection) || {};
@@ -345,6 +386,10 @@ const INTENT_CHECKERS = [
   { key: 'greeting', re: /^(hi|hello|hey|yo|howdy)(\s|$)|good (morning|afternoon|evening)/ },
   { key: 'thanks', re: /\b(thankyou|thanks|thank you|thx|appreciate it)\b/ },
   {
+    key: 'recordOne',
+    re: /^(i|we|just)( (just|today))? (made|sold|did|received|recorded|logged|entered|took in|took|collected|got) (a |an |one |the )?(sale|payment|income|cash|paid|\d)|^i (just )?sold (to|for)|^just (made|sold|received) /,
+  },
+  {
     key: 'dataImport',
     re: /\b(import(ing|ed|s)?|upload(ing|ed|s)?|migrate|migration)\b|(data|csv|spreadsheet|records|file).{0,20}(import|upload|transfer)|(import|upload|transfer).{0,20}(data|csv|spreadsheet|file|records)/,
   },
@@ -353,7 +398,7 @@ const INTENT_CHECKERS = [
     key: 'overview',
     re: /how (is|are|'s).{0,30}(business|doing|things|i doing)|what should i know|summary|overview|status report|how am i doing/,
   },
-  { key: 'howto', re: /how (do|to|can|should) i|help me (set up|with|understand|figure)|explain|walk me through|tell me how/ },
+  { key: 'howto', re: /how (do|to|can|should) i|help me (set up|with|understand|figure)|explain|walk me through|tell me how|guide me (to|through|on)|\bshow me how\b/ },
   { key: 'overdue', re: /\boverdue\b|past due|late invoices?|late payments?/ },
   { key: 'outstanding', re: /\b(owe|owes|owed|owing)\b|outstanding|unpaid|still owed|in debt|arrears|yet to pay|to be paid/ },
   {
