@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchCustomers, createCustomer, updateCustomer, deleteCustomer } from '../../services/api';
+import AssistantDoorway from '../../components/assistant/AssistantDoorway';
 import { sanitizeInput } from '../../utils/sanitize';
 
 const Header = styled.div`
@@ -357,7 +358,12 @@ const Customers = () => {
             </MobileActions>
           </MobileCard>
         ))}
-        {paginated.length === 0 && <EmptyState>No customers found.</EmptyState>}
+        {paginated.length === 0 && (
+          <>
+            <EmptyState>No customers found.</EmptyState>
+            <AssistantDoorway question="How do I add a customer?" />
+          </>
+        )}
       </MobileGrid>
 
       {totalPages > 1 && (

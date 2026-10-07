@@ -485,6 +485,45 @@ export const dbService = {
     return newRecord;
   },
 
+  async createUserRecords(uid, collection, records) {
+    assertBackendAvailable();
+    if (!Array.isArray(records) || records.length === 0) return [];
+
+    const rows = records.map((record) => {
+      const snake = toSnakeCase(record);
+      delete snake.id;
+      delete snake.user_id;
+      delete snake.uid;
+      return snake;
+    });
+
+    if (supabase) {
+      const CHUNK_SIZE = 200;
+      const inserted = [];
+      for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+        const chunk = rows.slice(i, i + CHUNK_SIZE).map((row) => ({ user_id: uid, ...row }));
+        const { data, error } = await supabase.from(collection).insert(chunk).select();
+        if (error) {
+          const failure = new Error(error.message || 'Some rows could not be saved.');
+          failure.inserted = inserted;
+          failure.failedFrom = i;
+          throw failure;
+        }
+        inserted.push(...(data || []).map((r) => ({ ...toCamelCase(r), id: String(r.id) })));
+      }
+      return inserted;
+    }
+
+    const existing = mockGet(collection);
+    const created = records.map((record) => ({
+      ...record,
+      id: 'rec-' + Math.random().toString(36).substr(2, 9),
+      user_id: uid,
+    }));
+    mockSet(collection, [...existing, ...created]);
+    return created;
+  },
+
   async updateUserRecord(uid, collection, recordId, recordData) {
     assertBackendAvailable();
     if (supabase) {

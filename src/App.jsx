@@ -13,6 +13,8 @@ import AdminCheck from './middleware/AdminCheck';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import ConfigError from './components/common/ConfigError';
 import IdleTimer from './components/common/IdleTimer';
+import AssistantPanel from './components/assistant/AssistantPanel';
+import { ASSISTANT_ENABLED } from './utils/features';
 
 // Features
 import WelcomePage from './features/auth/WelcomePage';
@@ -337,6 +339,7 @@ const App = () => {
                     )}
                   </Routes>
                 </Main>
+                {ASSISTANT_ENABLED && <AssistantPanel />}
               </Layout>
             } />
             <Route path="/admin" element={

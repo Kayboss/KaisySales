@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriangle, ArrowRight, BookOpen, Clock } from 'lucide-react';
+import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriangle, ArrowRight, Clock } from 'lucide-react';
 import { fetchSales, fetchExpenses, fetchInventory } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrencyShort, parseAmount } from '../../utils/currency';
-import TutorialModal, { STORAGE_KEY } from '../../components/tutorial/TutorialModal';
 
 const Grid = styled.div`
   display: grid;
@@ -338,9 +337,8 @@ const RestockLink = styled.button`
 `;
 
 const BusinessOverview = () => {
-  const { currency, businessType } = useSettingsStore();
+  const { currency } = useSettingsStore();
   const navigate = useNavigate();
-  const [showTutorial, setShowTutorial] = useState(false);
   const [stats, setStats] = useState({
     revenue: 0,
     salesToday: 0,
@@ -408,10 +406,6 @@ const BusinessOverview = () => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadStats();
 
-    if (!localStorage.getItem(STORAGE_KEY) && businessType !== 'services') {
-      setShowTutorial(true);
-    }
-
     const interval = setInterval(loadStats, 30000);
 
     const handleFocus = () => loadStats();
@@ -421,7 +415,6 @@ const BusinessOverview = () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (stats.loading) {
@@ -435,11 +428,6 @@ const BusinessOverview = () => {
           <h1 style={{ fontSize: '2rem' }}>Business Dashboard</h1>
           <p style={{ color: '#55423D' }}>Your revenue, sales, and growth at a glance.</p>
         </div>
-        {businessType !== 'services' && (
-        <button onClick={() => setShowTutorial(true)} style={{ background: 'white', border: '1px solid #E0D6D0', borderRadius: '20px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#6F240A' }}>
-          <BookOpen size={14} /> Tutorial
-        </button>
-        )}
       </header>
 
       {stats.lowStock > 0 && (
@@ -540,14 +528,6 @@ const BusinessOverview = () => {
           <GrowthChart data={stats.monthlyData} currency={currency} />
         </ChartContainer>
       </section>
-
-      {businessType !== 'services' && (
-        <TutorialModal
-          isOpen={showTutorial}
-          onClose={() => setShowTutorial(false)}
-          autoShow
-        />
-      )}
     </div>
   );
 };

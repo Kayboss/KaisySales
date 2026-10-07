@@ -9,6 +9,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { fetchSales, fetchInventory } from '../../services/api';
+import AssistantDoorway from '../../components/assistant/AssistantDoorway';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrency, formatCurrencyShort, parseAmount } from '../../utils/currency';
@@ -554,6 +555,7 @@ const SalesHistory = () => {
           <Calendar size={32} style={{ color: '#D0C8C4' }} />
           <p style={{ fontWeight: 700, color: '#55423D' }}>No sales in this range</p>
           <p style={{ fontSize: '0.85rem' }}>Try a wider date range, or record a sale on the Daily Sales page.</p>
+          <AssistantDoorway question="How much have I made so far?" children="Ask the assistant about your sales" />
         </EmptyState>
       ) : (
         <>

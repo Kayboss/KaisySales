@@ -1,6 +1,8 @@
 import { dbService, supabase } from './supabase';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
+import { getEntity, CATEGORY_TYPE_BY_ENTITY } from '../utils/import/schema';
+import { findDuplicates, applyImportValues } from '../utils/import/duplicates';
 
 
 /**
@@ -539,5 +541,198 @@ export const deleteBusinessLogo = async () => {
   if (files && files.length > 0) {
     const paths = files.map(f => `${uid}/${f.name}`);
     await supabase.storage.from('business-logos').remove(paths);
+  }
+};
+
+// ====================================================
+// 16. BULK IMPORT
+// ====================================================
+const WITHOUT_META = ['id', 'user_id', 'uid'];
+
+const stripMeta = (record) => {
+  const copy = { ...record };
+  for (const key of WITHOUT_META) delete copy[key];
+  return copy;
+};
+
+const importError = (message) => ({ message });
+
+export const fetchExistingRows = async (entityKey) => {
+  const entity = getEntity(entityKey);
+  if (!entity) throw new Error(`Unknown import target "${entityKey}".`);
+  const uid = getUid();
+  return await dbService.fetchUserRecords(uid, entity.table);
+};
+
+export const importRows = async (entityKey, records, options = {}) => {
+  const entity = getEntity(entityKey);
+  if (!entity) throw new Error(`Unknown import target "${entityKey}".`);
+  if (!Array.isArray(records) || records.length === 0) {
+    return { success: true, attempted: 0, inserted: [], replaced: [], merged: [] };
+  }
+
+  const uid = getUid();
+  const collision = options.collision === 'replace' ? 'replace' : 'add';
+  const near = options.near === 'merge' ? 'merge' : 'add';
+
+  let existing = options.existing || null;
+  if (!existing) {
+    try {
+      existing = await fetchExistingRows(entityKey);
+    } catch {
+      existing = [];
+    }
+  }
+
+  const { exact, near: nearMatches, unique } = findDuplicates(entity, records, existing);
+
+  const toInsert = [];
+  if (collision === 'add') toInsert.push(...exact.map((entry) => entry.record));
+  if (near === 'add') toInsert.push(...nearMatches.map((entry) => entry.record));
+  toInsert.push(...records.slice(0, unique));
+
+  const updated = [];
+  if (collision === 'replace') {
+    for (const entry of exact) {
+      updated.push({
+        id: entry.existing.id,
+        mode: 'replace',
+        record: applyImportValues(entity, entry.existing, entry.record, 'replace'),
+      });
+    }
+  }
+  if (near === 'merge') {
+    for (const entry of nearMatches) {
+      updated.push({
+        id: entry.existing.id,
+        mode: 'merge',
+        record: applyImportValues(entity, entry.existing, entry.record, 'merge'),
+      });
+    }
+  }
+
+  const outcome = {
+    attempted: records.length,
+    inserted: [],
+    replaced: [],
+    merged: [],
+    errors: [],
+  };
+
+  if (toInsert.length > 0) {
+    try {
+      outcome.inserted = await dbService.createUserRecords(uid, entity.table, toInsert);
+    } catch (error) {
+      outcome.inserted = error.inserted || [];
+      outcome.errors.push(error.message || 'Some rows could not be saved.');
+      outcome.failedFrom = error.failedFrom;
+    }
+  }
+
+  for (const operation of updated) {
+    const previous = existing.find((row) => String(row.id) === String(operation.id));
+    if (!previous) continue;
+
+    const next = operation.record;
+    const unchanged = JSON.stringify(stripMeta(next)) === JSON.stringify(stripMeta(previous));
+    if (unchanged) {
+      outcome[operation.mode === 'replace' ? 'replaced' : 'merged'].push({
+        id: operation.id,
+        previous,
+        applied: next,
+        unchanged: true,
+      });
+      continue;
+    }
+
+    try {
+      const applied = await dbService.updateUserRecord(uid, entity.table, operation.id, stripMeta(next));
+      outcome[operation.mode === 'replace' ? 'replaced' : 'merged'].push({
+        id: operation.id,
+        previous,
+        applied,
+      });
+    } catch (error) {
+      outcome.errors.push(error.message || `Could not update row ${operation.id}.`);
+    }
+  }
+
+  const applied = outcome.inserted.length + outcome.replaced.length + outcome.merged.length;
+  return {
+    success: outcome.errors.length === 0 || applied > 0,
+    attempted: outcome.attempted,
+    inserted: outcome.inserted,
+    replaced: outcome.replaced,
+    merged: outcome.merged,
+    partial: outcome.errors.length > 0,
+    error: outcome.errors.length ? importError(outcome.errors.join(' ')) : null,
+  };
+};
+
+export const undoImport = async (entityKey, { insertedIds = [], previous = [] }) => {
+  const entity = getEntity(entityKey);
+  if (!entity) return { success: true, error: null };
+
+  const uid = getUid();
+  const problems = [];
+
+  for (const id of insertedIds) {
+    try {
+      await dbService.deleteUserRecord(uid, entity.table, id);
+    } catch (error) {
+      problems.push(error.message || `Could not remove row ${id}.`);
+    }
+  }
+
+  for (const row of [...previous].reverse()) {
+    try {
+      await dbService.updateUserRecord(uid, entity.table, row.id, stripMeta(row));
+    } catch (error) {
+      problems.push(error.message || `Could not restore row ${row.id}.`);
+    }
+  }
+
+  return {
+    success: problems.length === 0,
+    error: problems.length ? importError(problems.join(' ')) : null,
+  };
+};
+
+export const deleteImportedRows = async (entityKey, ids) => {
+  const entity = getEntity(entityKey);
+  if (!entity || !Array.isArray(ids) || ids.length === 0) return { success: true };
+
+  const uid = getUid();
+  try {
+    for (const id of ids) {
+      await dbService.deleteUserRecord(uid, entity.table, id);
+    }
+    return { success: true };
+  } catch (error) {
+    return { success: false, error };
+  }
+};
+
+export const ensureImportCategories = async (entityKey, names) => {
+  const type = CATEGORY_TYPE_BY_ENTITY[entityKey];
+  if (!type) return { success: true, created: 0 };
+
+  const clean = [...new Set((names || []).map((name) => String(name).trim()).filter(Boolean))];
+  if (clean.length === 0) return { success: true, created: 0 };
+
+  const uid = getUid();
+  try {
+    const existing = await dbService.fetchUserRecords(uid, 'categories');
+    const existingNames = new Set(existing.map((cat) => String(cat.name).toLowerCase()));
+    const toCreate = clean.filter((name) => !existingNames.has(name.toLowerCase()));
+
+    let created = 0;
+    for (const name of toCreate) {
+      await dbService.createUserRecord(uid, 'categories', { name, type });
+      created++;
+    }
+    return { success: true, created };
+  } catch (error) {
+    return { success: false, error, created: 0 };
   }
 };

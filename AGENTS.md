@@ -109,6 +109,18 @@ A user is either retail or services — never both. Components in each mode neve
 - `public/landing/` — static landing pages: `index.html`, `pages/help.html`, `pages/privacy.html`, `pages/terms.html`, `css/style.css`, `js/main.js`. Navbar scroll toggles `.nav--scrolled` (swaps logo.svg ↔ logo2.svg). "Know your Business, Stay in Control" in Tango Sans.
 - `src/styles/themeTokens.js` — theme colors, Tango Sans display font.
 
+### Assistant (feature-flagged, on-device)
+
+`VITE_ASSISTANT` in `src/utils/features.js` gates the whole thing (`ASSISTANT_ENABLED`, default on). Zero model calls, zero network — records are read once when the panel opens and everything is computed client-side.
+
+- `src/utils/assistant/stats.js` — the only number source. `buildStatsByScope()` returns `statsByScope` keyed by `today / this week / this month / last month / this year / all time` (UTC ISO windows) by reusing the SAME pure helpers the dashboards use (`serviceProfit`, `buildOutstandingRows`, `summariseByCustomer`, `isOverdue`, inventory helpers), so the assistant can never disagree with a report. Sales only in retail; customers/outstanding/recurring only in services.
+- `src/utils/assistant/engine.js` — `answer(question, context)` words those numbers deterministically (`classifyIntent` + scope regexes); import-light so it unit-tests in plain Node. Never recomputes a figure — it only formats what it was handed.
+- `src/services/assistantContext.js` — loads every record in one `Promise.all` (api.js fetchers fail soft) and packages `{ mode, currency, businessName, statsByScope }`.
+- `src/store/assistantStore.js` — zustand: `open`, `initialQuestion`, `openAssistant(question?)`, `closeAssistant`, `clearInitial`.
+- `src/components/assistant/AssistantPanel.jsx` — floating FAB + panel, mounted in `App.jsx` inside the signed-in `Layout`. A doorway question is auto-answered once context loads via the React-sanctioned setState-during-render pattern (not an effect — the lint rule `react-hooks/set-state-in-effect` forbids the naive version). Nothing is persisted; history resets on reload.
+- `src/components/assistant/AssistantDoorway.jsx` — renders `<Sparkles>…</Sparkles>` dashed button on empty states (Inventory, Daily Sales no-inventory, Sales History, Income Tracking, Customers) and opens the panel pre-primed with that screen's question. Returns `null` when `ASSISTANT_ENABLED` is off.
+- Tests: `scripts/assistant.test.mjs` (engine), `scripts/assistant-stats.test.mjs` (stats) and `scripts/assistant-store.test.mjs` (store) run under the standard `npm test` glob. The store test pins down an anon-invisible bug class: `openAssistant` must reject non-strings (a React SyntheticEvent was once passed by the FAB's `onClick={openAssistant}` and rendered as a message child, tripping the global ErrorBoundary on every open).
+
 ## Gotchas
 
 - Vercel webhook auto-deploy unreliable → always `vercel --prod --yes` manually.

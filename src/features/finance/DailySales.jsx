@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { Plus, Search, Tag, TrendingUp, Calendar, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import AssistantDoorway from '../../components/assistant/AssistantDoorway';
 import { fetchSales, createSale, updateSale, deleteSale, fetchInventory, updateInventoryItem } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -695,6 +696,7 @@ const DailySales = () => {
               <div style={{ padding: '0.75rem', background: '#FFF8F0', borderRadius: '8px', border: '1px solid #F0EEE8', fontSize: '0.9rem', color: '#55423D' }}>
                 No inventory items available.{' '}
                 <a href="/inventory" style={{ color: '#6F240A', fontWeight: 700 }}>Add inventory first</a>.
+                <AssistantDoorway question="How do I record my first sale?" children="How do I record a sale?" />
               </div>
             ) : (
               <select 

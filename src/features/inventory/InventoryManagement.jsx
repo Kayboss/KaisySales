@@ -5,6 +5,7 @@ import { Search, Plus, Minus, Edit2, Trash2, Download } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import IconAction from '../../components/ui/IconAction';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import AssistantDoorway from '../../components/assistant/AssistantDoorway';
 import { fetchInventory, createInventoryItem, updateInventoryItem, deleteInventoryItem, fetchCategories, createCategory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -758,6 +759,14 @@ const InventoryManagement = () => {
           </ModalActions>
         </form>
       </Modal>
+
+      {inventory.length === 0 && (
+        <div style={{ marginBottom: '2rem', textAlign: 'center', padding: '2rem 1rem', border: '1px solid #DCC1B9', borderRadius: '16px', background: '#FFFFFF' }}>
+          <p style={{ margin: 0, color: '#1C1C18', fontWeight: 600 }}>No items on your shelf yet.</p>
+          <p style={{ margin: '0.25rem 0 0', color: '#55423D', fontSize: '0.9rem' }}>Add your first product, or import your existing list under Settings.</p>
+          <AssistantDoorway question="What should I know about my inventory?" />
+        </div>
+      )}
 
       <div style={{ marginBottom: '2rem' }}>
         <SearchBar>

@@ -9,6 +9,7 @@ import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 import { formatCurrency } from '../../utils/currency';
 import { serviceProfit, serviceRowReceived } from '../../utils/serviceFinance';
 import CatalogPicker from './CatalogPicker';
+import AssistantDoorway from '../../components/assistant/AssistantDoorway';
 
 const Header = styled.div`
   display: flex;
@@ -568,7 +569,12 @@ const IncomeTracking = () => {
                 </div>
               </MobileCard>
             ))}
-            {paginated.length === 0 && <EmptyState>No income entries yet.</EmptyState>}
+            {paginated.length === 0 && (
+              <>
+                <EmptyState>No income entries yet.</EmptyState>
+                <AssistantDoorway question="How do I track income?" />
+              </>
+            )}
           </MobileGrid>
 
           {totalPages > 1 && (
