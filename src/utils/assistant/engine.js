@@ -76,6 +76,12 @@ const HOWTO_TOPICS = [
     text:
       'Use Invoices to bill a client, then mark it Paid when the money arrives.\n\u2022 Payments link back to the invoice automatically, so balances stay right.',
   },
+  {
+    key: 'import',
+    re: /\b(import|upload|csv|spreadsheet|migrate)\b|bring (my|in|over).{0,20}(data|records|csv|numbers)/,
+    text:
+      'You can bring data in from a CSV without retyping it. Open Settings \u2192 Import Data, choose what you\u2019re importing, drop the file and map the columns.\n\u2022 Nothing saves until you review the rows I flag for a second look.',
+  },
 ];
 
 const fallbackHowto =
@@ -98,6 +104,28 @@ const unknownSuggestionsFor = (mode) =>
 
 const money = (value, currency) => formatCurrency(parseAmount(value), currency);
 const countText = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+const HORIZON_PATTERNS = [
+  { re: /next (\d+) months?|(\d+) months? (ahead|from now)|(\d+) months? out/, months: (n) => n },
+  { re: /next (\d+) years?|(\d+) years? (ahead|from now)/, months: (n) => n * 12 },
+  { re: /\bnext month\b|\ba month (ahead|from now)\b/, months: () => 1 },
+  { re: /\b(quarter|quarters? ahead)\b/, months: () => 3 },
+  { re: /six months|half a year|next half/, months: () => 6 },
+  { re: /\bnext year\b/, months: () => 12 },
+];
+
+const DEFAULT_HORIZON = 6;
+
+const parseHorizon = (raw) => {
+  const text = normalizeQuestion(raw);
+  for (const { re, months } of HORIZON_PATTERNS) {
+    const match = text.match(re);
+    if (!match) continue;
+    const captured = match.slice(1).find((group) => group !== undefined);
+    return captured ? months(Number(captured)) : months();
+  }
+  return DEFAULT_HORIZON;
+};
 
 const scopeStatsOf = (context, scope) => {
   const byScope = (context && context.statsByScope) || {};
@@ -271,6 +299,35 @@ const intentAnswerers = {
     const topic = HOWTO_TOPICS.find((candidate) => candidate.re.test(text));
     return topic ? topic.text : fallbackHowto;
   },
+
+  dataImport: () =>
+    "Yes — you don\u2019t have to type everything in. Open Settings \u2192 Import Data, pick what you\u2019re bringing in (inventory, sales, expenses, one-off income, recurring income or customers), upload the CSV and map the columns.\n\u2022 Nothing saves until you review the rows I flag for a second look.",
+
+  projection: (meta) => {
+    const { currency, mode } = meta;
+    const projectionData = (meta.context && meta.context.projection) || {};
+    const average = Number(projectionData.monthlyAverageIncome) || 0;
+    const activeMonths = Number(projectionData.activeMonths) || 0;
+    const horizon = parseHorizon(meta.matchedText);
+
+    if (average <= 0) {
+      const noun = mode === 'services' ? 'payments' : 'sales';
+      return (
+        `You haven\u2019t recorded any ${noun} this year yet, so there\u2019s nothing to project from. ` +
+        `Ask me again once money starts coming in and I\u2019ll put a number on it.`
+      );
+    }
+
+    const basis =
+      activeMonths > 1
+        ? `Based on the ${activeMonths} months of income you\u2019ve recorded this year, you average about ${money(average, currency)} a month`
+        : `You\u2019re at about ${money(average, currency)} a month so far this year`;
+    const monthsWord = horizon === 1 ? 'month' : 'months';
+    return (
+      `${basis}. As a rough guess, the next ${horizon} ${monthsWord} could bring in around ` +
+      `${money(average * horizon, currency)}. That\u2019s a straight average of recent months, not a promise.`
+    );
+  },
 };
 
 const lowStockSentence = (scopeStats) => {
@@ -287,6 +344,10 @@ const lowStockSentence = (scopeStats) => {
 const INTENT_CHECKERS = [
   { key: 'greeting', re: /^(hi|hello|hey|yo|howdy)(\s|$)|good (morning|afternoon|evening)/ },
   { key: 'thanks', re: /\b(thankyou|thanks|thank you|thx|appreciate it)\b/ },
+  {
+    key: 'dataImport',
+    re: /\b(import(ing|ed|s)?|upload(ing|ed|s)?|migrate|migration)\b|(data|csv|spreadsheet|records|file).{0,20}(import|upload|transfer)|(import|upload|transfer).{0,20}(data|csv|spreadsheet|file|records)/,
+  },
   { key: 'help', re: /\bhelp\b|what can you do|how (do|does) (you|this) work|\bcommands?\b|what do you do/ },
   {
     key: 'overview',
@@ -306,6 +367,10 @@ const INTENT_CHECKERS = [
   {
     key: 'recurring',
     re: /\brecurring\b|monthly income|quarterly income|monthly payments?|subscriptions?|retainer|steady income|every month|expected income/,
+  },
+  {
+    key: 'projection',
+    re: /\b(project(ions?|ed)?|forecast|predict(ions?|ed)?|outlook)\b|expect(ed)? (income|sales|revenue|payments?)|(next|coming|following) \d+ (months?|years?|quarters?)|(next|coming) few months/,
   },
   {
     key: 'expenseTop',

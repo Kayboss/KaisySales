@@ -1,6 +1,6 @@
 import { fetchSales, fetchServiceIncome, fetchExpenses, fetchInventory, fetchCustomers, fetchRecurringIncome, fetchInvoices } from './api';
 import { useSettingsStore } from '../store/settingsStore';
-import { buildStatsByScope } from '../utils/assistant/stats';
+import { buildStatsByScope, buildProjection } from '../utils/assistant/stats';
 
 /**
  * Loads everything the assistant needs in one pass and packages it into the
@@ -32,6 +32,7 @@ export const buildAssistantContext = async () => {
     recurring,
     invoices,
   });
+  const projection = buildProjection({ mode, sales, serviceIncome });
 
-  return { mode, currency: currency || 'GHS', businessName: businessName || '', statsByScope };
+  return { mode, currency: currency || 'GHS', businessName: businessName || '', statsByScope, projection };
 };

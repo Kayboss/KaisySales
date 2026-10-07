@@ -194,3 +194,52 @@ export const buildStatsByScope = (records = {}) => {
 
   return statsByScope;
 };
+
+/**
+ * Builds the numbers a "make a projection" question needs. The engine is told
+ * NOT to compute figures itself, so this helper hands it the single monthly
+ * figure it can scale by whatever horizon the question names.
+ *
+ * The average is year-to-date income over only the months that actually have
+ * income (a business that started in August is not punished for the empty
+ * months before it), measured through the same helpers the dashboards use.
+ *
+ * @param {{
+ *   mode: 'retail'|'services',
+ *   todayIso?: string,
+ *   sales?: Array<Object>,
+ *   serviceIncome?: Array<Object>,
+ * }} records
+ * @returns {{ monthlyAverageIncome: number, activeMonths: number, yearTotal: number }}
+ */
+export const buildProjection = (records = {}) => {
+  const todayIso = records.todayIso || new Date().toISOString().slice(0, 10);
+  const { sales = [], serviceIncome = [] } = records;
+
+  const salesOf = sales.map((s) => ({
+    date: s.date,
+    amount: parseAmount(s.amount || s.totalAmount),
+  }));
+  const incomeOf = serviceIncome.map((i) => ({
+    date: i.paymentDate,
+    amount: serviceRowReceived(i),
+  }));
+
+  const year = todayIso.slice(0, 4);
+  const inYear = (dateIso) => Boolean(dateIso && dateIso.slice(0, 4) === year);
+  const yearIncome = [...salesOf, ...incomeOf].filter((row) => inYear(row.date));
+  const yearTotal = sum(yearIncome.map((row) => row.amount));
+
+  if (yearTotal <= 0) {
+    return { monthlyAverageIncome: 0, activeMonths: 0, yearTotal: 0 };
+  }
+
+  const currentMonth = Number(todayIso.slice(5, 7));
+  const earliestMonth = yearIncome
+    .map((row) => row.date.slice(5, 7))
+    .map(Number)
+    .sort((a, b) => a - b)[0];
+  const activeMonths = Math.max(1, currentMonth - earliestMonth + 1);
+
+  return { monthlyAverageIncome: yearTotal / activeMonths, activeMonths, yearTotal };
+};

@@ -124,6 +124,21 @@ test('classifyIntent: how do i ... is a howto, not a data question', () => {
   assert.equal(classifyIntent('explain how expenses work').intent, 'howto');
 });
 
+test('classifyIntent: projections are their own intent', () => {
+  const { intent, scope } = classifyIntent('can you make a projection for the next 5 months');
+  assert.equal(intent, 'projection');
+  assert.equal(classifyIntent('what are my sales projected to be next quarter').intent, 'projection');
+  assert.equal(classifyIntent('predict my income for the next 3 months').intent, 'projection');
+  assert.equal(classifyIntent('forecast my revenue').intent, 'projection');
+});
+
+test('classifyIntent: data import beats the generic help intent', () => {
+  assert.equal(classifyIntent('can you help upload data').intent, 'dataImport');
+  assert.equal(classifyIntent('how do i import my data').intent, 'dataImport');
+  assert.equal(classifyIntent('import csv').intent, 'dataImport');
+  assert.equal(classifyIntent('where can i upload a spreadsheet').intent, 'dataImport');
+});
+
 test('classifyIntent: unknown falls through', () => {
   assert.equal(classifyIntent('what is your favorite color').intent, 'unknown');
   assert.equal(classifyIntent('tell me a joke').intent, 'unknown');
@@ -352,6 +367,63 @@ test('answer: numbers come only from the supplied stats, never recomputed', () =
     retail({ incomeTotal: 999, incomeCount: 1 })
   );
   assert.match(moneyish(text), /GHS 999\.00/);
+});
+
+test('answer: projection scales only the handed monthly average', () => {
+  const { text, intent } = answer('can you make a projection for the next 5 months', {
+    mode: 'services',
+    currency: 'GHS',
+    statsByScope: { 'this month': stats({}) },
+    projection: { monthlyAverageIncome: 1200, activeMonths: 3, yearTotal: 3600 },
+  });
+  assert.equal(intent, 'projection');
+  const t = moneyish(text);
+  assert.match(t, /GHS 1,200\.00 a month/);
+  assert.match(t, /next 5 months/);
+  assert.match(t, /GHS 6,000\.00/);
+  assert.match(t, /not a promise/);
+});
+
+test('answer: projection figures come only from the handed stats', () => {
+  const { text } = answer('what should i make in the next 2 months', {
+    mode: 'services',
+    currency: 'GHS',
+    statsByScope: { 'this month': stats({}) },
+    projection: { monthlyAverageIncome: 999.75, activeMonths: 2, yearTotal: 1999.5 },
+  });
+  const t = moneyish(text);
+  assert.match(t, /GHS 999\.75 a month/);
+  assert.match(t, /GHS 1,999\.50/);
+});
+
+test('answer: projection with a single active month phrases it as so-far', () => {
+  const { text } = answer('make a 6 month projection', {
+    mode: 'retail',
+    currency: 'GHS',
+    statsByScope: { 'this month': stats({}) },
+    projection: { monthlyAverageIncome: 823, activeMonths: 1, yearTotal: 823 },
+  });
+  assert.match(moneyish(text), /so far this year/);
+  assert.match(moneyish(text), /next 6 months/);
+  assert.match(moneyish(text), /GHS 4,938\.00/);
+});
+
+test('answer: projection with no recorded income is honest', () => {
+  const { text } = answer('can you make a projection', {
+    mode: 'services',
+    currency: 'GHS',
+    statsByScope: { 'this month': stats({}) },
+    projection: { monthlyAverageIncome: 0, activeMonths: 0, yearTotal: 0 },
+  });
+  assert.match(moneyish(text), /nothing to project from/);
+});
+
+test('answer: data import points at Settings to Import Data', () => {
+  const { text, intent } = answer('can you help upload data', retail({}));
+  assert.equal(intent, 'dataImport');
+  assert.match(text, /Settings/);
+  assert.match(text, /Import Data/);
+  assert.match(text, /CSV/);
 });
 
 test('suggestedQuestions returns different prompts per mode', () => {

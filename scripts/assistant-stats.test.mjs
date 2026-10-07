@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { scopeWindows, buildStatsByScope, SCOPE_KEYS } from '../src/utils/assistant/stats.js';
+import { scopeWindows, buildStatsByScope, buildProjection, SCOPE_KEYS } from '../src/utils/assistant/stats.js';
 
 const TODAY = '2026-10-07';
 const money = (n) => `GHS ${n.toFixed(2)}`;
@@ -201,4 +201,45 @@ test('all scope keys exist for every business mode', () => {
       assert.equal(typeof stats[key].profit, 'number');
     }
   }
+});
+
+test('projection averages this year income over its active months', () => {
+  const { yearTotal, activeMonths, monthlyAverageIncome } = buildProjection(retailRecords());
+  assert.equal(yearTotal, 750);
+  assert.equal(activeMonths, 8);
+  assert.equal(monthlyAverageIncome, 93.75);
+});
+
+test('projection: services measures what was actually received', () => {
+  const { yearTotal, activeMonths, monthlyAverageIncome } = buildProjection(servicesRecords());
+  assert.equal(yearTotal, 650);
+  assert.equal(activeMonths, 2);
+  assert.equal(monthlyAverageIncome, 325);
+});
+
+test('projection: a business that started this month uses only its own month', () => {
+  const { yearTotal, activeMonths, monthlyAverageIncome } = buildProjection({
+    mode: 'services',
+    todayIso: TODAY,
+    serviceIncome: [
+      { paymentDate: '2026-10-02', amount: money(823), platformFee: money(0), netAmount: money(823) },
+    ],
+  });
+  assert.equal(yearTotal, 823);
+  assert.equal(activeMonths, 1);
+  assert.equal(monthlyAverageIncome, 823);
+});
+
+test('projection: no income this year means no projection', () => {
+  assert.deepEqual(buildProjection({ mode: 'retail', todayIso: TODAY }), {
+    monthlyAverageIncome: 0,
+    activeMonths: 0,
+    yearTotal: 0,
+  });
+  const lastYear = buildProjection({
+    mode: 'retail',
+    todayIso: TODAY,
+    sales: [{ date: '2025-12-01', amount: money(90) }],
+  });
+  assert.equal(lastYear.monthlyAverageIncome, 0);
 });
