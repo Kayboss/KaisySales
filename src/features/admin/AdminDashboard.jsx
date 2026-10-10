@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Shield, Users, Activity, Crown, LogOut, ArrowLeft, History, Inbox } from 'lucide-react';
+import { Shield, Users, Activity, Crown, LogOut, ArrowLeft, History, Inbox, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import AdminOverview from './AdminOverview';
 import AdminInbox from './AdminInbox';
@@ -104,7 +104,28 @@ const Container = styled.div`
 `;
 
 const Header = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
   margin-bottom: 2rem;
+`;
+
+const RefreshBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid #D0C8C4;
+  background: white;
+  color: #55423D;
+  font-weight: 700;
+  font-size: 0.78rem;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover { border-color: #6F240A; }
 `;
 
 const Title = styled.h1`
@@ -193,12 +214,25 @@ const TABS = [
   { id: 'subscriptions', label: 'Subs', icon: Crown },
 ];
 
+const TabPanel = styled.div`
+  display: ${props => (props.$hidden ? 'none' : 'block')};
+`;
+
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('inbox');
+  // Tabs stay mounted once visited and are hidden with CSS when inactive, so
+  // switching back shows the data already loaded instead of re-fetching it.
+  const [visited, setVisited] = useState(() => new Set(['inbox']));
+  const [reloadKey, setReloadKey] = useState(0);
   const [activeUser, setActiveUser] = useState(null);
   const [attentionCount, setAttentionCount] = useState(0);
   const { logout } = useAuthStore();
   const navigate = useNavigate();
+
+  const selectTab = (id) => {
+    setActiveTab(id);
+    setVisited(prev => (prev.has(id) ? prev : new Set(prev).add(id)));
+  };
 
   const openUser = (user, section = 'support') => setActiveUser({ user, section });
 
@@ -228,13 +262,18 @@ const AdminDashboard = () => {
 
       <Container>
         <Header>
-          <Title>Admin Dashboard</Title>
-          <Subtitle>Track down where users get stuck, then support them from one place.</Subtitle>
+          <div>
+            <Title>Admin Dashboard</Title>
+            <Subtitle>Track down where users get stuck, then support them from one place.</Subtitle>
+          </div>
+          <RefreshBtn onClick={() => setReloadKey(k => k + 1)}>
+            <RefreshCw size={14} /> Refresh
+          </RefreshBtn>
         </Header>
 
         <Tabs>
           {TABS.map(tab => (
-            <Tab key={tab.id} $active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
+            <Tab key={tab.id} $active={activeTab === tab.id} onClick={() => selectTab(tab.id)}>
               <span className="tab-icon"><tab.icon size={18} /></span>
               {tab.label}
               {tab.id === 'inbox' && attentionCount > 0 && <TabBadge>{attentionCount}</TabBadge>}
@@ -242,12 +281,16 @@ const AdminDashboard = () => {
           ))}
         </Tabs>
 
-        {activeTab === 'inbox' && <AdminInbox onOpenUser={openUser} onAttentionCount={setAttentionCount} />}
-        {activeTab === 'overview' && <AdminOverview />}
-        {activeTab === 'users' && <AdminUsers onOpenUser={openUser} />}
-        {activeTab === 'activity' && <AdminActivity onOpenUser={openUser} />}
-        {activeTab === 'audit' && <AdminAudit onOpenUser={openUser} />}
-        {activeTab === 'subscriptions' && <AdminSubscriptions />}
+        {TABS.map(tab => (visited.has(tab.id) ? (
+          <TabPanel key={`${tab.id}-${reloadKey}`} $hidden={activeTab !== tab.id}>
+            {tab.id === 'inbox' && <AdminInbox onOpenUser={openUser} onAttentionCount={setAttentionCount} />}
+            {tab.id === 'overview' && <AdminOverview />}
+            {tab.id === 'users' && <AdminUsers onOpenUser={openUser} />}
+            {tab.id === 'activity' && <AdminActivity onOpenUser={openUser} />}
+            {tab.id === 'audit' && <AdminAudit onOpenUser={openUser} />}
+            {tab.id === 'subscriptions' && <AdminSubscriptions />}
+          </TabPanel>
+        ) : null))}
       </Container>
 
       {activeUser && (

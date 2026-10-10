@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { getEntity, CATEGORY_TYPE_BY_ENTITY } from '../utils/import/schema';
 import { findDuplicates, applyImportValues } from '../utils/import/duplicates';
+import { cached, invalidateAdminCache } from './adminCache';
 
 
 /**
@@ -218,21 +219,29 @@ const requireAdmin = async () => {
   if (!verifyUrl) {
     throw new Error('Admin verification service not configured.');
   }
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error('Unauthorized. Admin access required.');
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) throw new Error('No access token');
-    const res = await fetch(verifyUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || 'Admin access required.');
-    }
+    // The verify-admin edge function is a network hop in front of EVERY admin
+    // read. The answer cannot change until the access token does, so memoize it
+    // per token for a short window and share one in-flight call between the
+    // concurrent fetches a tab fires (e.g. the inbox's Promise.all). Failures are
+    // never cached, so a denied caller still fails on the next attempt.
+    await cached(`admin:verify:${token}`, async () => {
+      const res = await fetch(verifyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Admin access required.');
+      }
+      return true;
+    }, 60 * 1000);
   } catch (error) {
     if (error.message === 'Admin access required.' || error.message === 'No access token') {
       throw new Error('Unauthorized. Admin access required.', { cause: error });
@@ -244,7 +253,7 @@ const requireAdmin = async () => {
 export const fetchAllProfiles = async () => {
   try {
     await requireAdmin();
-    return await dbService.fetchAllProfiles();
+    return await cached('admin:allProfiles', () => dbService.fetchAllProfiles());
   } catch (error) {
     console.error('Failed to fetch all profiles', error);
     return [];
@@ -254,9 +263,19 @@ export const fetchAllProfiles = async () => {
 export const fetchUsersWithStats = async () => {
   try {
     await requireAdmin();
-    return await dbService.fetchUsersWithStats();
+    return await cached('admin:usersWithStats', () => dbService.fetchUsersWithStats());
   } catch (error) {
     console.error('Failed to fetch users with stats', error);
+    return [];
+  }
+};
+
+export const fetchNeverSignedInUsers = async (limit = 200) => {
+  try {
+    await requireAdmin();
+    return await dbService.fetchNeverSignedInUsers(limit);
+  } catch (error) {
+    console.error('Failed to fetch never-signed-in users', error);
     return [];
   }
 };
@@ -346,7 +365,9 @@ export const fetchErrorLogs = async (limit = 20, userId = null) => {
 export const updateUserStatus = async (userId, status) => {
   try {
     await requireAdmin();
-    return await dbService.updateUserStatus(userId, status);
+    const result = await dbService.updateUserStatus(userId, status);
+    invalidateAdminCache();
+    return result;
   } catch (error) {
     console.error('Failed to update user status', error);
     throw error;
@@ -356,7 +377,9 @@ export const updateUserStatus = async (userId, status) => {
 export const updateUserBusinessType = async (userId, businessType) => {
   try {
     await requireAdmin();
-    return await dbService.updateUserBusinessType(userId, businessType);
+    const result = await dbService.updateUserBusinessType(userId, businessType);
+    invalidateAdminCache();
+    return result;
   } catch (error) {
     console.error('Failed to update user business type', error);
     throw error;
@@ -378,7 +401,9 @@ export const fetchSubscriptionPlans = async () => {
 export const assignSubscription = async (userId, plan, durationDays) => {
   try {
     await requireAdmin();
-    return await dbService.assignSubscription(userId, plan, durationDays);
+    const result = await dbService.assignSubscription(userId, plan, durationDays);
+    invalidateAdminCache();
+    return result;
   } catch (error) {
     console.error('Failed to assign subscription', error);
     throw error;
@@ -388,7 +413,9 @@ export const assignSubscription = async (userId, plan, durationDays) => {
 export const cancelSubscription = async (userId) => {
   try {
     await requireAdmin();
-    return await dbService.cancelSubscription(userId);
+    const result = await dbService.cancelSubscription(userId);
+    invalidateAdminCache();
+    return result;
   } catch (error) {
     console.error('Failed to cancel subscription', error);
     throw error;
@@ -407,7 +434,9 @@ export const recordPayment = async (paymentData) => {
 export const confirmPayment = async (paymentId, adminId) => {
   try {
     await requireAdmin();
-    return await dbService.confirmPayment(paymentId, adminId);
+    const result = await dbService.confirmPayment(paymentId, adminId);
+    invalidateAdminCache();
+    return result;
   } catch (error) {
     console.error('Failed to confirm payment', error);
     throw error;

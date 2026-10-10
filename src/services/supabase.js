@@ -312,6 +312,24 @@ export const dbService = {
     return JSON.parse(localStorage.getItem('kaisysales_mock_all_profiles') || '[]');
   },
 
+  // Just the accounts that have never signed in. The admin inbox only needs
+  // these for the "never signed in" list, so it asks the database for exactly
+  // them instead of pulling every profile and filtering in the browser.
+  async fetchNeverSignedInUsers(limit = 200) {
+    assertBackendAvailable();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, business_name, owner_name, avatar_color, created_at, last_sign_in_at')
+        .is('last_sign_in_at', null)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data || []).map(r => toCamelCase(r));
+    }
+    return [];
+  },
+
   async fetchAllRecords(collection) {
     if (supabase) {
       const { data, error } = await supabase
@@ -608,13 +626,6 @@ export const dbService = {
 
   async fetchErrorLogs(limit = 20, userId = null) {
     if (supabase) {
-      // Auto-cleanup errors older than 30 days. Only on the global feed — a
-      // per-user fetch should not trigger a table-wide delete.
-      if (!userId) {
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        await supabase.from('error_logs').delete().lt('created_at', thirtyDaysAgo);
-      }
-
       let query = supabase
         .from('error_logs')
         .select('*')

@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import {
   Inbox, MessageSquare, Bug, UserX, ChevronRight, Clock, RefreshCw, CheckCircle2,
 } from 'lucide-react';
-import { fetchOpenSupportRequests, fetchErrorLogs, fetchAllProfiles } from '../../services/api';
+import { fetchOpenSupportRequests, fetchErrorLogs, fetchNeverSignedInUsers } from '../../services/api';
 
 const StatRow = styled.div`
   display: grid;
@@ -223,16 +223,15 @@ const Loading = styled.div`
 
 const shorten = (value) => (value ? new Date(value).toLocaleString() : '—');
 
-const countAttention = (reports, errors, profiles) => {
+const countAttention = (reports, errors, neverSignedIn) => {
   const errorUsers = new Set(errors.map(e => e.userId).filter(Boolean));
-  const neverSignedIn = profiles.filter(p => !p.lastSignInAt).length;
-  return reports.length + errorUsers.size + neverSignedIn;
+  return reports.length + errorUsers.size + neverSignedIn.length;
 };
 
 const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
   const [reports, setReports] = useState([]);
   const [errors, setErrors] = useState([]);
-  const [profiles, setProfiles] = useState([]);
+  const [neverSignedIn, setNeverSignedIn] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -240,16 +239,16 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
     let active = true;
     const load = async () => {
       try {
-        const [r, e, p] = await Promise.all([
+        const [r, e, n] = await Promise.all([
           fetchOpenSupportRequests(100),
           fetchErrorLogs(50),
-          fetchAllProfiles(),
+          fetchNeverSignedInUsers(200),
         ]);
         if (!active) return;
         setReports(r);
         setErrors(e);
-        setProfiles(p);
-        if (onAttentionCount) onAttentionCount(countAttention(r, e, p));
+        setNeverSignedIn(n);
+        if (onAttentionCount) onAttentionCount(countAttention(r, e, n));
       } catch (err) {
         console.error('Failed to load inbox', err);
       } finally {
@@ -263,24 +262,21 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const [r, e, p] = await Promise.all([
+      const [r, e, n] = await Promise.all([
         fetchOpenSupportRequests(100),
         fetchErrorLogs(50),
-        fetchAllProfiles(),
+        fetchNeverSignedInUsers(200),
       ]);
       setReports(r);
       setErrors(e);
-      setProfiles(p);
-      if (onAttentionCount) onAttentionCount(countAttention(r, e, p));
+      setNeverSignedIn(n);
+      if (onAttentionCount) onAttentionCount(countAttention(r, e, n));
     } catch (err) {
       console.error('Failed to refresh inbox', err);
     } finally {
       setRefreshing(false);
     }
   };
-
-  const profileMap = Object.fromEntries(profiles.map(p => [p.id, p]));
-  const profileOf = (uid) => profileMap[uid] || { id: uid };
 
   const errorsByUser = Object.values(
     errors.reduce((acc, e) => {
@@ -294,7 +290,8 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
     }, {})
   ).sort((a, b) => new Date(b.latest.createdAt || 0) - new Date(a.latest.createdAt || 0));
 
-  const neverSignedIn = profiles.filter(p => !p.lastSignInAt);
+  const labelOf = (entry) =>
+    entry?.businessName || entry?.userBusinessName || entry?.email || entry?.userEmail || null;
 
   if (loading) return <Loading>Loading inbox...</Loading>;
 
@@ -376,12 +373,15 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
             {errorsByUser.map(group => (
               <Row
                 key={group.userId || 'unknown'}
-                onClick={() => onOpenUser(profileOf(group.userId), 'errors')}
+                onClick={() => onOpenUser(
+                  { id: group.userId, email: group.latest.userEmail, businessName: group.latest.userBusinessName },
+                  'errors'
+                )}
               >
                 <RowIcon $tone="error"><Bug size={17} /></RowIcon>
                 <RowBody>
                   <RowTitle>
-                    {profileOf(group.userId).businessName || profileOf(group.userId).email || `User ${(group.userId || '').slice(0, 8)}`}
+                    {labelOf(group.latest) || `User ${(group.userId || '').slice(0, 8)}`}
                     <Tag>{group.count} error{group.count > 1 ? 's' : ''}</Tag>
                   </RowTitle>
                   <RowPreview>{group.latest.error}</RowPreview>
