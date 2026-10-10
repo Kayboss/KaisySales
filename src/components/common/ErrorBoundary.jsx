@@ -1,7 +1,8 @@
 import { Component } from 'react';
 import styled from 'styled-components';
 import { themeTokens } from '../../styles/themeTokens';
-import { logClientError } from '../../services/supabase';
+import { logClientError, dbService } from '../../services/supabase';
+import { useAuthStore } from '../../store/authStore';
 
 // This screen renders from main.jsx, outside any styled-components ThemeProvider,
 // and it may be showing precisely because rendering failed. So it reads the
@@ -80,14 +81,43 @@ const DashboardButton = styled.a`
   }
 `;
 
+const ReportButton = styled.button`
+  background: none;
+  color: ${themeTokens.colors.text.muted};
+  padding: 0.75rem 1rem;
+  border: none;
+  font-weight: 600;
+  font-family: ${themeTokens.fonts.main};
+  text-decoration: underline;
+  cursor: pointer;
+  transition: ${themeTokens.transitions.fast};
+
+  &:hover {
+    color: ${themeTokens.colors.primary};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+    text-decoration: none;
+  }
+`;
+
+const ReportedNote = styled.p`
+  color: ${themeTokens.colors.text.muted};
+  font-size: 0.9rem;
+  margin-top: 1rem;
+  max-width: 34rem;
+`;
+
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null, reported: false, reporting: false };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
@@ -95,7 +125,28 @@ class ErrorBoundary extends Component {
     logClientError(error, window.location.pathname);
   }
 
+  handleReport = async () => {
+    const { user } = useAuthStore.getState();
+    if (!user) return;
+    this.setState({ reporting: true });
+    try {
+      const detail = this.state.error?.message || 'Unknown error';
+      await dbService.createSupportNote({
+        userId: user.uid,
+        category: 'app_crash',
+        url: window.location.pathname,
+        message: `App crash on ${window.location.pathname}: ${detail}`,
+      });
+      this.setState({ reported: true });
+    } catch (err) {
+      console.error('Failed to report crash', err);
+    } finally {
+      this.setState({ reporting: false });
+    }
+  };
+
   render() {
+    const { user } = useAuthStore.getState();
     if (this.state.hasError) {
       return (
         <ErrorContainer>
@@ -110,7 +161,17 @@ class ErrorBoundary extends Component {
               Reload page
             </RefreshButton>
             <DashboardButton href="/dashboard">Return to dashboard</DashboardButton>
+            {user && !this.state.reported && (
+              <ReportButton onClick={this.handleReport} disabled={this.state.reporting}>
+                {this.state.reporting ? 'Sending report...' : 'Report this problem'}
+              </ReportButton>
+            )}
           </ButtonRow>
+          {this.state.reported && (
+            <ReportedNote>
+              Thanks — we received your report and can see what went wrong on this screen.
+            </ReportedNote>
+          )}
         </ErrorContainer>
       );
     }

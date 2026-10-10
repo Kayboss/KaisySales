@@ -261,10 +261,10 @@ export const fetchUsersWithStats = async () => {
   }
 };
 
-export const fetchRecentActivity = async (limit = 20) => {
+export const fetchRecentActivity = async (limit = 20, userId = null) => {
   try {
     await requireAdmin();
-    return await dbService.fetchRecentActivity(limit);
+    return await dbService.fetchRecentActivity(limit, userId);
   } catch (error) {
     console.error('Failed to fetch recent activity', error);
     return [];
@@ -291,10 +291,52 @@ export const fetchSupportNotes = async (userId) => {
   }
 };
 
-export const fetchErrorLogs = async (limit = 20) => {
+export const updateSupportNoteStatus = async (noteId, status) => {
   try {
     await requireAdmin();
-    return await dbService.fetchErrorLogs(limit);
+    return await dbService.updateSupportNoteStatus(noteId, status);
+  } catch (error) {
+    console.error('Failed to update support note status', error);
+    throw error;
+  }
+};
+
+// User-facing (no admin gate): a signed-in user files a problem report and can
+// read back their own thread. RLS scopes both to auth.uid() = user_id.
+export const createSupportRequest = async ({ message, category, url }) => {
+  const uid = getUid();
+  return await dbService.createSupportNote({ userId: uid, message, category, url });
+};
+
+export const fetchMySupportNotes = async () => {
+  const uid = getUid();
+  return await dbService.fetchSupportNotes(uid);
+};
+
+export const fetchUserActions = async (limit = 75, userId = null) => {
+  try {
+    await requireAdmin();
+    return await dbService.fetchUserActions(limit, userId);
+  } catch (error) {
+    console.error('Failed to fetch user actions', error);
+    return [];
+  }
+};
+
+export const fetchOpenSupportRequests = async (limit = 100) => {
+  try {
+    await requireAdmin();
+    return await dbService.fetchOpenSupportRequests(limit);
+  } catch (error) {
+    console.error('Failed to fetch open support requests', error);
+    return [];
+  }
+};
+
+export const fetchErrorLogs = async (limit = 20, userId = null) => {
+  try {
+    await requireAdmin();
+    return await dbService.fetchErrorLogs(limit, userId);
   } catch (error) {
     console.error('Failed to fetch error logs', error);
     return [];

@@ -123,6 +123,13 @@ const UserCard = styled.div`
   padding: 1rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   opacity: ${props => props.$suspended ? 0.6 : 1};
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: #D0C8C4;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  }
 `;
 
 const CardHeader = styled.div`
@@ -272,7 +279,7 @@ const getUserStatus = (lastSignInAt) => {
   return { label: 'Churned', status: 'churned' };
 };
 
-const AdminUsers = () => {
+const AdminUsers = ({ onOpenUser }) => {
   const { currency } = useSettingsStore();
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
@@ -403,7 +410,7 @@ const AdminUsers = () => {
                 const isSuspended = u.status === 'suspended';
                 const statusInfo = getUserStatus(u.lastSignInAt);
                 return (
-                  <tr key={u.id} style={{ opacity: isSuspended ? 0.6 : 1 }}>
+                  <tr key={u.id} style={{ opacity: isSuspended ? 0.6 : 1, cursor: 'pointer' }} onClick={() => onOpenUser && onOpenUser(u)}>
                     <Td>
                       <div style={{ fontWeight: 700 }}>{u.ownerName || '—'}</div>
                       <div style={{ fontSize: '0.7rem', color: '#89726C' }}>{u.email || '—'}</div>
@@ -424,7 +431,7 @@ const AdminUsers = () => {
                         <ToggleBtn
                           $suspended={isSuspended}
                           disabled={togglingId === u.id}
-                          onClick={() => setSuspendTarget(u)}
+                          onClick={(e) => { e.stopPropagation(); setSuspendTarget(u); }}
                           style={{ fontSize: '0.65rem', padding: '0.25rem 0.5rem' }}
                         >
                           {togglingId === u.id ? '...' : isSuspended ? <ToggleLeft size={13} /> : <ToggleRight size={13} />}
@@ -444,7 +451,7 @@ const AdminUsers = () => {
             const isSuspended = u.status === 'suspended';
             const statusInfo = getUserStatus(u.lastSignInAt);
             return (
-              <UserCard key={u.id} $suspended={isSuspended}>
+              <UserCard key={u.id} $suspended={isSuspended} onClick={() => onOpenUser && onOpenUser(u)}>
                 <CardHeader>
                   <div>
                     <CardName>{u.ownerName || '—'}</CardName>
@@ -455,7 +462,7 @@ const AdminUsers = () => {
                     <ToggleBtn
                       $suspended={isSuspended}
                       disabled={togglingId === u.id}
-                      onClick={() => setSuspendTarget(u)}
+                      onClick={(e) => { e.stopPropagation(); setSuspendTarget(u); }}
                       style={{ fontSize: '0.65rem', padding: '0.25rem 0.5rem' }}
                     >
                       {togglingId === u.id ? '...' : isSuspended ? <ToggleLeft size={13} /> : <ToggleRight size={13} />}
@@ -501,7 +508,7 @@ const AdminUsers = () => {
                   <TypeBtn
                     $services={u.businessType === 'services'}
                     disabled={btTogglingId === u.id}
-                    onClick={() => handleToggleBusinessType(u)}
+                    onClick={(e) => { e.stopPropagation(); handleToggleBusinessType(u); }}
                   >
                     {btTogglingId === u.id ? '...' : u.businessType === 'services' ? <Briefcase size={14} /> : <Store size={14} />}
                     {btTogglingId === u.id ? 'Processing' : u.businessType === 'services' ? 'Services' : 'Retail'}

@@ -27,6 +27,7 @@ import SalesHistory from './features/finance/SalesHistory';
 import AutomatedReporting from './features/reporting/AutomatedReporting';
 import RetailStores from './features/partners/RetailStores';
 import SettingsPage from './features/settings/SettingsPage';
+import HelpSupport from './features/settings/HelpSupport';
 import AdminDashboard from './features/admin/AdminDashboard';
 
 // Service business features
@@ -40,7 +41,7 @@ import RevenueHistory from './features/services/RevenueHistory';
 import ServiceOutstanding from './features/services/ServiceOutstanding';
 
 // Icons
-import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, FileText, Store, Settings, Receipt, Menu, X, Users, BarChart3, Shield, History, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, FileText, Store, Settings, Receipt, Menu, X, Users, BarChart3, Shield, History, AlertCircle, LifeBuoy } from 'lucide-react';
 
 const Layout = styled.div`
   display: flex;
@@ -214,6 +215,7 @@ const App = () => {
     { to: '/service-reporting', icon: BarChart3, label: 'Reports' },
     { to: '/service-revenue-history', icon: History, label: 'Revenue History' },
     { to: '/service-outstanding', icon: AlertCircle, label: 'Outstanding' },
+    { to: '/help', icon: LifeBuoy, label: 'Get Help' },
     { to: '/settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -226,6 +228,7 @@ const App = () => {
     { to: '/invoices', icon: Receipt, label: 'Invoices' },
     { to: '/inventory', icon: Package, label: 'Inventory' },
     { to: '/reporting', icon: FileText, label: 'Reporting' },
+    { to: '/help', icon: LifeBuoy, label: 'Get Help' },
     { to: '/settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -320,6 +323,7 @@ const App = () => {
                         <Route path="service-reporting" element={<ServiceReporting />} />
                         <Route path="service-revenue-history" element={<RevenueHistory />} />
       <Route path="service-outstanding" element={<ServiceOutstanding />} />
+                        <Route path="help" element={<HelpSupport />} />
                         <Route path="settings" element={<SettingsPage />} />
                         <Route path="*" element={<IncomeTracking />} />
                       </>
@@ -333,6 +337,7 @@ const App = () => {
                         <Route path="expenses" element={<ExpenseTracking />} />
                         <Route path="reporting" element={<AutomatedReporting />} />
                         <Route path="retail-stores" element={<RetailStores />} />
+                        <Route path="help" element={<HelpSupport />} />
                         <Route path="settings" element={<SettingsPage />} />
                         <Route path="*" element={<BusinessOverview />} />
                       </>

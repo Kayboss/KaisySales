@@ -62,7 +62,7 @@ const writeProbes = [
   'notes', 'description', 'name', 'title', 'vendor', 'milestone_label',
   'client_name', 'customer', 'item', 'business_name', 'owner_name', 'category',
   'status', 'message', 'content', 'platform_tag', 'location', 'phone',
-  'error', 'page',
+  'error', 'page', 'entity',
 ];
 // admin_audit_log is deliberately absent: its policy is `using: is_admin()`, so it
 // has no per-user access at all. Both fixture accounts are non-admin, so C/D/E

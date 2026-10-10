@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Shield, Users, Activity, MessageSquare, Crown, Bug, LogOut, ArrowLeft } from 'lucide-react';
+import { Shield, Users, Activity, Crown, LogOut, ArrowLeft, History, Inbox } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import AdminOverview from './AdminOverview';
+import AdminInbox from './AdminInbox';
 import AdminUsers from './AdminUsers';
 import AdminActivity from './AdminActivity';
-import AdminSupport from './AdminSupport';
 import AdminSubscriptions from './AdminSubscriptions';
-import AdminErrors from './AdminErrors';
+import AdminAudit from './AdminAudit';
+import AdminUserDetail from './AdminUserDetail';
 
 const PageWrapper = styled.div`
   min-height: 100vh;
@@ -174,19 +175,32 @@ const Tab = styled.button`
   }
 `;
 
+const TabBadge = styled.span`
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: white;
+  background: #BA1A1A;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+`;
+
 const TABS = [
+  { id: 'inbox', label: 'Inbox', icon: Inbox },
   { id: 'overview', label: 'Overview', icon: Shield },
   { id: 'users', label: 'Users', icon: Users },
   { id: 'activity', label: 'Activity', icon: Activity },
-  { id: 'support', label: 'Support', icon: MessageSquare },
-  { id: 'errors', label: 'Errors', icon: Bug },
+  { id: 'audit', label: 'Audit', icon: History },
   { id: 'subscriptions', label: 'Subs', icon: Crown },
 ];
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('inbox');
+  const [activeUser, setActiveUser] = useState(null);
+  const [attentionCount, setAttentionCount] = useState(0);
   const { logout } = useAuthStore();
   const navigate = useNavigate();
+
+  const openUser = (user, section = 'support') => setActiveUser({ user, section });
 
   const handleLogout = async () => {
     await logout();
@@ -215,7 +229,7 @@ const AdminDashboard = () => {
       <Container>
         <Header>
           <Title>Admin Dashboard</Title>
-          <Subtitle>Manage users, monitor activity, and provide support.</Subtitle>
+          <Subtitle>Track down where users get stuck, then support them from one place.</Subtitle>
         </Header>
 
         <Tabs>
@@ -223,17 +237,26 @@ const AdminDashboard = () => {
             <Tab key={tab.id} $active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
               <span className="tab-icon"><tab.icon size={18} /></span>
               {tab.label}
+              {tab.id === 'inbox' && attentionCount > 0 && <TabBadge>{attentionCount}</TabBadge>}
             </Tab>
           ))}
         </Tabs>
 
+        {activeTab === 'inbox' && <AdminInbox onOpenUser={openUser} onAttentionCount={setAttentionCount} />}
         {activeTab === 'overview' && <AdminOverview />}
-        {activeTab === 'users' && <AdminUsers />}
-        {activeTab === 'activity' && <AdminActivity />}
-        {activeTab === 'support' && <AdminSupport />}
-        {activeTab === 'errors' && <AdminErrors />}
+        {activeTab === 'users' && <AdminUsers onOpenUser={openUser} />}
+        {activeTab === 'activity' && <AdminActivity onOpenUser={openUser} />}
+        {activeTab === 'audit' && <AdminAudit onOpenUser={openUser} />}
         {activeTab === 'subscriptions' && <AdminSubscriptions />}
       </Container>
+
+      {activeUser && (
+        <AdminUserDetail
+          user={activeUser.user}
+          initialSection={activeUser.section}
+          onClose={() => setActiveUser(null)}
+        />
+      )}
     </PageWrapper>
   );
 };

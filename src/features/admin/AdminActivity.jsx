@@ -16,6 +16,10 @@ const FeedItem = styled.div`
   gap: 1rem;
   padding: 1rem 1.25rem;
   border-bottom: 1px solid #F0EEE8;
+  cursor: ${props => props.$clickable ? 'pointer' : 'default'};
+  transition: background 0.15s ease;
+
+  &:hover { background: ${props => props.$clickable ? '#FCF9F3' : 'transparent'}; }
 
   &:last-child {
     border-bottom: none;
@@ -132,7 +136,7 @@ const Pagination = styled.div`
   padding: 1rem;
 `;
 
-const AdminActivity = () => {
+const AdminActivity = ({ onOpenUser }) => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -176,7 +180,14 @@ const AdminActivity = () => {
         <Empty>No recent activity found.</Empty>
       ) : (
         paged.map((a, i) => (
-          <FeedItem key={`${a.type}-${a.id}-${i}`}>
+          <FeedItem
+            key={`${a.type}-${a.id}-${i}`}
+            $clickable={!!(a.userId && onOpenUser)}
+            onClick={() => a.userId && onOpenUser && onOpenUser(
+              { id: a.userId, email: a.userEmail, businessName: a.businessName },
+              'activity'
+            )}
+          >
             <IconBox $type={a.type}>{typeIcon(a.type)}</IconBox>
             <ActivityInfo>
               <ActivityLabel>{a.label}</ActivityLabel>

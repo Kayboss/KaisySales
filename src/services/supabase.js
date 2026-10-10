@@ -372,16 +372,18 @@ export const dbService = {
     }));
   },
 
-  async fetchRecentActivity(limit = 20) {
+  async fetchRecentActivity(limit = 20, userId = null) {
     if (!supabase) return [];
     const collections = ['sales', 'invoices', 'expenses', 'customers', 'service_income', 'recurring_income'];
     const results = [];
     for (const col of collections) {
-      const { data, error } = await supabase
+      let query = supabase
         .from(col)
         .select('*')
         .order('created_at', { ascending: false })
         .limit(limit);
+      if (userId) query = query.eq('user_id', userId);
+      const { data, error } = await query;
       if (error) continue;
       for (const r of data || []) {
         let label = '';
@@ -451,6 +453,49 @@ export const dbService = {
       return (data || []).map(r => toCamelCase(r));
     }
     return [];
+  },
+
+  async fetchOpenSupportRequests(limit = 100) {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('support_notes')
+      .select('*')
+      .eq('is_from_admin', false)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    const notes = (data || []).map(r => toCamelCase(r));
+    const userIds = [...new Set(notes.map(n => n.userId).filter(Boolean))];
+    if (userIds.length === 0) return notes;
+    const { data: profiles, error: pErr } = await supabase
+      .from('profiles')
+      .select('id, email, business_name')
+      .in('id', userIds);
+    if (pErr || !profiles) return notes;
+    const profileMap = Object.fromEntries(
+      profiles.map(p => [p.id, { email: p.email, businessName: p.business_name }])
+    );
+    return notes.map(n => ({
+      ...n,
+      userEmail: profileMap[n.userId]?.email || null,
+      userBusinessName: profileMap[n.userId]?.businessName || null,
+    }));
+  },
+
+  async updateSupportNoteStatus(noteId, status) {
+    if (supabase) {
+      const resolvedAt = status === 'resolved' ? new Date().toISOString() : null;
+      const { data, error } = await supabase
+        .from('support_notes')
+        .update({ status, resolved_at: resolvedAt })
+        .eq('id', noteId)
+        .select()
+        .single();
+      if (error) throw error;
+      return toCamelCase(data);
+    }
+    return { id: noteId, status };
   },
 
   async fetchUserRecords(uid, collection) {
@@ -561,17 +606,22 @@ export const dbService = {
     return true;
   },
 
-  async fetchErrorLogs(limit = 20) {
+  async fetchErrorLogs(limit = 20, userId = null) {
     if (supabase) {
-      // Auto-cleanup errors older than 30 days
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      await supabase.from('error_logs').delete().lt('created_at', thirtyDaysAgo);
+      // Auto-cleanup errors older than 30 days. Only on the global feed — a
+      // per-user fetch should not trigger a table-wide delete.
+      if (!userId) {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        await supabase.from('error_logs').delete().lt('created_at', thirtyDaysAgo);
+      }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('error_logs')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(limit);
+      if (userId) query = query.eq('user_id', userId);
+      const { data, error } = await query;
       if (error) throw error;
       const logs = (data || []).map(r => toCamelCase(r));
       const userIds = [...new Set(logs.map(l => l.userId).filter(Boolean))];
@@ -594,6 +644,34 @@ export const dbService = {
       return logs;
     }
     return [];
+  },
+
+  async fetchUserActions(limit = 75, userId = null) {
+    if (!supabase) return [];
+    let query = supabase
+      .from('user_actions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (userId) query = query.eq('user_id', userId);
+    const { data, error } = await query;
+    if (error) throw error;
+    const actions = (data || []).map(r => toCamelCase(r));
+    const userIds = [...new Set(actions.map(a => a.userId).filter(Boolean))];
+    if (userIds.length === 0) return actions;
+    const { data: profiles, error: pErr } = await supabase
+      .from('profiles')
+      .select('id, email, business_name')
+      .in('id', userIds);
+    if (pErr || !profiles) return actions;
+    const profileMap = Object.fromEntries(
+      profiles.map(p => [p.id, { email: p.email, businessName: p.business_name }])
+    );
+    return actions.map(a => ({
+      ...a,
+      userEmail: profileMap[a.userId]?.email || null,
+      userBusinessName: profileMap[a.userId]?.businessName || null,
+    }));
   },
 
   async updateUserStatus(userId, status) {
@@ -856,10 +934,21 @@ export const logClientError = async (error, page) => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     const errorMsg = typeof error === 'string' ? error : (error?.message || String(error));
+    // A message alone rarely says where the user was stuck. Keep the stack and
+    // the browser beside it so the admin Errors tab can reproduce the problem.
+    // Both go through sanitizeError: a stack can carry a token in a request URL,
+    // and user agent strings are capricious, so they are truncated and redacted.
+    const stack = typeof error?.stack === 'string' ? error.stack : '';
+    const details = {
+      stack: sanitizeError(stack).slice(0, 4000) || null,
+      userAgent: sanitizeError(navigator?.userAgent || '').slice(0, 300) || null,
+      viewport: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : null,
+    };
     await supabase.from('error_logs').insert({
       user_id: user?.id || null,
       error: sanitizeError(errorMsg),
       page: page || window.location.pathname,
+      details,
     });
   } catch {
     // Silently fail — don't log errors about logging errors
