@@ -5,6 +5,11 @@ import { TrendingUp, ShoppingBag, CreditCard, Package, ArrowUpRight, AlertTriang
 import { fetchSales, fetchExpenses, fetchInventory } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrencyShort, parseAmount } from '../../utils/currency';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonTable from '../../components/ui/SkeletonTable';
+import SkeletonChart from '../../components/ui/SkeletonChart';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
 
 const Grid = styled.div`
   display: grid;
@@ -418,7 +423,14 @@ const BusinessOverview = () => {
   }, []);
 
   if (stats.loading) {
-    return <div style={{ padding: '2rem', textAlign: 'center', color: '#89726C' }}>Loading your business overview...</div>;
+    return (
+      <SkeletonScreen label="Loading business overview">
+        <Skeleton height="2rem" width="35%" />
+        <SkeletonCards count={4} />
+        <SkeletonTable rows={5} cols={3} />
+        <SkeletonChart />
+      </SkeletonScreen>
+    );
   }
 
   return (

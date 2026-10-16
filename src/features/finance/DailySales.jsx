@@ -13,6 +13,10 @@ import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import IconAction from '../../components/ui/IconAction';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonTable from '../../components/ui/SkeletonTable';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 import { applyStockDelta, resolveMinStock, resolveStock } from '../../utils/inventory';
 
@@ -392,6 +396,8 @@ const DailySales = () => {
   const [saving, setSaving] = useState(false);
   const [limitError, setLimitError] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  // Cleared by the first fetch only — loadData also runs after save/delete, where a skeleton flash would be wrong.
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     item: '', quantity: 1, unitPrice: '', paymentMethod: 'Cash', discount: 0
@@ -412,7 +418,7 @@ const DailySales = () => {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData();
+    loadData().finally(() => setLoading(false));
   }, []);
 
   const handleSave = async (e) => {
@@ -655,6 +661,17 @@ const DailySales = () => {
     const csv = convertToCSV(exportRows, headers);
     downloadCSV(csv, `DailySales_${new Date().toISOString().split('T')[0]}.csv`);
   };
+
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading daily sales">
+        <Skeleton height="2rem" width="35%" />
+        <SkeletonCards count={4} />
+        <Skeleton height="3rem" width="55%" />
+        <SkeletonTable rows={8} cols={8} />
+      </SkeletonScreen>
+    );
+  }
 
   return (
     <div>

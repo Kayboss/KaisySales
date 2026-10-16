@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { ShoppingCart, Receipt, CreditCard, Clock, User, Briefcase, Users } from 'lucide-react';
 import { fetchRecentActivity } from '../../services/api';
+import EmptyState from '../../components/ui/EmptyState';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 
 const Feed = styled.div`
   background: white;
@@ -100,12 +103,6 @@ const TypeTag = styled.span`
     props.$type === 'customers' ? '#6F240A' : '#875200'};
 `;
 
-const Empty = styled.div`
-  text-align: center;
-  padding: 3rem;
-  color: #89726C;
-`;
-
 const PAGE_SIZE = 30;
 
 const PageBtn = styled.button`
@@ -172,12 +169,16 @@ const AdminActivity = ({ onOpenUser }) => {
     }
   };
 
-  if (loading) return <p style={{ color: '#89726C' }}>Loading activity...</p>;
+  if (loading) return (
+    <SkeletonScreen label="Loading activity">
+      <SkeletonTable rows={8} cols={4} />
+    </SkeletonScreen>
+  );
 
   return (
     <Feed>
       {activities.length === 0 ? (
-        <Empty>No recent activity found.</Empty>
+        <EmptyState>No recent activity found.</EmptyState>
       ) : (
         paged.map((a, i) => (
           <FeedItem

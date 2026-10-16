@@ -6,6 +6,11 @@ import { fetchSales, fetchExpenses, fetchInvoices, fetchInventory } from '../../
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrency, formatCurrencyShort, parseAmount } from '../../utils/currency';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonTable from '../../components/ui/SkeletonTable';
+import SkeletonChart from '../../components/ui/SkeletonChart';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
 
 const Header = styled.div`
   display: flex;
@@ -389,7 +394,17 @@ const AutomatedReporting = () => {
     downloadCSV(csv, `${fileName}_${new Date().toISOString().split('T')[0]}.csv`);
   };
 
-  if (data.loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading reports...</div>;
+  if (data.loading) {
+    return (
+      <SkeletonScreen label="Loading reports">
+        <Skeleton height="2rem" width="35%" />
+        <SkeletonCards count={6} $min="280px" />
+        <SkeletonChart />
+        <SkeletonChart />
+        <SkeletonTable rows={5} cols={6} />
+      </SkeletonScreen>
+    );
+  }
   return (
     <div>
       <Header>

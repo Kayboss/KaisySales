@@ -5,6 +5,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { fetchAllProfiles, fetchRecentActivity, fetchUsersWithStats, fetchVisitStats } from '../../services/api';
 import { formatCurrencyShort } from '../../utils/currency';
 import { useSettingsStore } from '../../store/settingsStore';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonChart from '../../components/ui/SkeletonChart';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 
 const Grid = styled.div`
   display: grid;
@@ -257,7 +261,13 @@ const AdminOverview = () => {
     .sort((a, b) => new Date(b.lastSignInAt || 0) - new Date(a.lastSignInAt || 0));
 
   if (loading) {
-    return <p style={{ color: '#89726C' }}>Loading overview...</p>;
+    return (
+      <SkeletonScreen label="Loading overview">
+        <SkeletonCards count={3} $min="220px" />
+        <SkeletonChart />
+        <SkeletonTable rows={5} cols={3} />
+      </SkeletonScreen>
+    );
   }
 
   return (

@@ -31,3 +31,6 @@ SECURITY.md
 
 # Disposable test-account credentials for the authz suite (never commit)
 .env.authz
+
+.vercel
+.env*

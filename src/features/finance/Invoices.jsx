@@ -15,6 +15,10 @@ import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { formatCurrency, getCurrencySymbol } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 import { applyStockDelta, resolveMinStock, resolveStock } from '../../utils/inventory';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import EmptyState from '../../components/ui/EmptyState';
 
 const Header = styled.div`
   display: flex;
@@ -394,15 +398,6 @@ const PageButton = styled.button`
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 `;
 
-const EmptyState = styled.div`
-  padding: 3rem 1.5rem;
-  text-align: center;
-  background: white;
-  border: 1px dashed #D0C8C4;
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  color: #55423D;
-`;
-
 const Invoices = () => {
   const { currency, subscriptionPlan } = useSettingsStore();
   const { businessName, phone: businessPhone, location: businessLocation } = useSettingsStore();
@@ -424,6 +419,8 @@ const Invoices = () => {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [limitError, setLimitError] = useState(null);
   const prevStatus = useRef('pending');
+  // Cleared by the first fetch only — loadData also runs after save/delete, where a skeleton flash would be wrong.
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0, notes: ''
@@ -519,7 +516,7 @@ const Invoices = () => {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData();
+    loadData().finally(() => setLoading(false));
   }, []);
 
   const handleSave = async (e) => {
@@ -790,6 +787,16 @@ const Invoices = () => {
     downloadCSV(csv, `Invoices_${new Date().toISOString().split('T')[0]}.csv`);
   };
 
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading invoices">
+        <Skeleton height="2rem" width="35%" />
+        <Skeleton height="3rem" width="60%" />
+        <SkeletonCards count={6} $min="300px" />
+      </SkeletonScreen>
+    );
+  }
+
   return (
     <div>
       <Header>
@@ -1039,7 +1046,7 @@ const Invoices = () => {
       </div>
 
       {filteredInvoices.length === 0 ? (
-        <EmptyState>
+        <EmptyState $boxed>
           <p style={{ fontWeight: 700, color: '#1C1C18', margin: '0 0 0.35rem' }}>No invoices found</p>
           <p style={{ margin: 0, fontSize: '0.9rem' }}>
             {invoices.length === 0 ? 'Create your first invoice to get started.' : 'Try a different search or status filter.'}

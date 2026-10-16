@@ -14,6 +14,10 @@ import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrencyShort } from '../../utils/currency';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonText from '../../components/ui/SkeletonText';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import EmptyState from '../../components/ui/EmptyState';
 
 const Overlay = styled.div`
   position: fixed;
@@ -254,14 +258,7 @@ const Body = styled.div`
   padding: 1.25rem;
 `;
 
-const Empty = styled.div`
-  text-align: center;
-  padding: 2.5rem 1rem;
-  color: #89726C;
-  font-size: 0.85rem;
 
-  svg { margin-bottom: 0.5rem; }
-`;
 
 const Note = styled.div`
   padding: 0.75rem;
@@ -465,12 +462,7 @@ const DetailsBox = styled.pre`
   overflow: auto;
 `;
 
-const Loading = styled.div`
-  text-align: center;
-  padding: 2rem;
-  color: #89726C;
-  font-size: 0.85rem;
-`;
+
 
 const SECTIONS = [
   { id: 'support', label: 'Support', icon: MessageSquare },
@@ -729,11 +721,41 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
 
         <Body>
           {sectionLoading ? (
-            <Loading>Loading {section}...</Loading>
+            <SkeletonScreen label={`Loading ${section}`}>
+              {section === 'support' && (
+                <>
+                  <div style={{ marginBottom: '0.75rem', padding: '0.75rem', border: '1px solid #F0EEE8', borderRadius: '10px', background: 'white' }}>
+                    <Skeleton width="30%" height="0.75rem" style={{ marginBottom: '0.5rem' }} />
+                    <SkeletonText lines={3} lastWidth="60%" />
+                  </div>
+                  <div style={{ marginBottom: '0.75rem', padding: '0.75rem', border: '1px solid #F0EEE8', borderRadius: '10px', background: 'white' }}>
+                    <Skeleton width="25%" height="0.75rem" style={{ marginBottom: '0.5rem' }} />
+                    <SkeletonText lines={2} lastWidth="40%" />
+                  </div>
+                  <div style={{ marginBottom: '0.75rem', padding: '0.75rem', border: '1px solid #F0EEE8', borderRadius: '10px', background: 'white' }}>
+                    <Skeleton width="28%" height="0.75rem" style={{ marginBottom: '0.5rem' }} />
+                    <SkeletonText lines={2} lastWidth="50%" />
+                  </div>
+                </>
+              )}
+              {(section === 'activity' || section === 'audit' || section === 'errors') && (
+                <>
+                  {[1,2,3,4].map(i => (
+                    <div key={i} style={{ display: 'flex', gap: '0.6rem', padding: '0.75rem 0', borderBottom: '1px solid #F0EEE8' }}>
+                      <Skeleton circle width="28px" height="28px" />
+                      <div style={{ flex: 1 }}>
+                        <Skeleton width="40%" height="0.8rem" style={{ marginBottom: '0.35rem' }} />
+                        <SkeletonText lines={2} lastWidth="70%" />
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </SkeletonScreen>
           ) : section === 'support' ? (
             <>
               {notes.length === 0 ? (
-                <Empty><MessageSquare size={26} /><div>No support notes yet.</div></Empty>
+                <EmptyState icon={<MessageSquare size={20} />} $compact>No support notes yet.</EmptyState>
               ) : (
                 notes.map(n => (
                   <Note key={n.id} $fromAdmin={n.isFromAdmin}>
@@ -780,7 +802,7 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
             </>
           ) : section === 'activity' ? (
             activity.length === 0 ? (
-              <Empty><ActivityIcon size={26} /><div>No recorded activity.</div></Empty>
+              <EmptyState icon={<ActivityIcon size={20} />} $compact>No recorded activity.</EmptyState>
             ) : (
               activity.map(item => {
                 const Icon = ACTIVITY_ICON[item.type] || ActivityIcon;
@@ -806,7 +828,7 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
             )
           ) : section === 'audit' ? (
             audit.length === 0 ? (
-              <Empty><History size={26} /><div>No audit entries for this user.</div></Empty>
+              <EmptyState icon={<History size={20} />} $compact>No audit entries for this user.</EmptyState>
             ) : (
               audit.map(a => {
                 const open = expanded === a.id;
@@ -841,7 +863,7 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
             )
           ) : (
             errors.length === 0 ? (
-              <Empty><Bug size={26} /><div>No errors recorded for this user.</div></Empty>
+              <EmptyState icon={<Bug size={20} />} $compact>No errors recorded for this user.</EmptyState>
             ) : (
               errors.map(e => (
                 <FeedRow key={e.id}>

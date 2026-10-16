@@ -4,6 +4,11 @@ import styled from 'styled-components';
 import { ArrowLeft, Plus, CheckCircle, Pencil, Trash2, Mail, Phone, MapPin, Building2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 import { fetchCustomers, fetchServiceIncome, fetchInvoices, fetchCategories, createCategory, createInvoice, createServiceIncome, updateInvoice, updateCustomer, updateServiceIncome, deleteServiceIncome, deleteInvoice, fetchServices } from '../../services/api';
 import { sanitizeInput } from '../../utils/sanitize';
 import { formatCurrency } from '../../utils/currency';
@@ -272,13 +277,6 @@ const ActionBtn = styled.button`
   }
 `;
 
-const EmptyState = styled.div`
-  text-align: center;
-  padding: 3rem;
-  color: ${({ theme }) => theme.colors.text.muted};
-  font-size: 0.95rem;
-`;
-
 const MobileGrid = styled.div`
   display: none;
   @media (max-width: 768px) {
@@ -462,6 +460,7 @@ const CustomerDetail = () => {
   const [editSizeRate, setEditSizeRate] = useState(0);
   const [editItems, setEditItems] = useState([{ name: '', quantity: '1', unitPrice: '' }]);
   const [payments, setPayments] = useState({});
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
     const [c, i, inv, cats, svcs] = await Promise.all([fetchCustomers(), fetchServiceIncome(), fetchInvoices(), fetchCategories('income'), fetchServices()]);
@@ -473,7 +472,20 @@ const CustomerDetail = () => {
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load().finally(() => setLoading(false)); }, []);
+
+  // "not found" is only a real answer once the customer list has arrived;
+  // before that it would flash on every load and refresh.
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading customer">
+        <Skeleton height="2rem" width="30%" />
+        <Skeleton height="5.5rem" width="100%" radius="12px" />
+        <SkeletonCards count={3} />
+        <SkeletonTable rows={5} cols={6} />
+      </SkeletonScreen>
+    );
+  }
 
   const openPayments = () => {
     setPayments({});
@@ -1151,7 +1163,7 @@ const CustomerDetail = () => {
               </tr>
             ))}
             {paymentRows.length === 0 && (
-              <tr><Td colSpan={6}><EmptyState>No payments recorded yet. Use <strong>Make Payment</strong> to receive money.</EmptyState></Td></tr>
+              <tr><Td colSpan={6}><EmptyState $compact>No payments recorded yet. Use <strong>Make Payment</strong> to receive money.</EmptyState></Td></tr>
             )}
           </tbody>
         </Table>

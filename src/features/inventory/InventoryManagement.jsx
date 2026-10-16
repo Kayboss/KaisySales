@@ -15,6 +15,9 @@ import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { formatCurrency, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 import { applyStockDelta, resolveMinStock, resolveStock, resolveStockStatus, stockValueAtCost, stockRetailValue, countUnitsInStock, countItemsMissingCost, countItemsWithCost, grossMarginPercent } from '../../utils/inventory';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonTable from '../../components/ui/SkeletonTable';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
 
 const PAGE_SIZE = 20;
 
@@ -442,6 +445,8 @@ const InventoryManagement = () => {
   const [limitError, setLimitError] = useState(null);
   const [adjustingId, setAdjustingId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  // Cleared by the first fetch only — loadData also runs after save/delete, where a skeleton flash would be wrong.
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     name: '', category: '', stock: '', price: '', costPrice: '', minStock: 5, newCategory: ''
@@ -462,7 +467,7 @@ const InventoryManagement = () => {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData();
+    loadData().finally(() => setLoading(false));
   }, []);
 
   const handleSave = async (e) => {
@@ -618,6 +623,17 @@ const InventoryManagement = () => {
   const stockValueAtCostValue = stockValueAtCost(filteredInventory);
   const retailValue = stockRetailValue(filteredInventory);
   const marginPercent = grossMarginPercent(filteredInventory);
+
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading inventory">
+        <Skeleton height="2rem" width="35%" />
+        <Skeleton height="2.5rem" width="45%" />
+        <Skeleton height="3rem" width="400px" />
+        <SkeletonTable rows={8} cols={8} />
+      </SkeletonScreen>
+    );
+  }
 
   return (
     <div>

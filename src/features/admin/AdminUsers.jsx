@@ -3,6 +3,9 @@ import styled from 'styled-components';
 import { Search, Mail, Calendar, ShoppingCart, CreditCard, ToggleLeft, ToggleRight, Briefcase, Store, Users, Package, DollarSign, LayoutGrid, List } from 'lucide-react';
 import { fetchUsersWithStats, updateUserStatus, updateUserBusinessType } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import EmptyState from '../../components/ui/EmptyState';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
 import { formatCurrencyShort } from '../../utils/currency';
 import { useSettingsStore } from '../../store/settingsStore';
 
@@ -98,12 +101,6 @@ const ToggleBtn = styled.button`
   &:hover:not(:disabled) { opacity: 0.8; }
 
   &:disabled { opacity: 0.6; cursor: not-allowed; }
-`;
-
-const Empty = styled.div`
-  text-align: center;
-  padding: 3rem;
-  color: #89726C;
 `;
 
 const CardGrid = styled.div`
@@ -348,7 +345,11 @@ const AdminUsers = ({ onOpenUser }) => {
     (u.email || '').toLowerCase().includes(search.toLowerCase()))
   );
 
-  if (loading) return <p style={{ color: '#89726C' }}>Loading users...</p>;
+  if (loading) return (
+    <SkeletonScreen label="Loading users">
+      <SkeletonCards count={6} $min="300px" />
+    </SkeletonScreen>
+  );
 
   return (
     <div>
@@ -386,7 +387,7 @@ const AdminUsers = ({ onOpenUser }) => {
       </SumRow>
 
       {filtered.length === 0 ? (
-        <Empty>{search ? 'No users match your search.' : 'No users found.'}</Empty>
+        <EmptyState>{search ? 'No users match your search.' : 'No users found.'}</EmptyState>
       ) : viewMode === 'list' ? (
         <TableWrapper>
           <Table>

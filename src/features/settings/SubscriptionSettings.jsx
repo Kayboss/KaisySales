@@ -5,6 +5,8 @@ import { recordPayment, fetchUserPayments } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrency } from '../../utils/currency';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
 
 const Section = styled.div`
   margin-bottom: 2rem;
@@ -303,13 +305,20 @@ const SubscriptionSettings = () => {
   const { user } = useAuthStore();
   const { subscriptionPlan, subscriptionStatus, subscriptionExpiresAt, currency } = useSettingsStore();
   const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showPayment, setShowPayment] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('mobile_money');
   const [reference, setReference] = useState('');
   const [yearly, setYearly] = useState(false);
 
   useEffect(() => {
-    if (user?.uid) fetchUserPayments(user.uid).then(setPayments);
+    let active = true;
+    const load = user?.uid ? fetchUserPayments(user.uid) : Promise.resolve([]);
+    load
+      .then(data => { if (active) setPayments(data); })
+      .catch(err => { console.error('Failed to load payments', err); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [user?.uid]);
 
   const currentPlan = subscriptionPlan || 'none';
@@ -423,7 +432,22 @@ const SubscriptionSettings = () => {
         </CardGrid>
       </Section>
 
-      {payments.length > 0 && (
+      {loading ? (
+        <SkeletonScreen label="Loading payment history">
+          <Section>
+            <SectionTitle>Payment History</SectionTitle>
+            <SectionDesc>Your recent subscription payments.</SectionDesc>
+            <div style={{ background: 'white', borderRadius: 12, border: '1px solid #F0EEE8', padding: '0 1rem' }}>
+              {[0, 1].map(i => (
+                <ReceiptRow key={i}>
+                  <Skeleton width="55%" height="0.9rem" />
+                  <Skeleton width="4.5rem" height="1.3rem" radius="20px" />
+                </ReceiptRow>
+              ))}
+            </div>
+          </Section>
+        </SkeletonScreen>
+      ) : payments.length > 0 && (
         <Section>
           <SectionTitle>Payment History</SectionTitle>
           <SectionDesc>Your recent subscription payments.</SectionDesc>

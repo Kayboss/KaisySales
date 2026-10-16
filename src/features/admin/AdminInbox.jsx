@@ -4,6 +4,10 @@ import {
   Inbox, MessageSquare, Bug, UserX, ChevronRight, Clock, RefreshCw, CheckCircle2,
 } from 'lucide-react';
 import { fetchOpenSupportRequests, fetchErrorLogs, fetchNeverSignedInUsers } from '../../services/api';
+import EmptyState from '../../components/ui/EmptyState';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 
 const StatRow = styled.div`
   display: grid;
@@ -203,24 +207,6 @@ const Chevron = styled(ChevronRight)`
   margin-top: 0.35rem;
 `;
 
-const Empty = styled.div`
-  text-align: center;
-  padding: 2.5rem 1rem;
-  color: #89726C;
-  font-size: 0.85rem;
-  background: white;
-  border: 1px solid #F0EEE8;
-  border-radius: 12px;
-
-  svg { margin-bottom: 0.5rem; }
-`;
-
-const Loading = styled.div`
-  text-align: center;
-  padding: 3rem;
-  color: #89726C;
-`;
-
 const shorten = (value) => (value ? new Date(value).toLocaleString() : '—');
 
 const countAttention = (reports, errors, neverSignedIn) => {
@@ -293,7 +279,12 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
   const labelOf = (entry) =>
     entry?.businessName || entry?.userBusinessName || entry?.email || entry?.userEmail || null;
 
-  if (loading) return <Loading>Loading inbox...</Loading>;
+  if (loading) return (
+    <SkeletonScreen label="Loading inbox">
+      <SkeletonCards count={3} $min="280px" />
+      <SkeletonTable rows={6} cols={3} />
+    </SkeletonScreen>
+  );
 
   return (
     <div>
@@ -331,7 +322,7 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
           </RefreshBtn>
         </SectionHeader>
         {reports.length === 0 ? (
-          <Empty><CheckCircle2 size={26} /><div>No open reports. All clear.</div></Empty>
+          <EmptyState icon={<CheckCircle2 size={26} />}>No open reports. All clear.</EmptyState>
         ) : (
           <RowCard>
             {reports.map(r => (
@@ -367,7 +358,7 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
           <CountPill>{errorsByUser.length}</CountPill>
         </SectionHeader>
         {errorsByUser.length === 0 ? (
-          <Empty><CheckCircle2 size={26} /><div>No errors recorded.</div></Empty>
+          <EmptyState icon={<CheckCircle2 size={26} />}>No errors recorded.</EmptyState>
         ) : (
           <RowCard>
             {errorsByUser.map(group => (
@@ -402,7 +393,7 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
           <CountPill>{neverSignedIn.length}</CountPill>
         </SectionHeader>
         {neverSignedIn.length === 0 ? (
-          <Empty><CheckCircle2 size={26} /><div>Every user has signed in at least once.</div></Empty>
+          <EmptyState icon={<CheckCircle2 size={26} />}>Every user has signed in at least once.</EmptyState>
         ) : (
           <RowCard>
             {neverSignedIn.map(p => (

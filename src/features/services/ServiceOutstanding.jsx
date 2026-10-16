@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { AlertCircle, Download, Search, TrendingDown, Wallet } from 'lucide-react';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 import { fetchInvoices, fetchServiceIncome } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -189,12 +194,6 @@ const Td = styled.td`
   font-size: 0.85rem;
 `;
 
-const EmptyState = styled.div`
-  text-align: center;
-  padding: 2rem;
-  color: ${({ theme }) => theme.colors.text.muted};
-`;
-
 /* The <Table> hides itself below 768px, so each table needs a card layout
    behind it or the data simply disappears on a phone. */
 const MobileList = styled.div`
@@ -343,7 +342,15 @@ const ServiceOutstanding = () => {
     );
   };
 
-  if (loading) return <EmptyState>Loading outstanding balances...</EmptyState>;
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading outstanding balances">
+        <Skeleton height="2rem" width="35%" />
+        <SkeletonCards count={3} />
+        <SkeletonTable rows={5} cols={7} />
+      </SkeletonScreen>
+    );
+  }
 
   return (
     <Container>

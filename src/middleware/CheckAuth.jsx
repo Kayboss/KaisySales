@@ -6,29 +6,48 @@ import OnboardingWizard from '../features/auth/OnboardingWizard';
 import styled from 'styled-components';
 import { Ban, Crown } from 'lucide-react';
 import { isSubscriptionExpired } from '../utils/subscriptionLimits';
+import Skeleton from '../components/ui/Skeleton';
+import SkeletonCards from '../components/ui/SkeletonCards';
+import SkeletonTable from '../components/ui/SkeletonTable';
+import SkeletonChart from '../components/ui/SkeletonChart';
+import SkeletonScreen from '../components/ui/SkeletonScreen';
 
-const LoaderContainer = styled.div`
-  height: 100vh;
+/* The old bootstrap screen was a centred spinner on a cream page, so the whole
+   shell appeared at once when the profile resolved. This mirrors the real
+   Layout (280px sidebar + padded main) with grey bones, so the sign-in lands on
+   a screen the same shape as the one it is about to replace. */
+const AppShell = styled.div`
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: #FCF9F3;
-  color: #6F240A;
-  gap: 1.5rem;
-  font-family: 'Manrope', sans-serif;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background-color: ${({ theme }) => theme.colors.background.main};
 `;
 
-const Spinner = styled.div`
-  width: 48px;
-  height: 48px;
-  border: 4px solid rgba(111, 36, 10, 0.1);
-  border-top-color: #6F240A;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+const ShellSidebar = styled.div`
+  width: 280px;
+  flex-shrink: 0;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: ${({ theme }) => (theme.mode === 'dark' ? '#232326' : '#E4E4E7')};
 
-  @keyframes spin {
-    to { transform: rotate(360deg); }
+  @media (max-width: 768px) {
+    display: none;
+  }
+`;
+
+const ShellMain = styled.div`
+  flex: 1;
+  padding: 3rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+
+  @media (max-width: 768px) {
+    padding: 1.5rem;
+    padding-top: 5rem;
   }
 `;
 
@@ -65,18 +84,27 @@ const CheckAuth = () => {
     }
   }, [isAuthenticated, user?.uid, loadSettings, clearSettings]);
 
-  // Show a premium loading state while auth initializes, profile loads, or onboarding status is undetermined
+  // Show a skeleton of the app shell while auth initializes, the profile loads,
+  // or onboarding status is still undetermined.
   if (!isInitialized || (isAuthenticated && (isLoading || isOnboarded === null))) {
     return (
-      <LoaderContainer>
-        <Spinner />
-<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, letterSpacing: '1px' }}>
-  <span style={{ fontFamily: "'Tango Sans', sans-serif" }}>KaisySales</span>
-</div>
-        <p style={{ fontSize: '0.9rem', color: '#55423D', fontWeight: 600 }}>
-          Weaving your digital workshop...
-        </p>
-      </LoaderContainer>
+      <AppShell>
+        <ShellSidebar>
+          <Skeleton height="1.5rem" width="55%" />
+          <div style={{ height: '1.5rem' }} />
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} height="2.25rem" $radius="8px" />
+          ))}
+        </ShellSidebar>
+        <ShellMain>
+          <SkeletonScreen label="Loading KaisySales">
+            <Skeleton height="2rem" width="40%" />
+            <SkeletonCards count={4} />
+            <SkeletonChart />
+            <SkeletonTable rows={4} cols={4} />
+          </SkeletonScreen>
+        </ShellMain>
+      </AppShell>
     );
   }
 

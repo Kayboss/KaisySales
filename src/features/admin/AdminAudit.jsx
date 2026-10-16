@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { PlusCircle, Pencil, Trash2, Clock, User, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { fetchUserActions } from '../../services/api';
+import EmptyState from '../../components/ui/EmptyState';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 
 const Toolbar = styled.div`
   display: flex;
@@ -146,12 +149,6 @@ const Details = styled.pre`
   max-height: 220px;
 `;
 
-const Empty = styled.div`
-  text-align: center;
-  padding: 3rem;
-  color: #89726C;
-`;
-
 const ACTION_LABEL = { insert: 'Created', update: 'Updated', delete: 'Deleted' };
 const FILTERS = [
   { id: 'all', label: 'All' },
@@ -211,7 +208,11 @@ const AdminAudit = ({ onOpenUser }) => {
     return hay.includes(query.trim().toLowerCase());
   });
 
-  if (loading) return <p style={{ color: '#89726C' }}>Loading audit trail...</p>;
+  if (loading) return (
+    <SkeletonScreen label="Loading audit trail">
+      <SkeletonTable rows={8} cols={4} />
+    </SkeletonScreen>
+  );
 
   return (
     <>
@@ -230,10 +231,7 @@ const AdminAudit = ({ onOpenUser }) => {
 
       <Feed>
         {filtered.length === 0 ? (
-          <Empty>
-            <History size={28} style={{ marginBottom: '0.5rem' }} />
-            <div>No audit entries match.</div>
-          </Empty>
+          <EmptyState icon={<History size={28} />}>No audit entries match.</EmptyState>
         ) : (
           filtered.map(a => {
             const open = expanded === a.id;

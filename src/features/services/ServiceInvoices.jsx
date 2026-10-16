@@ -5,6 +5,11 @@ import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircl
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import IconAction from '../../components/ui/IconAction';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
 import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchCustomers, createSale, deleteSale, createServiceIncome, deleteServiceIncome } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -398,15 +403,6 @@ const PageButton = styled.button`
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 `;
 
-const EmptyState = styled.div`
-  padding: 3rem 1.5rem;
-  text-align: center;
-  background: white;
-  border: 1px dashed #D0C8C4;
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  color: #55423D;
-`;
-
 const ServiceInvoices = () => {
   const { currency, subscriptionPlan } = useSettingsStore();
   const { businessName, phone: businessPhone, location: businessLocation } = useSettingsStore();
@@ -414,6 +410,7 @@ const ServiceInvoices = () => {
   const location = useLocation();
   const user = useAuthStore(s => s.user);
   const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -536,7 +533,7 @@ const ServiceInvoices = () => {
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData().finally(() => setLoading(false)); }, []);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -886,6 +883,17 @@ const ServiceInvoices = () => {
     setFormData({ customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0, notes: '' });
   };
 
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading invoices">
+        <Skeleton height="2rem" width="40%" />
+        {viewMode === 'list'
+          ? <SkeletonTable rows={6} cols={6} />
+          : <SkeletonCards count={6} $min="300px" />}
+      </SkeletonScreen>
+    );
+  }
+
   return (
     <div>
       <Header>
@@ -1084,11 +1092,11 @@ const ServiceInvoices = () => {
       )}
 
       {filteredInvoices.length === 0 ? (
-        <EmptyState>
-          <p style={{ fontWeight: 700, color: '#1C1C18', margin: '0 0 0.35rem' }}>No invoices found</p>
-          <p style={{ margin: 0, fontSize: '0.9rem' }}>
+        <EmptyState $boxed>
+          <span style={{ display: 'block', fontWeight: 700, color: '#1C1C18', marginBottom: '0.35rem' }}>No invoices found</span>
+          <span style={{ display: 'block', fontSize: '0.9rem' }}>
             {invoices.length === 0 ? 'Create your first invoice to get started.' : 'Try a different search or status filter.'}
-          </p>
+          </span>
         </EmptyState>
       ) : viewMode === 'list' ? (
         <ListCard>

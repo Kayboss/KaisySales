@@ -10,6 +10,12 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonChart from '../../components/ui/SkeletonChart';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 import { fetchServiceIncome, fetchExpenses } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -277,15 +283,6 @@ const Badge = styled.span`
   font-weight: 700;
 `;
 
-const EmptyState = styled.div`
-  background: ${({ theme }) => theme.colors.background.surface};
-  border: 1px dashed ${({ theme }) => theme.colors.outlineVariant};
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
-  padding: 3rem 1.5rem;
-  text-align: center;
-  color: ${({ theme }) => theme.colors.text.muted};
-`;
-
 const Pager = styled.div`
   display: flex;
   align-items: center;
@@ -429,7 +426,14 @@ const RevenueHistory = () => {
   };
 
   if (loading) {
-    return <EmptyState>Loading revenue history...</EmptyState>;
+    return (
+      <SkeletonScreen label="Loading revenue history">
+        <Skeleton height="2rem" width="40%" />
+        <SkeletonCards count={4} />
+        <SkeletonChart />
+        <SkeletonTable rows={6} cols={7} />
+      </SkeletonScreen>
+    );
   }
 
   return (
@@ -517,7 +521,7 @@ const RevenueHistory = () => {
       )}
 
       {visible.length === 0 ? (
-        <EmptyState>
+        <EmptyState $boxed>
           {searchTerm
             ? 'No payments match that search in these months.'
             : 'No payments recorded in these months yet. Add income from your dashboard and it will appear here.'}

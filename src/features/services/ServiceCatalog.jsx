@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Tag, Edit2, Trash2, Check, X, DollarSign, Save } from 'lucide-react';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 import { fetchServices, createService, updateService, deleteService, fetchCategories } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -194,13 +198,6 @@ const Divider = styled.div`
   }
 `;
 
-const EmptyState = styled.p`
-  color: ${({ theme }) => theme.colors.text.muted};
-  font-size: 0.9rem;
-  text-align: center;
-  padding: 2rem;
-`;
-
 const Hint = styled.p`
   color: ${({ theme }) => theme.colors.text.muted};
   font-size: 0.85rem;
@@ -222,6 +219,7 @@ const ServiceCatalog = () => {
   const settings = useSettingsStore();
   const { user } = useAuthStore();
   const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('');
@@ -247,7 +245,7 @@ const ServiceCatalog = () => {
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load().finally(() => setLoading(false)); }, []);
 
   const handleSaveDefaults = async () => {
     if (!user) return;
@@ -326,6 +324,18 @@ const ServiceCatalog = () => {
       setDeleting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <Card>
+        <SkeletonScreen label="Loading service catalog">
+          <Skeleton height="2rem" width="45%" />
+          <Skeleton height="6.5rem" width="100%" radius="12px" />
+          <SkeletonTable rows={4} cols={3} />
+        </SkeletonScreen>
+      </Card>
+    );
+  }
 
   return (
     <Card>

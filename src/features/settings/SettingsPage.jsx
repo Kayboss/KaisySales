@@ -5,6 +5,9 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { fetchCategories, createCategory, updateCategory, deleteCategory, uploadBusinessLogo, deleteBusinessLogo } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
 import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, DollarSign, Upload, FileUp } from 'lucide-react';
 import ServiceCatalog from '../services/ServiceCatalog';
 import ImportData from './ImportData';
@@ -204,13 +207,6 @@ const EditInput = styled.input`
   min-width: 0;
 `;
 
-const EmptyState = styled.p`
-  color: ${({ theme }) => theme.colors.text.muted};
-  font-size: 0.9rem;
-  text-align: center;
-  padding: 2rem;
-`;
-
 const ColorGrid = styled.div`
   display: flex;
   gap: 0.75rem;
@@ -312,6 +308,7 @@ const SettingsPage = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [catTab, setCatTab] = useState('income');
   const [newCatName, setNewCatName] = useState('');
   const [editingCatId, setEditingCatId] = useState(null);
@@ -331,7 +328,7 @@ const SettingsPage = () => {
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { loadCategories(); }, []);
+  useEffect(() => { loadCategories().finally(() => setCategoriesLoading(false)); }, []);
 
   const filteredCategories = categories.filter(c => (c.type || 'income') === catTab);
 
@@ -697,8 +694,16 @@ const SettingsPage = () => {
           >{addingCat ? 'Adding...' : '+ Add'}</button>
         </div>
 
-        {filteredCategories.length === 0 ? (
-          <EmptyState>No {catTab} categories yet. Add one above.</EmptyState>
+        {categoriesLoading ? (
+          <SkeletonScreen label="Loading categories">
+            <CatList>
+              <Skeleton height="2.75rem" />
+              <Skeleton height="2.75rem" />
+              <Skeleton height="2.75rem" />
+            </CatList>
+          </SkeletonScreen>
+        ) : filteredCategories.length === 0 ? (
+          <EmptyState $compact>No {catTab} categories yet. Add one above.</EmptyState>
         ) : (
           <CatList>
             {filteredCategories.map(cat => (

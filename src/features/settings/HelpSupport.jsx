@@ -3,6 +3,10 @@ import { useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { LifeBuoy, Send, CheckCircle, MessageSquare, Clock } from 'lucide-react';
 import { createSupportRequest, fetchMySupportNotes } from '../../services/api';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonText from '../../components/ui/SkeletonText';
 
 const CATEGORIES = [
   { value: 'help', label: "I'm stuck and need help" },
@@ -186,18 +190,12 @@ const Badge = styled.span`
   color: ${props => props.$tone === 'resolved' ? '#25432F' : '#875200'};
 `;
 
-const Empty = styled.div`
-  color: ${({ theme }) => theme.colors.text.muted};
-  font-size: 0.88rem;
-  text-align: center;
-  padding: 2rem 1rem;
-`;
-
 const HelpSupport = () => {
   const location = useLocation();
   const [category, setCategory] = useState('help');
   const [message, setMessage] = useState(location.state?.prefill || '');
   const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
@@ -213,7 +211,9 @@ const HelpSupport = () => {
 
   useEffect(() => {
     let active = true;
-    loadNotes().then(data => { if (active) setNotes(data); });
+    loadNotes()
+      .then(data => { if (active) setNotes(data); })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
 
@@ -293,8 +293,27 @@ const HelpSupport = () => {
 
         <Card>
           <CardTitle><MessageSquare size={18} /> Your recent reports</CardTitle>
-          {notes.length === 0 ? (
-            <Empty>You have not reported anything yet.</Empty>
+          {loading ? (
+            <SkeletonScreen label="Loading your reports">
+              <div>
+                <Note>
+                  <NoteHeader>
+                    <Skeleton width="30%" height="0.7rem" />
+                    <Skeleton width="25%" height="0.7rem" />
+                  </NoteHeader>
+                  <SkeletonText lines={2} lastWidth="70%" />
+                </Note>
+                <Note>
+                  <NoteHeader>
+                    <Skeleton width="30%" height="0.7rem" />
+                    <Skeleton width="25%" height="0.7rem" />
+                  </NoteHeader>
+                  <SkeletonText lines={3} lastWidth="50%" />
+                </Note>
+              </div>
+            </SkeletonScreen>
+          ) : notes.length === 0 ? (
+            <EmptyState $compact>You have not reported anything yet.</EmptyState>
           ) : (
             notes.slice(0, 20).map(n => (
               <Note key={n.id} $fromAdmin={n.isFromAdmin}>

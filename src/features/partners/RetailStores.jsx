@@ -7,6 +7,9 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { fetchStores, createStore, updateStore, deleteStore, fetchInvoices } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrency } from '../../utils/currency';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
 
 const Header = styled.div`
   display: flex;
@@ -202,6 +205,8 @@ const RetailStores = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Cleared by the first fetch only — loadData also runs after save/delete, where a skeleton flash would be wrong.
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     name: '', type: '', location: '', phone: '', contactName: ''
@@ -230,7 +235,7 @@ const RetailStores = () => {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData();
+    loadData().finally(() => setLoading(false));
   }, []);
 
   const handleSave = async (e) => {
@@ -318,6 +323,16 @@ const RetailStores = () => {
     store.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     store.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading retail stores">
+        <Skeleton height="2rem" width="35%" />
+        <Skeleton height="3rem" width="55%" />
+        <SkeletonCards count={6} $min="320px" />
+      </SkeletonScreen>
+    );
+  }
 
   return (
     <div>

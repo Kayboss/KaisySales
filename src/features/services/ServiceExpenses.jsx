@@ -3,6 +3,11 @@ import styled from 'styled-components';
 import { Plus, Edit2, Trash2, Calendar } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchServiceIncome, fetchCategories, createCategory, fetchCustomers } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 import { formatCurrency } from '../../utils/currency';
@@ -176,12 +181,6 @@ const Checkbox = styled.label`
   cursor: pointer;
 `;
 
-const EmptyState = styled.div`
-  text-align: center;
-  padding: 3rem;
-  color: ${({ theme }) => theme.colors.text.muted};
-`;
-
 const StatRow = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -231,6 +230,7 @@ const ServiceExpenses = () => {
   const [serviceIncome, setServiceIncome] = useState([]);
   const [expenseCategories, setExpenseCategories] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
@@ -254,7 +254,7 @@ const ServiceExpenses = () => {
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load().finally(() => setLoading(false)); }, []);
 
   const openAdd = () => {
     setEditId(null);
@@ -374,6 +374,16 @@ const ServiceExpenses = () => {
   // eslint-disable-next-line react-hooks/purity
   const now = useMemo(() => Date.now(), []);
   const upcomingRenewals = expenses.filter(e => e.renewalDate && new Date(e.renewalDate) >= new Date() && new Date(e.renewalDate) <= new Date(now + 30 * 24 * 60 * 60 * 1000));
+
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading expenses">
+        <Skeleton height="2rem" width="35%" />
+        <SkeletonCards count={4} />
+        <SkeletonTable rows={6} cols={8} />
+      </SkeletonScreen>
+    );
+  }
 
   return (
     <div>

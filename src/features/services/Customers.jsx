@@ -4,6 +4,10 @@ import styled from 'styled-components';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 import { fetchCustomers, createCustomer, updateCustomer, deleteCustomer } from '../../services/api';
 import AssistantDoorway from '../../components/assistant/AssistantDoorway';
 import { sanitizeInput } from '../../utils/sanitize';
@@ -208,13 +212,6 @@ const Textarea = styled.textarea`
   font-family: inherit;
 `;
 
-const EmptyState = styled.div`
-  text-align: center;
-  padding: 3rem;
-  color: ${({ theme }) => theme.colors.text.muted};
-  font-size: 0.95rem;
-`;
-
 const PAGE_SIZE = 20;
 
 const initials = (name) => {
@@ -228,6 +225,7 @@ const initials = (name) => {
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
@@ -243,7 +241,7 @@ const Customers = () => {
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load().finally(() => setLoading(false)); }, []);
 
   const openAdd = () => {
     setEditId(null);
@@ -303,6 +301,15 @@ const Customers = () => {
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading customers">
+        <Skeleton height="2rem" width="35%" />
+        <SkeletonTable rows={6} cols={5} />
+      </SkeletonScreen>
+    );
+  }
 
   return (
     <div>

@@ -4,6 +4,12 @@ import { Plus, Edit2, Trash2, RefreshCw, DollarSign } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonChart from '../../components/ui/SkeletonChart';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 import { fetchServiceIncome, createServiceIncome, updateServiceIncome, deleteServiceIncome, fetchRecurringIncome, createRecurringIncome, updateRecurringIncome, deleteRecurringIncome, fetchCustomers, fetchExpenses, fetchCategories, createCategory, fetchServices } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 import { formatCurrency } from '../../utils/currency';
@@ -180,12 +186,6 @@ const Select = styled.select`
   background: white;
 `;
 
-const EmptyState = styled.div`
-  text-align: center;
-  padding: 3rem;
-  color: ${({ theme }) => theme.colors.text.muted};
-`;
-
 const StatRow = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -255,6 +255,7 @@ const IncomeTracking = () => {
   const [expenses, setExpenses] = useState([]);
   const [incomeCategories, setIncomeCategories] = useState([]);
   const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
@@ -288,7 +289,7 @@ const IncomeTracking = () => {
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load().finally(() => setLoading(false)); }, []);
 
   const handleCreateNewCat = async () => {
     if (!newCatName.trim()) return;
@@ -440,6 +441,17 @@ const IncomeTracking = () => {
     Income: monthlyData[key].income,
     Expenses: monthlyData[key].expenses,
   }));
+
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading income">
+        <Skeleton height="2rem" width="35%" />
+        <SkeletonCards count={4} />
+        <SkeletonChart />
+        <SkeletonTable rows={6} cols={9} />
+      </SkeletonScreen>
+    );
+  }
 
   return (
     <div>

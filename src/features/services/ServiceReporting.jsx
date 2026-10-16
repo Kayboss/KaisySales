@@ -2,6 +2,12 @@ import { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { Download, DollarSign, TrendingUp, TrendingDown, PieChart, Users, Search } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart as RPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import EmptyState from '../../components/ui/EmptyState';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonChart from '../../components/ui/SkeletonChart';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import SkeletonTable from '../../components/ui/SkeletonTable';
 import { fetchServiceIncome, fetchRecurringIncome, fetchExpenses, fetchCustomers, fetchInvoices } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { formatCurrency, parseAmount } from '../../utils/currency';
@@ -114,12 +120,6 @@ const Td = styled.td`
   padding: 0.75rem 0.5rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   font-size: 0.85rem;
-`;
-
-const EmptyState = styled.div`
-  text-align: center;
-  padding: 2rem;
-  color: ${({ theme }) => theme.colors.text.muted};
 `;
 
 const DateRange = styled.div`
@@ -276,6 +276,7 @@ const tooltipStyle = { borderRadius: 8, border: '1px solid #E8E5DF', fontSize: 1
 
 const ServiceReporting = () => {
   const [tab, setTab] = useState('overview');
+  const [loading, setLoading] = useState(true);
   const [income, setIncome] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -295,7 +296,7 @@ const ServiceReporting = () => {
       fetchCustomers(), fetchInvoices(),
     ]).then(([i, , e, c, inv]) => {
       setIncome(i); setExpenses(e); setCustomers(c); setInvoices(inv);
-    });
+    }).finally(() => setLoading(false));
   }, []);
 
   const applyPreset = (key) => {
@@ -879,6 +880,17 @@ const ServiceReporting = () => {
       </>
     );
   };
+
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading reports">
+        <Skeleton height="2rem" width="30%" />
+        <SkeletonCards count={4} />
+        <SkeletonChart />
+        <SkeletonTable rows={6} cols={7} />
+      </SkeletonScreen>
+    );
+  }
 
   return (
     <Container>

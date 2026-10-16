@@ -5,6 +5,10 @@ import { fetchUsersWithStats, fetchSubscriptionPlans, assignSubscription, cancel
 import { useAuthStore } from '../../store/authStore';
 import { formatCurrency } from '../../utils/currency';
 import { useSettingsStore } from '../../store/settingsStore';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonTable from '../../components/ui/SkeletonTable';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import EmptyState from '../../components/ui/EmptyState';
 
 const TabRow = styled.div`
   display: flex;
@@ -137,11 +141,7 @@ const ActionBtn = styled.button`
   }
 `;
 
-const Empty = styled.div`
-  text-align: center;
-  padding: 3rem;
-  color: #89726C;
-`;
+
 
 const MobileCardGrid = styled.div`
   display: none;
@@ -372,6 +372,7 @@ const AdminSubscriptions = () => {
   const [cancellingId, setCancellingId] = useState(null);
   const [confirmingId, setConfirmingId] = useState(null);
   const { user } = useAuthStore();
+  const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     const [u, p, pl] = await Promise.all([
@@ -385,7 +386,7 @@ const AdminSubscriptions = () => {
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData().finally(() => setLoading(false)); }, []);
 
   const handleAssign = async () => {
     if (!assignTarget || assigning) return;
@@ -461,6 +462,18 @@ const AdminSubscriptions = () => {
     ],
   };
 
+  if (loading) return (
+    <SkeletonScreen label="Loading subscriptions">
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        <Skeleton width="4rem" height="2rem" radius="8px" />
+        <Skeleton width="5rem" height="2rem" radius="8px" />
+        <Skeleton width="4rem" height="2rem" radius="8px" />
+      </div>
+      <Skeleton width="50%" height="3rem" radius="8px" style={{ marginBottom: '1rem' }} />
+      <SkeletonTable rows={6} cols={5} />
+    </SkeletonScreen>
+  );
+
   return (
     <div>
       <TabRow>
@@ -511,7 +524,7 @@ const AdminSubscriptions = () => {
       {subTab === 'payments' && (
         <>
           {payments.length === 0 ? (
-            <Empty>No payments recorded yet.</Empty>
+            <EmptyState icon={<DollarSign size={20} />} $compact>No payments recorded yet.</EmptyState>
           ) : (
             <PaymentFeed>
               {payments.map(p => (
@@ -549,7 +562,7 @@ const AdminSubscriptions = () => {
           </SearchBar>
 
           {filtered.length === 0 ? (
-            <Empty>{search ? 'No users match your search.' : 'No users found.'}</Empty>
+            <EmptyState icon={<Search size={20} />} $compact>{search ? 'No users match your search.' : 'No users found.'}</EmptyState>
           ) : (
             <>
               <TableWrapper>

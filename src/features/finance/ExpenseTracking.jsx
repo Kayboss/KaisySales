@@ -9,6 +9,10 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrency, formatCurrencyShort, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 import IconAction from '../../components/ui/IconAction';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonTable from '../../components/ui/SkeletonTable';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
 
 const Header = styled.div`
   display: flex;
@@ -344,6 +348,8 @@ const ExpenseTracking = () => {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [formError, setFormError] = useState('');
+  // Cleared by the first fetch only — loadData also runs after save/delete, where a skeleton flash would be wrong.
+  const [loading, setLoading] = useState(true);
 
   const emptyForm = { title: '', category: '', quantity: 1, unitPrice: '', totalAmount: '', date: '', newCategory: '' };
 
@@ -383,7 +389,7 @@ const ExpenseTracking = () => {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData();
+    loadData().finally(() => setLoading(false));
   }, []);
 
   const handleSave = async (e) => {
@@ -523,6 +529,16 @@ const ExpenseTracking = () => {
     };
     fetchInvoiceCount();
   }, []);
+
+  if (loading) {
+    return (
+      <SkeletonScreen label="Loading expenses">
+        <Skeleton height="2rem" width="35%" />
+        <SkeletonCards count={3} />
+        <SkeletonTable rows={6} cols={3} />
+      </SkeletonScreen>
+    );
+  }
 
   return (
     <div>

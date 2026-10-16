@@ -13,6 +13,11 @@ import AssistantDoorway from '../../components/assistant/AssistantDoorway';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
 import { formatCurrency, formatCurrencyShort, parseAmount } from '../../utils/currency';
+import Skeleton from '../../components/ui/Skeleton';
+import SkeletonCards from '../../components/ui/SkeletonCards';
+import SkeletonTable from '../../components/ui/SkeletonTable';
+import SkeletonScreen from '../../components/ui/SkeletonScreen';
+import EmptyState from '../../components/ui/EmptyState';
 
 const DAYS_PER_PAGE = 10;
 const PAGE_SIZE = 20;
@@ -257,15 +262,6 @@ const Badge = styled.span`
   font-weight: 700;
 `;
 
-const EmptyState = styled.div`
-  background: white;
-  border: 1px dashed ${({ theme }) => theme.colors.outlineVariant};
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
-  padding: 3rem 1.5rem;
-  text-align: center;
-  color: ${({ theme }) => theme.colors.text.muted};
-`;
-
 const Pager = styled.div`
   display: flex;
   align-items: center;
@@ -468,7 +464,13 @@ const SalesHistory = () => {
     : 'all recorded days';
 
   if (loading) {
-    return <div style={{ color: '#55423D' }}>Loading sales history...</div>;
+    return (
+      <SkeletonScreen label="Loading sales history">
+        <Skeleton height="2rem" width="35%" />
+        <SkeletonCards count={4} />
+        <SkeletonTable rows={6} cols={8} />
+      </SkeletonScreen>
+    );
   }
 
   return (
@@ -551,7 +553,7 @@ const SalesHistory = () => {
       </StatsGrid>
 
       {days.length === 0 ? (
-        <EmptyState>
+        <EmptyState $boxed>
           <Calendar size={32} style={{ color: '#D0C8C4' }} />
           <p style={{ fontWeight: 700, color: '#55423D' }}>No sales in this range</p>
           <p style={{ fontSize: '0.85rem' }}>Try a wider date range, or record a sale on the Daily Sales page.</p>
