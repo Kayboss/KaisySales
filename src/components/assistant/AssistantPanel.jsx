@@ -246,7 +246,7 @@ const AssistantPanel = () => {
               ? NOT_CONFIGURED_MESSAGE
               : parsed.reason === 'unauthorized'
                 ? 'Your session has expired. Sign in again and I can record that for you.'
-                : 'I couldn\u2019t reach the record service just now. I can still answer questions about your business.';
+                : 'Something went wrong on the record service just now. I can still answer questions about your business.';
           setMessages((prev) => [...prev, { role: 'assistant', text }]);
           return;
         }

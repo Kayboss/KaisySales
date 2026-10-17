@@ -184,7 +184,10 @@ serve(async (req) => {
     });
   }
 
-  const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
+  // gemini-2.5-flash answers 404 NOT_FOUND for keys created after its retirement
+  // ("no longer available to new users"), which surfaces to the user as a dead
+  // panel, so the default tracks the current Flash. Override with GEMINI_MODEL.
+  const model = Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
   const prompt = buildPrompt({ ...body, text });
 
   try {
