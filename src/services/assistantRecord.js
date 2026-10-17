@@ -9,6 +9,7 @@ import {
 } from './api';
 import { applyStockDelta } from '../utils/inventory';
 import { buildInventoryItemPayload, matchInventoryItem, summariseInventoryItem } from '../utils/assistant/recordPayload';
+import { fastParse } from '../utils/assistant/fastParse';
 
 /**
  * Network side of the "talk to record" assistant.
@@ -51,6 +52,16 @@ const accessToken = async () => {
  * >}
  */
 export const parseSentence = async ({ text, mode, currency, categories, items, merge }) => {
+  // A follow-up answer is semantic work — echoing the held fields back and
+  // folding a reply onto them — so it always goes to the model. A fresh
+  // sentence is tried locally first: the shapes people actually say ("paid 800
+  // for fuel") are free, instant, offline, and survive the model being
+  // unconfigured or slow. Anything the fast path declines falls through.
+  if (!merge) {
+    const local = fastParse(text, { mode, categories });
+    if (local) return { ok: true, ...local, source: 'local', clarify: null };
+  }
+
   const url = fnUrl();
   if (!isSupabaseConfigured || !url) return { ok: false, reason: 'not_configured' };
 
@@ -114,6 +125,7 @@ export const parseSentence = async ({ text, mode, currency, categories, items, m
       confidence: typeof parsed?.confidence === 'string' ? parsed.confidence : 'medium',
       fields: parsed?.fields && typeof parsed.fields === 'object' ? parsed.fields : {},
       clarify: typeof parsed?.clarify === 'string' && parsed.clarify ? parsed.clarify : null,
+      source: 'model',
     };
   } catch {
     return { ok: false, reason: 'invalid' };

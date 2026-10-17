@@ -53,6 +53,7 @@ const Panel = styled.aside`
 `;
 
 const Header = styled.div`
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -81,6 +82,13 @@ const Close = styled.button`
 
 const Messages = styled.div`
   flex: 1;
+  /* min-height: 0 is load-bearing. A flex item's automatic minimum size is its
+     content, so without it this scroll area grows to fit a tall confirmation
+     card instead of scrolling it — the panel (overflow: hidden) then clips the
+     overflow, the Save buttons and composer slide out of reach, and on a phone
+     the scroll simply stops working. */
+  min-height: 0;
+  overscroll-behavior: contain;
   overflow-y: auto;
   padding: 1rem;
   display: flex;
@@ -120,6 +128,7 @@ const Thinking = styled.div`
 `;
 
 const Suggestions = styled.div`
+  flex-shrink: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
@@ -144,6 +153,7 @@ const Chip = styled.button`
 `;
 
 const PendingRow = styled.div`
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -157,12 +167,15 @@ const PendingRow = styled.div`
 `;
 
 const Composer = styled.form`
+  flex-shrink: 0;
   display: flex;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-top: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   background: ${({ theme }) => theme.colors.background.surface};
-`;const Input = styled.input`
+`;
+
+const Input = styled.input`
   flex: 1;
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   border-radius: ${({ theme }) => theme.borderRadius.md};
@@ -459,7 +472,12 @@ const AssistantPanel = () => {
           input: q,
           kind: 'record',
           recordType: parsed.recordType,
-          parsed: { recordType: parsed.recordType, confidence: parsed.confidence, fields: parsed.fields },
+          parsed: {
+            recordType: parsed.recordType,
+            confidence: parsed.confidence,
+            fields: parsed.fields,
+            source: parsed.source || 'model',
+          },
         });
 
         presentCard({
