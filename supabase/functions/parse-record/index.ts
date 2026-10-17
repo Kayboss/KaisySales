@@ -59,6 +59,13 @@ const FEW_SHOT: Array<[string, string]> = [
     "sold 2 gallons of oil to Mama Ada for 180",
     `{"kind":"record","recordType":"sale","confidence":"high","fields":{"item":"Oil","quantity":2,"unitPrice":90,"amount":180,"category":"","date":null,"paymentMethod":"cash"},"clarify":null}`,
   ],
+  // From a real feedback='down' row (2026-10-17): the user typed this meaning a
+  // cost and the model answered service_income, because in "services" mode a bare
+  // amount reads as money in. It is money out unless a verb says otherwise.
+  [
+    "39.00 for sticker printing",
+    `{"kind":"record","recordType":"expense","confidence":"medium","fields":{"title":"Sticker printing","amount":39,"quantity":1,"unitPrice":39,"category":"Printing","date":null},"clarify":null}`,
+  ],
 ];
 
 const SYSTEM_PROMPT = `You turn one sentence a small African business owner typed into structured JSON. You are a parser, not an adviser.
@@ -72,6 +79,7 @@ STRICT RULES
   * goods SOLD to someone -> "sale" (fields: item, quantity, unitPrice, amount, category, date, paymentMethod)
   * money the business EARNED from a client -> "service_income" (fields: client_name, amount, category, date, notes)
 - In mode="retail" never produce service_income. In mode="services" prefer service_income for money in and never produce sale.
+- A sentence that is only an amount and a thing ("39 for sticker printing", "120 on fuel") is money PAID OUT -> "expense". Only a verb saying the money came IN (sold, received, earned, "paid me") makes it money in.
 - Amounts: plain numbers, no currency symbols, no commas. "8k" -> 8000. Total amount goes in "amount"; per-unit in "unitPrice"; compute whichever is missing.
 - quantity defaults to 1. unitPrice defaults to amount/quantity when not stated.
 - category: pick the closest from the provided category list, else "" (never invent a category when a list is given).
