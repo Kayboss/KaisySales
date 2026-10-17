@@ -17,7 +17,8 @@
     "test:authz": "node scripts/test-authz.mjs",
     "verify": "npm run lint && npm test && npm run audit && npm run secrets && npm run build && npm run scan:dist",
     "verify:full": "npm run verify && npm run test:authz",
-    "release": "npm run verify && vercel --prod --yes"
+    "check:migrations": "node scripts/check-migrations.mjs",
+    "release": "npm run verify && node scripts/check-migrations.mjs && vercel --prod --yes"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",
