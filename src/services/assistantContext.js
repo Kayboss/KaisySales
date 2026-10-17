@@ -1,4 +1,4 @@
-import { fetchSales, fetchServiceIncome, fetchExpenses, fetchInventory, fetchCustomers, fetchRecurringIncome, fetchInvoices } from './api';
+import { fetchSales, fetchServiceIncome, fetchExpenses, fetchInventory, fetchCustomers, fetchRecurringIncome, fetchInvoices, fetchCategories } from './api';
 import { useSettingsStore } from '../store/settingsStore';
 import { buildStatsByScope, buildProjection } from '../utils/assistant/stats';
 
@@ -12,7 +12,7 @@ export const buildAssistantContext = async () => {
   const { businessType, currency, businessName } = useSettingsStore.getState();
   const mode = businessType === 'services' ? 'services' : 'retail';
 
-  const [sales, serviceIncome, expenses, inventory, customers, recurring, invoices] = await Promise.all([
+  const [sales, serviceIncome, expenses, inventory, customers, recurring, invoices, expenseCategories, incomeCategories] = await Promise.all([
     mode === 'retail' ? fetchSales() : Promise.resolve([]),
     mode === 'services' ? fetchServiceIncome() : Promise.resolve([]),
     fetchExpenses(),
@@ -20,6 +20,8 @@ export const buildAssistantContext = async () => {
     mode === 'services' ? fetchCustomers() : Promise.resolve([]),
     mode === 'services' ? fetchRecurringIncome() : Promise.resolve([]),
     mode === 'services' ? fetchInvoices() : Promise.resolve([]),
+    fetchCategories('expense'),
+    mode === 'services' ? fetchCategories('income') : Promise.resolve([]),
   ]);
 
   const statsByScope = buildStatsByScope({
@@ -34,5 +36,11 @@ export const buildAssistantContext = async () => {
   });
   const projection = buildProjection({ mode, sales, serviceIncome });
 
-  return { mode, currency: currency || 'GHS', businessName: businessName || '', statsByScope, projection };
+  // The parser prompt is given the category list so it reuses the business's own
+  // names instead of inventing one, and the item list so a sale lines up with the
+  // inventory row whose cost and stock must move with it.
+  const categories = [...new Set([...expenseCategories, ...incomeCategories].map((c) => c?.name).filter(Boolean))];
+  const items = inventory.map((item) => item?.name).filter(Boolean);
+
+  return { mode, currency: currency || 'GHS', businessName: businessName || '', statsByScope, projection, categories, items };
 };

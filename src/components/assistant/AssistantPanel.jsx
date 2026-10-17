@@ -2,8 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { Send, X, Sparkles, MessageCircle } from 'lucide-react';
 import { answer, suggestedQuestions } from '../../utils/assistant/engine';
+import { shouldParseSentence } from '../../utils/assistant/route';
+import { buildRecordPayload, RECORD_TYPE_SECTIONS } from '../../utils/assistant/recordPayload';
 import { buildAssistantContext } from '../../services/assistantContext';
+import { parseSentence, logParse, updateParse, saveParsedRecord, NOT_CONFIGURED_MESSAGE } from '../../services/assistantRecord';
 import { useAssistantStore } from '../../store/assistantStore';
+import RecordCard from './RecordCard';
 
 const Fab = styled.button`
   position: fixed;
@@ -107,6 +111,13 @@ const Bubble = styled.div`
       `}
 `;
 
+const Thinking = styled.div`
+  align-self: flex-start;
+  padding: 0 0.25rem;
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  color: ${({ theme }) => theme.colors.text.muted};
+`;
+
 const Suggestions = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -188,23 +199,145 @@ const AssistantPanel = () => {
   const [input, setInput] = useState('');
   const [context, setContext] = useState(null);
   const [ready, setReady] = useState(false);
+  const [thinking, setThinking] = useState(false);
   const [lastAuto, setLastAuto] = useState(null);
   const builtRef = useRef(false);
   const endRef = useRef(null);
 
+  const patchCard = useCallback(
+    (key, patch) =>
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.card && message.card.key === key ? { ...message, card: { ...message.card, ...patch } } : message
+        )
+      ),
+    []
+  );
+
   const ask = useCallback(
-    (question) => {
-      const q = String(question || '').trim();
+    async (raw) => {
+      const q = String(raw || '').trim();
       if (!q) return;
+      setMessages((prev) => [...prev, { role: 'user', text: q }]);
+
       const safeContext = context || { mode: 'retail', currency: 'GHS', statsByScope: {} };
-      const result = answer(q, safeContext);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'user', text: q },
-        { role: 'assistant', text: result.text },
-      ]);
+
+      // A sentence with no number and a question word in it can only be a
+      // question, so it is answered from the on-device stats without a round trip.
+      if (!shouldParseSentence(q)) {
+        const result = answer(q, safeContext);
+        setMessages((prev) => [...prev, { role: 'assistant', text: result.text }]);
+        return;
+      }
+
+      setThinking(true);
+      try {
+        const parsed = await parseSentence({
+          text: q,
+          mode: safeContext.mode,
+          currency: safeContext.currency,
+          categories: safeContext.categories,
+          items: safeContext.items,
+        });
+
+        if (!parsed.ok) {
+          const text =
+            parsed.reason === 'not_configured'
+              ? NOT_CONFIGURED_MESSAGE
+              : parsed.reason === 'unauthorized'
+                ? 'Your session has expired. Sign in again and I can record that for you.'
+                : 'I couldn\u2019t reach the record service just now. I can still answer questions about your business.';
+          setMessages((prev) => [...prev, { role: 'assistant', text }]);
+          return;
+        }
+
+        if (parsed.kind !== 'record' || !parsed.recordType) {
+          const result = answer(q, safeContext);
+          const text = parsed.kind === 'unknown' && parsed.clarify ? parsed.clarify : result.text;
+          setMessages((prev) => [...prev, { role: 'assistant', text }]);
+          return;
+        }
+
+        const built = buildRecordPayload(parsed.recordType, parsed.fields, {
+          mode: safeContext.mode,
+          currency: safeContext.currency,
+        });
+
+        // The attempt is logged either way: a sentence the model got wrong is the
+        // exact material the weekly review turns into a new FEW_SHOT example.
+        const parseId = await logParse({
+          input: q,
+          kind: 'record',
+          recordType: parsed.recordType,
+          parsed: { recordType: parsed.recordType, confidence: parsed.confidence, fields: parsed.fields },
+        });
+
+        if (!built.ok) {
+          setMessages((prev) => [...prev, { role: 'assistant', text: built.error }]);
+          return;
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            card: {
+              key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              parseId,
+              recordType: built.recordType,
+              payload: built.payload,
+              summary: built.summary,
+              confidence: parsed.confidence,
+              status: 'pending',
+            },
+          },
+        ]);
+      } finally {
+        setThinking(false);
+      }
     },
     [context]
+  );
+
+  const handleSaveCard = useCallback(
+    async (card) => {
+      patchCard(card.key, { status: 'saving' });
+      try {
+        const result = await saveParsedRecord({
+          recordType: card.recordType,
+          payload: card.payload,
+        });
+        patchCard(card.key, {
+          status: 'saved',
+          shortfall: result?.shortfall || null,
+          item: card.payload?.item || null,
+        });
+        updateParse(card.parseId, { saved: true, feedback: 'up' });
+        // A saved record is new input for any follow-up question, so rebuild the
+        // stats the engine answers from rather than leaving it a record behind.
+        buildAssistantContext().then(setContext).catch(() => {});
+      } catch (error) {
+        console.error('Failed to save assistant record', error);
+        patchCard(card.key, { status: 'error' });
+      }
+    },
+    [patchCard]
+  );
+
+  const handleDiscardCard = useCallback(
+    (card) => {
+      patchCard(card.key, { status: 'rejected' });
+      updateParse(card.parseId, { feedback: 'down' });
+      const section = RECORD_TYPE_SECTIONS[card.recordType] || 'your records';
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: `No problem \u2014 nothing was saved. You can add it by hand in ${section}, or say it another way.`,
+        },
+      ]);
+    },
+    [patchCard]
   );
 
   const onSubmit = (event) => {
@@ -257,7 +390,7 @@ const AssistantPanel = () => {
 
   useEffect(() => {
     if (endRef.current) endRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages]);
+  }, [messages, thinking]);
 
   if (!open) {
     return (
@@ -269,6 +402,7 @@ const AssistantPanel = () => {
   }
 
   const suggestions = suggestedQuestions(context?.mode || 'retail');
+  const recordExample = context?.mode === 'services' ? 'Received 5,000 from Kwame' : 'Paid 800 for fuel';
 
   return (
     <>
@@ -286,20 +420,29 @@ const AssistantPanel = () => {
         <Messages>
           {messages.length === 0 && (
             <Bubble $assistant>
-              Hi! Ask me about your records in plain language — how much you made, what you're spending on, stock levels, or who still owes you. Everything stays on this device.
+              Hi! Tell me what happened — “paid 800 for fuel” — and I&apos;ll read it back for you to confirm
+              before anything is saved. Or ask about your numbers; those are answered right here on your device.
             </Bubble>
           )}
-          {messages.map((message, index) => (
-            <Bubble key={index} $assistant={message.role === 'assistant'}>
-              {message.text}
-            </Bubble>
-          ))}
+          {messages.map((message, index) =>
+            message.card ? (
+              <RecordCard key={message.card.key} card={message.card} onSave={handleSaveCard} onDiscard={handleDiscardCard} />
+            ) : (
+              <Bubble key={index} $assistant={message.role === 'assistant'}>
+                {message.text}
+              </Bubble>
+            )
+          )}
+          {thinking && <Thinking>Reading your sentence…</Thinking>}
           <div ref={endRef} />
         </Messages>
 
         {messages.length === 0 && (
           <Suggestions>
-            {suggestions.slice(0, 4).map((suggestion) => (
+            <Chip key={recordExample} type="button" onClick={() => ask(recordExample)}>
+              {recordExample}
+            </Chip>
+            {suggestions.slice(0, 3).map((suggestion) => (
               <Chip key={suggestion} type="button" onClick={() => ask(suggestion)}>
                 {suggestion}
               </Chip>
@@ -311,10 +454,10 @@ const AssistantPanel = () => {
           <Input
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder="Ask about your business…"
-            aria-label="Ask the assistant a question"
+            placeholder="Type a record or ask a question…"
+            aria-label="Type a record or a question for the assistant"
           />
-          <SendButton type="submit" disabled={!input.trim()} aria-label="Send question">
+          <SendButton type="submit" disabled={!input.trim()} aria-label="Send to the assistant">
             <Send size={16} />
           </SendButton>
         </Composer>
