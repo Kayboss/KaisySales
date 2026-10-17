@@ -1,4 +1,5 @@
 import { formatCurrency, parseAmount } from '../currency.js';
+import { RECORDING_INTENT_RE } from './route.js';
 
 /**
  * KaisySales assistant engine.
@@ -39,53 +40,99 @@ export const normalizeQuestion = (text) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/**
+ * One walkthrough per screen, keyed on what the person is talking about.
+ *
+ * `modes` matters because the two business modes have different screens: a
+ * services business has no Sales or Inventory, so telling it to tap "Record
+ * sale" would be sending it somewhere that does not exist. The income topic's
+ * pattern also catches "record a sale", because in services mode that is the
+ * same act — money received.
+ */
 const HOWTO_TOPICS = [
   {
     key: 'sales',
+    modes: ['retail'],
     re: /\bsale\b|\bsell\b|record.*sale|selling/,
     text:
       "In Sales, tap 'Record sale', pick the item, set the quantity and price, then save.\n\u2022 Selling an item that matches an inventory name also moves that stock automatically.\n\u2022 Leave the total empty and it is worked out from quantity \u00d7 unit price.",
   },
   {
     key: 'inventory',
+    modes: ['retail'],
     re: /\binventor|\bstock\b|\bitem\b|\bproduct\b|supplier/,
     text:
       'In Inventory, add each product with its name, unit, cost and selling price, and a low-stock level.\n\u2022 Sales link to items by name, spelled the same way.\n\u2022 Import your existing list from Settings \u2192 Import Data.',
   },
   {
     key: 'expenses',
+    modes: ['retail', 'services'],
     re: /\bexpense|\bspend|\bcost\b|\bpay(out|ment)?\b/,
     text:
-      "In the Expenses screen, tap 'Add expense', fill in the amount and category, then save.\n\u2022 Amounts are stored as text, so any format (GHS 800.00 or 800) reads back correctly.\n\u2022 Set 'Is an asset' for things that last more than a year.",
+      "In the Expenses screen, tap 'Add Expense', fill in the amount and category, then save.\n\u2022 Any amount format reads back the same \u2014 \u201cGHS 800.00\u201d or \u201c800\u201d both work.\n\u2022 Set 'Is an asset' for things that last more than a year.",
   },
   {
     key: 'customers',
+    modes: ['retail', 'services'],
     re: /\bcustomer|\bclient\b|\bcontact\b/,
     text:
       'On the Customers page, tap \u2018Add customer\u2019.\n\u2022 Only the name is needed \u2014 email, phone and company are optional and can be filled in later.',
   },
   {
     key: 'income',
-    re: /\bincome\b|\bpay(ment)?\b|\breceiv|\bmoney (\bin|coming)|(input|enter|log|record) (it|this|the (payment|income|sale))\b/,
+    modes: ['services'],
+    re: /\bincome\b|\bpay(ment)?\b|\breceiv|\bmoney (\bin|coming)|(input|enter|log|record) (it|this|the (payment|income|sale))\b|(record|add|enter|log) (an? |one |the |some )?(payment|income|sale|money)\b/,
     text:
       'In Income Tracking, add one-off payments on the Income tab, or ongoing amounts under Recurring.\n\u2022 Net income is worked out as amount minus any platform fee.',
   },
   {
     key: 'invoices',
+    modes: ['retail', 'services'],
     re: /\binvoice\b|\bbill\b|\bbe paid\b|\bmark.*paid/,
     text:
       'Use Invoices to bill a client, then mark it Paid when the money arrives.\n\u2022 Payments link back to the invoice automatically, so balances stay right.',
   },
   {
     key: 'import',
+    modes: ['retail', 'services'],
     re: /\b(import|upload|csv|spreadsheet|migrate)\b|bring (my|in|over).{0,20}(data|records|csv|numbers)/,
     text:
       'You can bring data in from a CSV without retyping it. Open Settings \u2192 Import Data, choose what you\u2019re importing, drop the file and map the columns.\n\u2022 Nothing saves until you review the rows I flag for a second look.',
   },
 ];
 
-const fallbackHowto =
-  'Pick what you want help with and I will walk you through it.\n\u2022 Setting up inventory, recording a sale, tracking expenses, adding customers or sending invoices.';
+const fallbackHowto = (mode) =>
+  mode === 'services'
+    ? 'Pick what you want help with and I will walk you through it.\n\u2022 Recording income, tracking expenses, adding a client or sending an invoice.'
+    : 'Pick what you want help with and I will walk you through it.\n\u2022 Setting up inventory, recording a sale, tracking expenses, adding customers or sending invoices.';
+
+const pickHowtoTopic = (text, mode) =>
+  HOWTO_TOPICS.find((candidate) => (!candidate.modes || candidate.modes.includes(mode)) && candidate.re.test(text)) || null;
+
+/**
+ * The one-sentence form the assistant itself accepts, offered only where a
+ * sentence would actually become a record (expense, sale, income).
+ */
+const dictationHint = (topicKey, mode) => {
+  const example =
+    topicKey === 'expenses'
+      ? mode === 'services'
+        ? '500 for design work today'
+        : '800 for fuel today'
+      : topicKey === 'sales'
+        ? 'sold 3 bags of cement for 150'
+        : topicKey === 'income'
+          ? 'received 500 from Ama today'
+          : null;
+  if (!example) return '';
+  return `\n\u2022 Or just say it as one sentence \u2014 \u201c${example}\u201d \u2014 and I\u2019ll put the record in front of you to approve.`;
+};
+
+const guidanceAnswer = (meta) => {
+  const topic = pickHowtoTopic(normalizeQuestion(meta.matchedText || ''), meta.mode);
+  const body = topic ? topic.text : fallbackHowto(meta.mode);
+  return `${body}${dictationHint(topic ? topic.key : null, meta.mode)}`;
+};
 
 const unknownSuggestionsFor = (mode) =>
   mode === 'services'
@@ -319,11 +366,12 @@ const intentAnswerers = {
     return `Most of your income came from ${top.name} (${money(top.total, currency)}).`;
   },
 
-  howto: (meta) => {
-    const text = normalizeQuestion(meta.matchedText || '');
-    const topic = HOWTO_TOPICS.find((candidate) => candidate.re.test(text));
-    return topic ? topic.text : fallbackHowto;
-  },
+  howto: guidanceAnswer,
+
+  // Said as an intention — "I want to record an expenses" — rather than asked
+  // as a question. Same walkthrough as "how do I ...", because it is the same
+  // answer the person is after: where to tap.
+  recordGuide: guidanceAnswer,
 
   dataImport: () =>
     "Yes — you don\u2019t have to type everything in. Open Settings \u2192 Import Data, pick what you\u2019re bringing in (inventory, sales, expenses, one-off income, recurring income or customers), upload the CSV and map the columns.\n\u2022 Nothing saves until you review the rows I flag for a second look.",
@@ -388,6 +436,16 @@ const INTENT_CHECKERS = [
   {
     key: 'recordOne',
     re: /^(i|we|just)( (just|today))? (made|sold|did|received|recorded|logged|entered|took in|took|collected|got) (a |an |one |the )?(sale|payment|income|cash|paid|\d)|^i (just )?sold (to|for)|^just (made|sold|received) /,
+  },
+  {
+    // The intention to record, shared with shouldParseSentence: a statement of
+    // intent must not fall through to the stats intents and be answered with
+    // "you haven't recorded any X this month" — that answers a question nobody
+    // asked. It sits after recordOne (which reads as already done) and before
+    // every stats intent (stats sentences start with a question word, which
+    // this pattern does not).
+    key: 'recordGuide',
+    re: RECORDING_INTENT_RE,
   },
   {
     key: 'dataImport',

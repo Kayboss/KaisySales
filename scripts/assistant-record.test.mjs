@@ -383,3 +383,15 @@ test('routing sends money events to the parser and plain questions locally', () 
   assert.equal(shouldParseSentence(''), false);
   assert.equal(shouldParseSentence('   '), false);
 });
+
+test('routing answers an intent to record on the spot instead of calling the parser', () => {
+  assert.equal(shouldParseSentence('I want to record an expenses'), false);
+  assert.equal(shouldParseSentence('let me record an expense'), false);
+  assert.equal(shouldParseSentence('add an expense'), false);
+  assert.equal(shouldParseSentence('help me record an expense'), false);
+  assert.equal(shouldParseSentence('i want to track my expenses'), false);
+
+  // a number is still a real record, however it is phrased
+  assert.equal(shouldParseSentence('record an expense of 50 for fuel'), true);
+  assert.equal(shouldParseSentence('i want to record 2 sales'), true);
+});

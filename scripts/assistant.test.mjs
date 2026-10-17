@@ -149,6 +149,21 @@ test('classifyIntent: a reported sale is guidance, not an income question', () =
   assert.equal(classifyIntent('i made a profit last month').intent, 'profit');
 });
 
+test('classifyIntent: wanting to record is guidance, not a stats readout', () => {
+  assert.equal(classifyIntent('i want to record an expenses').intent, 'recordGuide');
+  assert.equal(classifyIntent('I need to add an expense').intent, 'recordGuide');
+  assert.equal(classifyIntent('let me record an expense').intent, 'recordGuide');
+  assert.equal(classifyIntent('help me record an expense').intent, 'recordGuide');
+  assert.equal(classifyIntent('record an expense').intent, 'recordGuide');
+  assert.equal(classifyIntent('i want to track my expenses').intent, 'recordGuide');
+
+  // and it must leave the questions that sound alike alone
+  assert.equal(classifyIntent('what are my expenses').intent, 'expenses');
+  assert.equal(classifyIntent('how much did i spend').intent, 'expenses');
+  assert.equal(classifyIntent('add up my expenses').intent, 'expenses');
+  assert.equal(classifyIntent('how do i record a sale').intent, 'howto');
+});
+
 test('classifyIntent: guide me is a howto, not unknown', () => {
   assert.equal(classifyIntent('can you guide me to input it').intent, 'howto');
   assert.equal(classifyIntent('show me how to record a sale').intent, 'howto');
@@ -352,6 +367,28 @@ test('answer: howto gives an actionable sales walkthrough', () => {
   const { text } = answer('how do i record a sale', retail({}));
   assert.match(text, /Record sale/);
   assert.match(text, /moves that stock automatically/);
+});
+
+test('answer: wanting to record an expense gives directions, not an empty month', () => {
+  const { text, intent } = answer('I want to record an expenses', retail({}));
+  assert.equal(intent, 'recordGuide');
+  assert.match(text, /Add Expense/);
+  assert.match(text, /800 for fuel today/);
+  assert.doesNotMatch(text, /haven.t recorded any expenses/);
+});
+
+test('answer: record guidance names a screen that exists in that mode', () => {
+  const servicesExpense = answer('I want to record an expense', services({})).text;
+  assert.match(servicesExpense, /Add Expense/);
+  assert.match(servicesExpense, /500 for design work today/);
+
+  const retailSale = answer('I want to record a sale', retail({})).text;
+  assert.match(retailSale, /Record sale/);
+  assert.match(retailSale, /3 bags of cement/);
+
+  const servicesSale = answer('I want to record a sale', services({})).text;
+  assert.doesNotMatch(servicesSale, /In Sales/);
+  assert.match(servicesSale, /Income Tracking/);
 });
 
 test('answer: howto falls back gracefully for unknown topics', () => {
