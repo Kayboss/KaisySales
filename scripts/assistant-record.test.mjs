@@ -45,6 +45,127 @@ test('expense back-fills unit price from a lump sum', () => {
   assert.equal(built.payload.amount, 'GHS 1000.00');
 });
 
+test('a services expense mirrors the ServiceExpenses payload instead', () => {
+  const built = buildRecordPayload(
+    'expense',
+    {
+      title: 'Adobe',
+      amount: 39,
+      category: 'Software',
+      vendor: 'Adobe',
+      renewal_date: '2026-11-17',
+      client_name: 'Kwame',
+    },
+    { ...OPTS, mode: 'services' }
+  );
+  assert.equal(built.ok, true);
+  assert.deepEqual(built.payload, {
+    title: 'Adobe',
+    amount: 'GHS 39.00',
+    category: 'Software',
+    date: TODAY,
+    subcategory: 'general',
+    vendor: 'Adobe',
+    renewal_date: '2026-11-17',
+    is_asset: false,
+    asset_lifetime_years: null,
+    transaction_fee: 0,
+    client_name: 'Kwame',
+  });
+});
+
+test('a services expense carries none of the retail-only keys', () => {
+  const built = buildRecordPayload('expense', { title: 'Adobe', amount: 39 }, { ...OPTS, mode: 'services' });
+  assert.equal('quantity' in built.payload, false);
+  assert.equal('unitPrice' in built.payload, false);
+  assert.equal('trend' in built.payload, false);
+});
+
+test('a retail expense stays exactly as it was', () => {
+  const built = buildRecordPayload('expense', { title: 'Fuel', amount: 10 }, OPTS);
+  assert.equal('client_name' in built.payload, false);
+  assert.equal('renewal_date' in built.payload, false);
+  assert.equal('subcategory' in built.payload, false);
+});
+
+test('a services expense adds the transaction fee to the stored amount', () => {
+  const built = buildRecordPayload(
+    'expense',
+    { title: 'Adobe', amount: 39, transaction_fee: 2 },
+    { ...OPTS, mode: 'services' }
+  );
+  assert.equal(built.payload.transaction_fee, 2);
+  assert.equal(built.payload.amount, 'GHS 41.00');
+});
+
+test('a services expense keeps an asset year count only for a stated asset', () => {
+  const asset = buildRecordPayload(
+    'expense',
+    { title: 'Laptop', amount: 5000, is_asset: true, asset_lifetime_years: 3 },
+    { ...OPTS, mode: 'services' }
+  );
+  assert.equal(asset.payload.is_asset, true);
+  assert.equal(asset.payload.asset_lifetime_years, 3);
+
+  const noLifetime = buildRecordPayload(
+    'expense',
+    { title: 'Laptop', amount: 5000, is_asset: true },
+    { ...OPTS, mode: 'services' }
+  );
+  assert.equal(noLifetime.payload.asset_lifetime_years, null);
+
+  const notAnAsset = buildRecordPayload(
+    'expense',
+    { title: 'Fuel', amount: 50, asset_lifetime_years: 3 },
+    { ...OPTS, mode: 'services' }
+  );
+  assert.equal(notAnAsset.payload.is_asset, false);
+  assert.equal(notAnAsset.payload.asset_lifetime_years, null);
+});
+
+test('a services expense refuses a subcategory the screen does not offer', () => {
+  const junk = buildRecordPayload(
+    'expense',
+    { title: 'Adobe', amount: 39, subcategory: 'nonsense' },
+    { ...OPTS, mode: 'services' }
+  );
+  assert.equal(junk.payload.subcategory, 'general');
+
+  const saas = buildRecordPayload(
+    'expense',
+    { title: 'Adobe', amount: 39, subcategory: 'saas' },
+    { ...OPTS, mode: 'services' }
+  );
+  assert.equal(saas.payload.subcategory, 'saas');
+});
+
+test('a services expense without an amount is still refused', () => {
+  const built = buildRecordPayload('expense', { title: 'Adobe' }, { ...OPTS, mode: 'services' });
+  assert.equal(built.ok, false);
+  assert.match(built.error, /how much/i);
+});
+
+test('the services expense summary shows the columns the user checks', () => {
+  const built = buildRecordPayload(
+    'expense',
+    {
+      title: 'Adobe',
+      amount: 39,
+      category: 'Software',
+      vendor: 'Adobe',
+      client_name: 'Kwame',
+      renewal_date: '2026-11-17',
+    },
+    { ...OPTS, mode: 'services' }
+  );
+  const labels = built.summary.map((r) => r.label);
+  assert.deepEqual(labels.slice(0, 7), ['Amount', 'What', 'Client', 'Category', 'Vendor', 'Date', 'Renewal']);
+
+  // A blank column is simply not shown; the card marks it "Not set" instead.
+  const bare = buildRecordPayload('expense', { title: 'Adobe', amount: 39 }, { ...OPTS, mode: 'services' });
+  assert.equal(bare.summary.some((r) => r.label === 'Renewal'), false);
+});
+
 test('expense without an amount is refused with a question', () => {
   const built = buildRecordPayload('expense', { title: 'Fuel' }, OPTS);
   assert.equal(built.ok, false);

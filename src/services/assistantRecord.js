@@ -30,6 +30,10 @@ const accessToken = async () => {
 /**
  * Sends one sentence to the parser.
  *
+ * `merge` turns the call into a follow-up: the model is given the fields the
+ * card already holds and asked to echo them back alongside whatever the answer
+ * adds, so a reply can never silently wipe the amount the first sentence gave.
+ *
  * Never throws: the panel must degrade to local Q&A rather than break when the
  * model is unreachable, unconfigured or slow.
  *
@@ -38,7 +42,7 @@ const accessToken = async () => {
  *   | { ok: false, reason: 'not_configured'|'unauthorized'|'model_error'|'unreachable'|'invalid', status?: number }
  * >}
  */
-export const parseSentence = async ({ text, mode, currency, categories, items }) => {
+export const parseSentence = async ({ text, mode, currency, categories, items, merge }) => {
   const url = fnUrl();
   if (!isSupabaseConfigured || !url) return { ok: false, reason: 'not_configured' };
 
@@ -65,6 +69,12 @@ export const parseSentence = async ({ text, mode, currency, categories, items })
         currency: currency || 'GHS',
         categories: Array.isArray(categories) ? categories.slice(0, 60) : [],
         items: Array.isArray(items) ? items.slice(0, 60) : [],
+        // A follow-up: the record type and fields already held, so the model
+        // echoes every field back and this side merges. Only ever sent when a
+        // card is on screen, so the model cannot invent a new record type here.
+        merge: merge?.recordType
+          ? { recordType: merge.recordType, fields: merge.fields || {} }
+          : null,
       }),
       signal: controller.signal,
     });

@@ -28,6 +28,10 @@ export const RECORD_TYPE_SECTIONS = {
 export const allowedRecordTypes = (mode) =>
   mode === 'services' ? ['expense', 'service_income'] : ['expense', 'sale'];
 
+// Must match SUBCATEGORIES in ServiceExpenses.jsx. The parser picks one of these
+// and anything else falls back to 'general', the same default that screen uses.
+export const EXPENSE_SUBCATEGORIES = ['general', 'saas', 'subcontractor', 'hardware', 'platform_fee'];
+
 const normalizePaymentMethod = (raw) => {
   const text = String(raw || '').toLowerCase();
   if (text.includes('mobile') || text.includes('momo') || text.includes('m-pesa')) {
@@ -86,6 +90,50 @@ export const buildRecordPayload = (recordType, fields = {}, options = {}) => {
 
     const category = sanitizeInput(String(fields.category || ''), 50);
     const date = isoDate(fields.date, today);
+
+    // Retail's ExpenseTracking and services' ServiceExpenses are different rows in
+    // the same table, so "expense" is not one payload. ServiceExpenses.jsx:284 has
+    // no quantity or unit price and carries client, vendor, renewal and the
+    // asset/fee columns instead. Writing the retail shape into a services account
+    // leaves those columns blank on the owner's own screen, so each mode gets the
+    // shape its screen would have written.
+    if (mode === 'services') {
+      const fee = Math.max(0, sanitizeNumber(fields.transaction_fee));
+      const stated = String(fields.subcategory || '');
+      const subcategory = EXPENSE_SUBCATEGORIES.includes(stated) ? stated : 'general';
+      const isAsset = fields.is_asset === true;
+      const lifetime = parseInt(fields.asset_lifetime_years, 10);
+      const clientName = sanitizeInput(String(fields.client_name || '').trim(), 100);
+      const vendor = sanitizeInput(String(fields.vendor || '').trim(), 100);
+      const renewalDate = isoDate(fields.renewal_date, null);
+      const billed = parseFloat((total + fee).toFixed(2));
+      const payload = {
+        title,
+        amount: formatMoneyText(billed),
+        category,
+        date,
+        subcategory,
+        vendor,
+        renewal_date: renewalDate,
+        is_asset: isAsset,
+        asset_lifetime_years: isAsset && lifetime > 0 ? lifetime : null,
+        transaction_fee: fee,
+        client_name: clientName,
+      };
+      const summary = [
+        row('Amount', money(billed)),
+        row('What', title),
+        row('Client', clientName),
+        row('Category', category),
+        row('Vendor', vendor),
+        row('Date', date),
+        row('Renewal', renewalDate),
+        row('Fee', fee > 0 ? money(fee) : ''),
+        row('Asset', isAsset ? 'Yes' : ''),
+      ].filter(Boolean);
+      return { ok: true, recordType, payload, summary };
+    }
+
     const payload = {
       title,
       category,

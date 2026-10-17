@@ -3,7 +3,8 @@ import styled from 'styled-components';
 import { Send, X, Sparkles, MessageCircle } from 'lucide-react';
 import { answer, suggestedQuestions } from '../../utils/assistant/engine';
 import { shouldParseSentence } from '../../utils/assistant/route';
-import { buildRecordPayload, RECORD_TYPE_SECTIONS } from '../../utils/assistant/recordPayload';
+import { buildRecordPayload, RECORD_TYPE_LABELS, RECORD_TYPE_SECTIONS } from '../../utils/assistant/recordPayload';
+import { missingFields, clarifyPrompt, mergeFields } from '../../utils/assistant/clarify';
 import { buildAssistantContext } from '../../services/assistantContext';
 import { parseSentence, logParse, updateParse, saveParsedRecord, NOT_CONFIGURED_MESSAGE } from '../../services/assistantRecord';
 import { useAssistantStore } from '../../store/assistantStore';
@@ -142,15 +143,26 @@ const Chip = styled.button`
   }
 `;
 
+const PendingRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0 1rem 0.5rem;
+  padding: 0.45rem 0.5rem 0.45rem 0.75rem;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  background: ${({ theme }) => theme.colors.background.surfaceVariant};
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  color: ${({ theme }) => theme.colors.text.muted};
+`;
+
 const Composer = styled.form`
   display: flex;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-top: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   background: ${({ theme }) => theme.colors.background.surface};
-`;
-
-const Input = styled.input`
+`;const Input = styled.input`
   flex: 1;
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   border-radius: ${({ theme }) => theme.borderRadius.md};
@@ -201,6 +213,10 @@ const AssistantPanel = () => {
   const [ready, setReady] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [lastAuto, setLastAuto] = useState(null);
+  // The card whose blank fields the assistant just asked about. While it is set,
+  // the next thing the user types is read as an answer to that question rather
+  // than as a fresh record.
+  const [pending, setPending] = useState(null);
   const builtRef = useRef(false);
   const endRef = useRef(null);
 
@@ -214,6 +230,71 @@ const AssistantPanel = () => {
     []
   );
 
+  const mode = context?.mode === 'services' ? 'services' : 'retail';
+  const currency = context?.currency || 'GHS';
+
+  /**
+   * Builds the payload, shows the card, and asks about whatever the record is
+   * still missing. `replaceKey` re-renders an existing card in place, which is
+   * how an answer to the follow-up question lands: same card, fuller record.
+   */
+  const presentCard = useCallback(
+    ({ recordType, fields, confidence, parseId, replaceKey }) => {
+      const built = buildRecordPayload(recordType || '', fields, { mode, currency });
+      if (!built.ok) {
+        setMessages((prev) => [...prev, { role: 'assistant', text: built.error }]);
+        if (!replaceKey) setPending(null);
+        return;
+      }
+
+      const missing = missingFields(built.recordType, built.payload, mode);
+      const cardKey = replaceKey || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const card = {
+        key: cardKey,
+        parseId,
+        recordType: built.recordType,
+        payload: built.payload,
+        summary: built.summary,
+        missing,
+        confidence,
+        status: 'pending',
+      };
+
+      if (replaceKey) {
+        // Keep the original parse row: the feedback the user gives when they save
+        // or reject belongs to the sentence that started the record, not to the
+        // answer that finished it.
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.card && message.card.key === replaceKey
+              ? { ...message, card: { ...card, parseId: message.card.parseId, status: message.card.status } }
+              : message
+          )
+        );
+      } else {
+        setMessages((prev) => [...prev, { role: 'assistant', card }]);
+      }
+
+      setPending(
+        missing.length
+          ? {
+              cardKey,
+              recordType: built.recordType,
+              fields,
+              label:
+                built.payload.title || built.payload.item || built.payload.client_name ||
+                RECORD_TYPE_LABELS[built.recordType] ||
+                'this record',
+            }
+          : null
+      );
+
+      const question = clarifyPrompt(missing);
+      if (question) setMessages((prev) => [...prev, { role: 'assistant', text: question }]);
+    },
+    [mode, currency]
+  );
+
   const ask = useCallback(
     async (raw) => {
       const q = String(raw || '').trim();
@@ -221,10 +302,13 @@ const AssistantPanel = () => {
       setMessages((prev) => [...prev, { role: 'user', text: q }]);
 
       const safeContext = context || { mode: 'retail', currency: 'GHS', statsByScope: {} };
+      const answering = pending;
 
       // A sentence with no number and a question word in it can only be a
       // question, so it is answered from the on-device stats without a round trip.
-      if (!shouldParseSentence(q)) {
+      // An answer to the assistant's own question is exempt: "Adobe" carries no
+      // number, but it is an answer, and it has to reach the parser.
+      if (!answering && !shouldParseSentence(q)) {
         const result = answer(q, safeContext);
         setMessages((prev) => [...prev, { role: 'assistant', text: result.text }]);
         return;
@@ -238,6 +322,7 @@ const AssistantPanel = () => {
           currency: safeContext.currency,
           categories: safeContext.categories,
           items: safeContext.items,
+          merge: answering ? { recordType: answering.recordType, fields: answering.fields } : null,
         });
 
         if (!parsed.ok) {
@@ -251,6 +336,23 @@ const AssistantPanel = () => {
           return;
         }
 
+        if (answering) {
+          // The reply may have been a question of their own instead of an answer.
+          // Answer it and leave the card, and the question, standing.
+          if (parsed.kind !== 'record' || !parsed.recordType) {
+            const result = answer(q, safeContext);
+            setMessages((prev) => [...prev, { role: 'assistant', text: result.text }]);
+            return;
+          }
+          presentCard({
+            recordType: parsed.recordType,
+            fields: mergeFields(answering.fields, parsed.fields),
+            confidence: parsed.confidence,
+            replaceKey: answering.cardKey,
+          });
+          return;
+        }
+
         if (parsed.kind !== 'record' || !parsed.recordType) {
           const result = answer(q, safeContext);
           const text = parsed.kind === 'unknown' && parsed.clarify ? parsed.clarify : result.text;
@@ -258,13 +360,10 @@ const AssistantPanel = () => {
           return;
         }
 
-        const built = buildRecordPayload(parsed.recordType, parsed.fields, {
-          mode: safeContext.mode,
-          currency: safeContext.currency,
-        });
-
         // The attempt is logged either way: a sentence the model got wrong is the
-        // exact material the weekly review turns into a new FEW_SHOT example.
+        // exact material the weekly review turns into a new FEW_SHOT example. An
+        // answer to a follow-up question is deliberately NOT logged — detached
+        // from the sentence it was answering it would read as a broken example.
         const parseId = await logParse({
           input: q,
           kind: 'record',
@@ -272,35 +371,22 @@ const AssistantPanel = () => {
           parsed: { recordType: parsed.recordType, confidence: parsed.confidence, fields: parsed.fields },
         });
 
-        if (!built.ok) {
-          setMessages((prev) => [...prev, { role: 'assistant', text: built.error }]);
-          return;
-        }
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            card: {
-              key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              parseId,
-              recordType: built.recordType,
-              payload: built.payload,
-              summary: built.summary,
-              confidence: parsed.confidence,
-              status: 'pending',
-            },
-          },
-        ]);
+        presentCard({
+          recordType: parsed.recordType,
+          fields: parsed.fields,
+          confidence: parsed.confidence,
+          parseId,
+        });
       } finally {
         setThinking(false);
       }
     },
-    [context]
+    [context, pending, presentCard]
   );
 
   const handleSaveCard = useCallback(
     async (card) => {
+      if (pending?.cardKey === card.key) setPending(null);
       patchCard(card.key, { status: 'saving' });
       try {
         const result = await saveParsedRecord({
@@ -321,11 +407,12 @@ const AssistantPanel = () => {
         patchCard(card.key, { status: 'error' });
       }
     },
-    [patchCard]
+    [patchCard, pending]
   );
 
   const handleDiscardCard = useCallback(
     (card) => {
+      if (pending?.cardKey === card.key) setPending(null);
       patchCard(card.key, { status: 'rejected' });
       updateParse(card.parseId, { feedback: 'down' });
       const section = RECORD_TYPE_SECTIONS[card.recordType] || 'your records';
@@ -333,11 +420,11 @@ const AssistantPanel = () => {
         ...prev,
         {
           role: 'assistant',
-          text: `No problem \u2014 nothing was saved. You can add it by hand in ${section}, or say it another way.`,
+            text: `No problem \u2014 nothing was saved. You can add it by hand in ${section}, or say it another way.`,
         },
       ]);
     },
-    [patchCard]
+    [patchCard, pending]
   );
 
   const onSubmit = (event) => {
@@ -450,11 +537,22 @@ const AssistantPanel = () => {
           </Suggestions>
         )}
 
+        {pending && (
+          <PendingRow>
+            <span>
+              Adding to &ldquo;{pending.label}&rdquo;
+            </span>
+            <Chip type="button" onClick={() => setPending(null)}>
+              New record instead
+            </Chip>
+          </PendingRow>
+        )}
+
         <Composer onSubmit={onSubmit}>
           <Input
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder="Type a record or ask a question…"
+            placeholder={pending ? 'Answer, or say something else…' : 'Type a record or ask a question…'}
             aria-label="Type a record or a question for the assistant"
           />
           <SendButton type="submit" disabled={!input.trim()} aria-label="Send to the assistant">

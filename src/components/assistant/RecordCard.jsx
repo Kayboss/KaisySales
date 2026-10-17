@@ -58,6 +58,12 @@ const Value = styled.dd`
   overflow-wrap: anywhere;
 `;
 
+const Unset = styled(Value)`
+  font-weight: 500;
+  font-style: italic;
+  color: ${({ theme }) => theme.colors.text.muted};
+`;
+
 const Actions = styled.div`
   display: flex;
   gap: 0.5rem;
@@ -138,6 +144,16 @@ const RecordCard = ({ card, onSave, onDiscard }) => {
             <Value>{entry.value}</Value>
           </div>
         ))}
+        {/* While the card is still open, a column the screen has but the sentence
+            did not mention is shown rather than hidden: the user is being asked
+            for it, so it must be visible that it is blank. */}
+        {card.status === 'pending' &&
+          (card.missing || []).map((field) => (
+            <div key={`missing-${field.key}`} style={{ display: 'contents' }}>
+              <Label>{field.label}</Label>
+              <Unset>Not set</Unset>
+            </div>
+          ))}
       </Rows>
 
       {card.status === 'pending' && (
