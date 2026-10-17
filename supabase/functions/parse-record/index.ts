@@ -184,11 +184,17 @@ serve(async (req) => {
     });
   }
 
-  // gemini-2.5-flash answers 404 NOT_FOUND for keys created after its retirement
-  // ("no longer available to new users"), which surfaces to the user as a dead
-  // panel, so the default tracks the current Flash. Override with GEMINI_MODEL.
-  const model = Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
+  // Model choice here is about latency, not intelligence: this is a one-sentence
+  // extraction. gemini-2.5-flash is retired for keys issued after it (404
+  // NOT_FOUND), and gemini-3.8-flash thinks at "medium" by default, which blew
+  // past a 15 s and then a 20 s cap even at "low". The Flash-Lite tier answers at
+  // "minimal" by default. Override with GEMINI_MODEL.
+  const model = Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite";
   const prompt = buildPrompt({ ...body, text });
+
+  // Declared outside the try so the catch below can still report how long the
+  // call ran before it died — a bare AbortError says "too slow", never "how slow".
+  const startedAt = Date.now();
 
   try {
     const controller = new AbortController();
@@ -208,12 +214,14 @@ serve(async (req) => {
           body: JSON.stringify({
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             generationConfig: {
-              // 3.8 Flash thinks at "medium" by default, and reasoning is what
-              // pushed this call past the timeout. "minimal" is not a valid level
-              // for 3.8 (400), so "low" is the fastest one allowed. temperature,
-              // top_p and top_k are ignored from 3.6 on, so none is sent.
-              thinkingConfig: { thinkingLevel: "low" },
+              // Flash-Lite answers at "minimal" (its default) — "minimal" is a
+              // 400 for 3.8 Flash, so if GEMINI_MODEL pins 3.8 this must go back
+              // to "low". temperature, top_p and top_k are ignored from 3.6 on,
+              // so none is sent. The output cap bounds a runaway JSON body, which
+              // is the other way this call could outlive the timeout.
+              thinkingConfig: { thinkingLevel: "minimal" },
               responseMimeType: "application/json",
+              maxOutputTokens: 400,
             },
           }),
           signal: controller.signal,
@@ -225,7 +233,7 @@ serve(async (req) => {
 
     if (!geminiRes.ok) {
       const detail = await geminiRes.text().catch(() => "");
-      console.error("gemini error", geminiRes.status, detail.slice(0, 500));
+      console.error("gemini error", geminiRes.status, `after ${Date.now() - startedAt}ms`, detail.slice(0, 500));
       return new Response(
         JSON.stringify({ error: "model_error", status: geminiRes.status }),
         { status: 502, headers: { "Content-Type": "application/json", ...corsHeaders } },
@@ -233,6 +241,20 @@ serve(async (req) => {
     }
 
     const data = await geminiRes.json();
+    // Latency, finish reason and token counts are logged on every success: if the
+    // call ever creeps back over the timeout, this line says whether the model was
+    // slow, whether it hit maxOutputTokens, or whether thinking tokens ballooned.
+    const usage = data?.usageMetadata ?? {};
+    console.log(
+      "gemini ok",
+      `${Date.now() - startedAt}ms`,
+      "finish",
+      data?.candidates?.[0]?.finishReason ?? "?",
+      "out",
+      usage.candidatesTokenCount ?? "?",
+      "thoughts",
+      usage.thoughtsTokenCount ?? "?",
+    );
     const raw: string =
       data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
     // Strip markdown fences if the model ignored instructions.
@@ -271,7 +293,7 @@ serve(async (req) => {
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } },
     );
   } catch (err) {
-    console.error("parse-record failure", err);
+    console.error("parse-record failure", `after ${Date.now() - startedAt}ms`, err);
     return new Response(JSON.stringify({ error: "parse_failed" }), {
       status: 502,
       headers: { "Content-Type": "application/json", ...corsHeaders },
