@@ -46,7 +46,10 @@ export const parseSentence = async ({ text, mode, currency, categories, items })
   if (!token) return { ok: false, reason: 'unauthorized' };
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  // Deliberately longer than the function's own 20 s Gemini cap: a slow model
+  // must arrive as the function's JSON error, not as an aborted fetch that the
+  // panel can only report as unreachable.
+  const timer = setTimeout(() => controller.abort(), 30000);
   let response;
   try {
     response = await fetch(url, {

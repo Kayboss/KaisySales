@@ -192,7 +192,9 @@ serve(async (req) => {
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    // Gemini gets 20 s and the client waits 30 s, so a slow model still answers
+    // the panel with this function's own JSON error instead of an aborted fetch.
+    const timer = setTimeout(() => controller.abort(), 20000);
     let geminiRes: Response;
     try {
       geminiRes = await fetch(
@@ -206,7 +208,11 @@ serve(async (req) => {
           body: JSON.stringify({
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             generationConfig: {
-              temperature: 0,
+              // 3.8 Flash thinks at "medium" by default, and reasoning is what
+              // pushed this call past the timeout. "minimal" is not a valid level
+              // for 3.8 (400), so "low" is the fastest one allowed. temperature,
+              // top_p and top_k are ignored from 3.6 on, so none is sent.
+              thinkingConfig: { thinkingLevel: "low" },
               responseMimeType: "application/json",
             },
           }),
