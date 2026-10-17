@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { Check, X, AlertTriangle } from 'lucide-react';
+import { Check, X, AlertTriangle, PackagePlus } from 'lucide-react';
 import { RECORD_TYPE_LABELS, RECORD_TYPE_SECTIONS } from '../../utils/assistant/recordPayload';
 
 const Card = styled.div`
@@ -64,6 +64,35 @@ const Unset = styled(Value)`
   color: ${({ theme }) => theme.colors.text.muted};
 `;
 
+const Warn = styled(Value)`
+  color: ${({ theme }) => theme.colors.status.error};
+`;
+
+const Add = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  background: transparent;
+  color: ${({ theme }) => theme.colors.text.main};
+  font-family: ${({ theme }) => theme.fonts.main};
+  font-weight: 700;
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  transition: ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.background.surfaceVariant};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
 const Actions = styled.div`
   display: flex;
   gap: 0.5rem;
@@ -122,17 +151,40 @@ const Error = styled(Note)`
   color: ${({ theme }) => theme.colors.status.error};
 `;
 
-const RecordCard = ({ card, onSave, onDiscard }) => {
+const RecordCard = ({ card, onSave, onDiscard, onAddToInventory, addingToInventory }) => {
   const section = RECORD_TYPE_SECTIONS[card.recordType] || 'your records';
+  const blocked = Boolean(card.unresolvedItem) && card.status === 'pending';
+
+  // A sale is the one record that changes a number the user already has, so the
+  // stock consequence is shown before Save rather than after. The wording calls
+  // out a shortfall instead of hiding it, because a sale that exceeds the shelf
+  // would otherwise look identical to one that does not.
+  const quantity = Math.max(0, Math.round(Number(card.payload?.quantity)) || 0);
+  const stockRow =
+    card.recordType === 'sale' && card.status === 'pending'
+      ? card.inventoryMatch
+        ? `${card.inventoryMatch.stock} in stock \u00b7 ${
+            card.inventoryMatch.stock < quantity
+              ? `short by ${quantity - card.inventoryMatch.stock}`
+              : `${quantity} will leave`
+          }`
+        : 'Not in your inventory'
+      : null;
 
   return (
     <Card>
       <Head>
         <Badge>{RECORD_TYPE_LABELS[card.recordType] || 'Record'}</Badge>
-        {card.status === 'pending' && card.confidence !== 'high' && (
+        {card.status === 'pending' && !blocked && card.confidence !== 'high' && (
           <Hint>
             <AlertTriangle size={13} />
             Check the details
+          </Hint>
+        )}
+        {blocked && (
+          <Hint>
+            <AlertTriangle size={13} />
+            Not in inventory
           </Hint>
         )}
       </Head>
@@ -144,6 +196,12 @@ const RecordCard = ({ card, onSave, onDiscard }) => {
             <Value>{entry.value}</Value>
           </div>
         ))}
+        {stockRow && (
+          <div style={{ display: 'contents' }}>
+            <Label>Stock</Label>
+            {blocked ? <Warn>{stockRow}</Warn> : <Value>{stockRow}</Value>}
+          </div>
+        )}
         {/* While the card is still open, a column the screen has but the sentence
             did not mention is shown rather than hidden: the user is being asked
             for it, so it must be visible that it is blank. */}
@@ -158,9 +216,18 @@ const RecordCard = ({ card, onSave, onDiscard }) => {
 
       {card.status === 'pending' && (
         <Actions>
-          <Save type="button" onClick={() => onSave(card)}>
-            Save
-          </Save>
+          {blocked ? (
+            // No Save here at all: the sale cannot move stock that does not
+            // exist, so the only way forward is to make the item real.
+            <Add type="button" onClick={() => onAddToInventory(card)} disabled={addingToInventory}>
+              <PackagePlus size={15} />
+              {addingToInventory ? 'Waiting for the count…' : 'Add to inventory'}
+            </Add>
+          ) : (
+            <Save type="button" onClick={() => onSave(card)}>
+              Save
+            </Save>
+          )}
           <Discard type="button" onClick={() => onDiscard(card)}>
             Not right
           </Discard>

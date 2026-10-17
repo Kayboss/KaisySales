@@ -1,6 +1,7 @@
 import { sanitizeInput, sanitizeNumber } from '../sanitize.js';
 import { formatMoneyText } from '../import/coerce.js';
-import { formatCurrency } from '../currency.js';
+import { formatCurrency, parseAmount } from '../currency.js';
+import { resolveMinStock, resolveStock, resolveStockStatus } from '../inventory.js';
 
 /**
  * Turns the fields the model parsed out of one sentence into the exact payload
@@ -55,6 +56,62 @@ const localTime = (date) =>
   }).format(date);
 
 const row = (label, value) => (value === '' || value === null || value === undefined ? null : { label, value });
+
+/**
+ * Finds the inventory row a spoken item name refers to.
+ *
+ * Exactly first, then case-insensitively: "cement" must find "Cement", but
+ * "Cement" must win over "cement bags" so an exact name is never shadowed by a
+ * fuzzier one. Deliberately NOT substring matching — "bag" matching "Bags of
+ * cement" would deduct stock from the wrong row, and a wrong stock deduction is
+ * invisible until the shelf disagrees with the screen.
+ */
+export const matchInventoryItem = (items, name) => {
+  const wanted = String(name || '').trim().toLowerCase();
+  if (!wanted || !Array.isArray(items)) return null;
+  return (
+    items.find((item) => String(item?.name || '').trim().toLowerCase() === wanted) || null
+  );
+};
+
+/**
+ * A sale's inventory row, reduced to the numbers the card shows and the sale
+ * needs. `costPrice` is parsed here so a stored "GHS 12.00" never reaches the
+ * numeric `sales.cost` column as a string.
+ */
+export const summariseInventoryItem = (item) =>
+  item
+    ? {
+        id: item.id ?? null,
+        name: item.name || '',
+        category: item.category || '',
+        stock: resolveStock(item),
+        minStock: resolveMinStock(item),
+        cost: parseAmount(item.costPrice),
+      }
+    : null;
+
+/**
+ * The inventory row the Inventory screen would have written for a hand-typed
+ * item (InventoryManagement.jsx). A sale can only be recorded against a row
+ * that exists, so when the assistant is asked to add one it must produce the
+ * same shape — a bare `{ name }` would render as an unpriced, unstocked item.
+ */
+export const buildInventoryItemPayload = ({ name, category, stock, costPrice, minStock } = {}) => {
+  const units = Math.max(0, Math.round(sanitizeNumber(stock)) || 0);
+  // Left raw on purpose: resolveMinStock owns the default, so an omitted value
+  // becomes 5 while an explicit 0 stays 0.
+  const reorderAt = resolveMinStock({ minStock });
+  return {
+    name: sanitizeInput(String(name || ''), 100),
+    category: sanitizeInput(String(category || ''), 50),
+    stock: units,
+    minStock: reorderAt,
+    price: formatMoneyText(0),
+    costPrice: formatMoneyText(Math.max(0, sanitizeNumber(costPrice))),
+    status: resolveStockStatus(units, reorderAt),
+  };
+};
 
 /**
  * @param {string} recordType 'expense' | 'sale' | 'service_income'
@@ -164,9 +221,24 @@ export const buildRecordPayload = (recordType, fields = {}, options = {}) => {
     if (!(unitPrice > 0)) return { ok: false, error: 'How much did you sell it for?' };
 
     const total = quantity * unitPrice;
-    const category = sanitizeInput(String(fields.category || ''), 50);
     const date = isoDate(fields.date, today);
     const paymentMethod = normalizePaymentMethod(fields.paymentMethod);
+
+    // A sale only exists against an inventory row: that row is what moves stock
+    // and what supplies the cost that profit is reported from. Matching happens
+    // here rather than at save time so the card can show the stock consequence
+    // before anything is written, and `inventoryMatch: null` is the signal the
+    // panel blocks on. `inventory` is absent outside retail, where a sale is
+    // refused anyway, so a missing list is not treated as "no match".
+    const match = summariseInventoryItem(matchInventoryItem(options.inventory, item));
+    // DailySales takes the sale's category from the inventory row it matched
+    // (`invMatch?.category`), so a spoken category never puts the sale in a
+    // different category from the item it sold.
+    const category =
+      sanitizeInput(String(fields.category || ''), 50) ||
+      sanitizeInput(String(match?.category || ''), 50) ||
+      '';
+
     const payload = {
       item,
       category,
@@ -176,6 +248,8 @@ export const buildRecordPayload = (recordType, fields = {}, options = {}) => {
       date,
       time: localTime(now),
       amount: formatMoneyText(total),
+      // Per-unit cost, the same value DailySales stores from invMatch.costPrice.
+      cost: match ? match.cost : 0,
     };
     const summary = [
       row('Amount', money(total)),
@@ -191,6 +265,7 @@ export const buildRecordPayload = (recordType, fields = {}, options = {}) => {
       recordType,
       payload,
       summary,
+      inventoryMatch: match,
     };
   }
 

@@ -38,9 +38,20 @@ export const buildAssistantContext = async () => {
 
   // The parser prompt is given the category list so it reuses the business's own
   // names instead of inventing one, and the item list so a sale lines up with the
-  // inventory row whose cost and stock must move with it.
+  // inventory row whose cost and stock must move with it. The full `inventory`
+  // rows ride along too, because the panel has to resolve that row (stock, cost,
+  // min level) before it can show — or block — a sale's card.
   const categories = [...new Set([...expenseCategories, ...incomeCategories].map((c) => c?.name).filter(Boolean))];
   const items = inventory.map((item) => item?.name).filter(Boolean);
 
-  return { mode, currency: currency || 'GHS', businessName: businessName || '', statsByScope, projection, categories, items };
+  return {
+    mode,
+    currency: currency || 'GHS',
+    businessName: businessName || '',
+    statsByScope,
+    projection,
+    categories,
+    items,
+    inventory,
+  };
 };

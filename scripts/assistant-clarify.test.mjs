@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { missingFields, clarifyPrompt, mergeFields } from '../src/utils/assistant/clarify.js';
+import {
+  missingFields,
+  clarifyPrompt,
+  mergeFields,
+  unknownItemPrompt,
+  inventoryStockPrompt,
+  parseStockAnswer,
+} from '../src/utils/assistant/clarify.js';
 
 const keys = (recordType, payload, mode) => missingFields(recordType, payload, mode).map((f) => f.key);
 
@@ -81,4 +88,24 @@ test('an answer adds fields the first sentence never mentioned', () => {
 test('an empty answer changes nothing', () => {
   assert.deepEqual(mergeFields({ title: 'Adobe' }, {}), { title: 'Adobe' });
   assert.deepEqual(mergeFields({ title: 'Adobe' }, null), { title: 'Adobe' });
+});
+
+test('unknown item prompts the user to add it or pick a stocked item', () => {
+  assert.ok(unknownItemPrompt('Bag of cement').includes('Bag of cement'));
+  assert.ok(unknownItemPrompt('Bag of cement').includes('Add'));
+  assert.ok(unknownItemPrompt('   ').includes('that item'));
+});
+
+test('stock prompt names the sold quantity when present', () => {
+  assert.ok(inventoryStockPrompt('Cement', 12).includes('12'));
+  assert.ok(inventoryStockPrompt('Cement').includes('in stock right now'));
+});
+
+test('parseStockAnswer only accepts a plain number count', () => {
+  assert.equal(parseStockAnswer('40'), 40);
+  assert.equal(parseStockAnswer('40 units'), 40);
+  assert.equal(parseStockAnswer('  500  pcs  '), 500);
+  assert.equal(parseStockAnswer('40 for the cement'), null);
+  assert.equal(parseStockAnswer('about 40'), null);
+  assert.equal(parseStockAnswer('forty'), null);
 });

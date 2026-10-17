@@ -81,3 +81,39 @@ export const mergeFields = (base = {}, patch = {}) => {
   }
   return merged;
 };
+
+/**
+ * The blocked-sale question. A sale moves stock, so it can only be written
+ * against an inventory row; inventing one silently would record an item with no
+ * cost and no stock level for the owner to see. So the assistant says why it is
+ * stopped and offers the two ways out: add the item, or name the right one.
+ */
+export const unknownItemPrompt = (item) => {
+  const name = String(item || '').trim() || 'that item';
+  return `I can\u2019t record that sale yet \u2014 \u201c${name}\u201d isn\u2019t in your inventory, so there\u2019s no stock to sell it from. Add it to inventory first, or tell me the item you actually sold.`;
+};
+
+/**
+ * The one question the add-to-inventory flow asks. The count must be the level
+ * *before* this sale, because the sale deducts its own quantity afterwards, so a
+ * bare shelf count would be recorded as "you had this much and also sold some of
+ * it" — which is why the sold units are named in the question.
+ */
+export const inventoryStockPrompt = (item, quantity) => {
+  const name = String(item || '').trim() || 'it';
+  const sold = Math.max(0, Math.round(Number(quantity)) || 0);
+  const note = sold > 0 ? ` Include the ${sold} you just sold.` : '';
+  return `How many ${name} do you have in stock right now?${note}`;
+};
+
+/**
+ * Reads a reply to the stock question. Deliberately strict — a count, optionally
+ * with a unit word, and nothing else — so that "40 for the cement" is not read as
+ * a stock level of 40, and any other reply falls through to the normal flow.
+ */
+export const parseStockAnswer = (text) => {
+  const match = /^\s*(\d{1,7})\s*(?:units?|pieces?|pcs|items?|in stock)?\s*\.?$/i.exec(String(text || ''));
+  if (!match) return null;
+  const value = parseInt(match[1], 10);
+  return Number.isFinite(value) ? value : null;
+};

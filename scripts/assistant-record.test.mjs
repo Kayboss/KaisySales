@@ -4,12 +4,19 @@ import assert from 'node:assert/strict';
 import {
   buildRecordPayload,
   allowedRecordTypes,
+  buildInventoryItemPayload,
+  matchInventoryItem,
   RECORD_TYPE_SECTIONS,
 } from '../src/utils/assistant/recordPayload.js';
 import { shouldParseSentence } from '../src/utils/assistant/route.js';
+import { applyStockDelta, resolveStockStatus } from '../src/utils/inventory.js';
 
 const TODAY = '2026-10-17';
-const OPTS = { mode: 'retail', currency: 'GHS', today: TODAY };
+const MOCK_INVENTORY = [
+  { id: 'c1', name: 'Cement', category: 'Building', stock: 50, minStock: 10, costPrice: 'GHS 7200.00', price: 'GHS 8000.00' },
+  { id: 'o1', name: 'Oil', category: 'Food', stock: 20, minStock: 5, costPrice: 'GHS 90.00', price: 'GHS 180.00' },
+];
+const OPTS = { mode: 'retail', currency: 'GHS', today: TODAY, inventory: MOCK_INVENTORY };
 
 test('allowedRecordTypes is mode specific', () => {
   assert.deepEqual(allowedRecordTypes('retail'), ['expense', 'sale']);
@@ -198,6 +205,8 @@ test('sale mirrors the DailySales payload and relies on full numbers', () => {
   assert.equal(built.payload.paymentMethod, 'Cash');
   assert.equal(built.payload.date, TODAY);
   assert.ok(built.payload.time);
+  assert.equal(built.inventoryMatch?.stock, 50);
+  assert.equal(built.inventoryMatch?.cost, 7200);
 });
 
 test('sale derives unit price from a total when only a total was said', () => {
@@ -215,6 +224,73 @@ test('sale normalises mobile money and card payment wordings', () => {
 test('sale without an item or price is refused', () => {
   assert.match(buildRecordPayload('sale', { amount: 50 }, OPTS).error, /sell\?/i);
   assert.match(buildRecordPayload('sale', { item: 'Rice' }, OPTS).error, /how much/i);
+});
+
+test('a sale names its inventory row, or returns no match to block on', () => {
+  const matched = buildRecordPayload('sale', { item: 'cement', amount: 800 }, OPTS);
+  assert.equal(matched.inventoryMatch.name, 'Cement');
+  assert.equal(matched.inventoryMatch.id, 'c1');
+
+  const unmatched = buildRecordPayload('sale', { item: 'Rice', amount: 800 }, OPTS);
+  assert.equal(unmatched.ok, true);
+  assert.equal(unmatched.inventoryMatch, null);
+});
+
+test('a sale falls back to the category of the item it sold', () => {
+  const fromRow = buildRecordPayload('sale', { item: 'Oil', amount: 100 }, OPTS);
+  assert.equal(fromRow.payload.category, 'Food');
+  assert.equal(fromRow.payload.cost, 90);
+
+  const spoken = buildRecordPayload('sale', { item: 'Oil', amount: 100, category: 'Wholesale' }, OPTS);
+  assert.equal(spoken.payload.category, 'Wholesale');
+});
+
+test('a sale with no inventory list is not blocked by a missing list', () => {
+  const built = buildRecordPayload('sale', { item: 'Rice', amount: 100 }, { ...OPTS, inventory: undefined });
+  assert.equal(built.ok, true);
+  assert.equal(built.inventoryMatch, null);
+});
+
+test('an inventory item is built the way the Inventory screen writes one', () => {
+  assert.deepEqual(buildInventoryItemPayload({ name: 'Cement', category: 'Building', stock: '12', costPrice: 'GHS 7200.00' }), {
+    name: 'Cement',
+    category: 'Building',
+    stock: 12,
+    minStock: 5,
+    price: 'GHS 0.00',
+    costPrice: 'GHS 7200.00',
+    status: 'In Stock',
+  });
+  // A blank minimum is the default, but an explicit zero is left alone.
+  assert.equal(buildInventoryItemPayload({ name: 'Rope', stock: 0, minStock: 0 }).minStock, 0);
+  assert.equal(buildInventoryItemPayload({ name: 'Rope', stock: 2 }).status, 'Low Stock');
+});
+
+test('inventory matching is exact and case-insensitive, never a substring', () => {
+  const items = [{ id: 'a', name: 'Cement' }, { id: 'b', name: 'cement bags' }];
+  assert.equal(matchInventoryItem(items, 'cement')?.id, 'a');
+  assert.equal(matchInventoryItem(items, 'CEMENT BAGS')?.id, 'b');
+  assert.equal(matchInventoryItem(items, 'bag'), null);
+  assert.equal(matchInventoryItem([], 'cement'), null);
+  assert.equal(matchInventoryItem(undefined, 'cement'), null);
+});
+
+// Regression: applyStockDelta's delta is units LEAVING the shelf, so a positive
+// number deducts. saveParsedRecord once passed a negative quantity here, which
+// meant every assistant sale added stock instead of removing it.
+test('a sale moves its units off the shelf in the same direction as DailySales', () => {
+  const built = buildRecordPayload('sale', { item: 'Cement', quantity: 12, amount: 100 }, OPTS);
+  const applied = applyStockDelta(built.inventoryMatch.stock, built.payload.quantity, built.inventoryMatch.minStock);
+  assert.equal(applied.stock, 38);
+  assert.equal(applied.shortfall, 0);
+  assert.equal(
+    resolveStockStatus(applied.stock, built.inventoryMatch.minStock),
+    'In Stock'
+  );
+
+  const oversold = applyStockDelta(38, 50, 10);
+  assert.equal(oversold.stock, 0);
+  assert.equal(oversold.shortfall, 12);
 });
 
 test('service_income mirrors the IncomeTracking payload', () => {
@@ -266,7 +342,7 @@ test('no payload ever carries user_id or an id', () => {
       type === 'expense'
         ? { title: 'Fuel', amount: 10 }
         : type === 'sale'
-          ? { item: 'Rice', amount: 10 }
+          ? { item: 'Cement', amount: 10 }
           : { client_name: 'A', amount: 10 };
     const built = buildRecordPayload(type, fields, { ...OPTS, mode: type === 'sale' ? 'retail' : 'services' });
     assert.equal(built.ok, true);

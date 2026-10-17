@@ -1,6 +1,14 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { createExpense, createSale, createServiceIncome, fetchInventory, updateInventoryItem } from './api';
-import { applyStockDelta, resolveStock, resolveMinStock } from '../utils/inventory';
+import {
+  createExpense,
+  createSale,
+  createServiceIncome,
+  createInventoryItem,
+  fetchInventory,
+  updateInventoryItem,
+} from './api';
+import { applyStockDelta } from '../utils/inventory';
+import { buildInventoryItemPayload, matchInventoryItem, summariseInventoryItem } from '../utils/assistant/recordPayload';
 
 /**
  * Network side of the "talk to record" assistant.
@@ -173,26 +181,47 @@ export const saveParsedRecord = async ({ recordType, payload }) => {
 
   if (recordType !== 'sale') throw new Error('Unsupported record type');
 
-  const created = await createSale(payload);
+  // A sale is only ever written against an inventory row, because that row is
+  // what moves the shelf and what supplies the cost that profit is reported
+  // from. The panel blocks this too, but the guard lives here as well so a stale
+  // card can never write a sale that silently skips inventory.
+  const inventory = await fetchInventory();
+  const rawMatch = matchInventoryItem(inventory, payload.item);
+  if (!rawMatch) {
+    const unknown = new Error('unknown_item');
+    unknown.code = 'unknown_item';
+    throw unknown;
+  }
+  const match = summariseInventoryItem(rawMatch);
+
+  const created = await createSale({ ...payload, cost: match.cost });
+
   // Keep inventory in step with the sale, permanently fail-soft: DailySales warns
   // and continues when this throws, because the sale itself is already saved.
   let shortfall = null;
   try {
-    const inventory = await fetchInventory();
-    const match = inventory.find(
-      (item) => String(item.name || '').toLowerCase() === String(payload.item || '').toLowerCase(),
-    );
-    if (match) {
-      const qty = parseInt(payload.quantity, 10) || 0;
-      const applied = applyStockDelta(resolveStock(match), -qty, resolveMinStock(match));
-      await updateInventoryItem(match.id, { ...match, stock: applied.stock, status: applied.status });
-      if (applied.shortfall > 0) shortfall = applied.shortfall;
-    }
+    const qty = Math.max(0, Math.round(Number(payload.quantity)) || 0);
+    const applied = applyStockDelta(match.stock, qty, match.minStock);
+    // The raw row is spread back, not the summary: a summary is a subset, and an
+    // update that omitted price and costPrice would blank them.
+    await updateInventoryItem(rawMatch.id, { ...rawMatch, stock: applied.stock, status: applied.status });
+    if (applied.shortfall > 0) shortfall = applied.shortfall;
   } catch (inventoryError) {
     console.warn('Assistant inventory auto-deduct skipped:', inventoryError);
   }
 
   return { record: created, shortfall };
+};
+
+/**
+ * Creates the inventory row a sale needs before that sale can be recorded at
+ * all. Mirrors what the Inventory screen writes, so the item the assistant adds
+ * is indistinguishable from a hand-typed one. Cost is left at zero because
+ * nobody has said what it cost — the owner can fill that in on the item later.
+ */
+export const addInventoryItem = async ({ name, category, stock, costPrice, minStock }) => {
+  const payload = buildInventoryItemPayload({ name, category, stock, costPrice, minStock });
+  return createInventoryItem(payload);
 };
 
 export { NOT_CONFIGURED_MESSAGE };
