@@ -1,19 +1,33 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Send, X, Sparkles, MessageCircle } from 'lucide-react';
+import { ChevronRight, Send, Sparkles, X } from 'lucide-react';
 import { answer, suggestedQuestions } from '../../utils/assistant/engine';
-import { shouldParseSentence } from '../../utils/assistant/route';
-import { buildRecordPayload, RECORD_TYPE_LABELS, RECORD_TYPE_SECTIONS } from '../../utils/assistant/recordPayload';
-import { missingFields, clarifyPrompt, mergeFields, unknownItemPrompt, inventoryStockPrompt, parseStockAnswer } from '../../utils/assistant/clarify';
+import { buildInsights } from '../../utils/assistant/insights';
 import { buildAssistantContext } from '../../services/assistantContext';
-import { parseSentence, logParse, updateParse, saveParsedRecord, addInventoryItem, NOT_CONFIGURED_MESSAGE } from '../../services/assistantRecord';
 import { useAssistantStore } from '../../store/assistantStore';
-import RecordCard from './RecordCard';
+
+/**
+ * The assistant is a reading surface, not an input method.
+ *
+ * Recording is left to the screens, which already do it well and validate what
+ * they are told — a spoken sentence was a slower, blurrier way to fill the same
+ * form. So this panel does the thing the screens cannot: it looks across every
+ * record and says what needs attention, then answers questions about the numbers.
+ * Both are computed on-device from the same stats the reports use, so the panel
+ * can never disagree with a screen.
+ */
+
+const severityColor = (theme, severity) => {
+  if (severity === 'high') return theme.colors.status.error;
+  if (severity === 'medium') return theme.colors.status.warning;
+  return theme.colors.primary;
+};
 
 const Fab = styled.button`
   position: fixed;
   right: 1.5rem;
-  bottom: 1.5rem;
+  bottom: 5.25rem;
   z-index: 300;
   display: flex;
   align-items: center;
@@ -83,10 +97,9 @@ const Close = styled.button`
 const Messages = styled.div`
   flex: 1;
   /* min-height: 0 is load-bearing. A flex item's automatic minimum size is its
-     content, so without it this scroll area grows to fit a tall confirmation
-     card instead of scrolling it — the panel (overflow: hidden) then clips the
-     overflow, the Save buttons and composer slide out of reach, and on a phone
-     the scroll simply stops working. */
+     content, so without it this scroll area grows to fit a tall message instead
+     of scrolling it — the panel (overflow: hidden) then clips the overflow and
+     on a phone the composer slides out of reach. */
   min-height: 0;
   overscroll-behavior: contain;
   overflow-y: auto;
@@ -120,10 +133,54 @@ const Bubble = styled.div`
       `}
 `;
 
-const Thinking = styled.div`
-  align-self: flex-start;
-  padding: 0 0.25rem;
+const SectionLabel = styled.div`
+  margin-top: 0.25rem;
+  font-family: ${({ theme }) => theme.fonts.display};
+  font-weight: 700;
   font-size: ${({ theme }) => theme.fontSizes.xs};
+  color: ${({ theme }) => theme.colors.text.muted};
+`;
+
+const InsightCard = styled.button`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  text-align: left;
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  border-left: 3px solid ${({ theme, $severity }) => severityColor(theme, $severity)};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  background: ${({ theme }) => theme.colors.background.surface};
+  padding: 0.65rem 0.75rem;
+  cursor: pointer;
+  font-family: ${({ theme }) => theme.fonts.main};
+  transition: ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.background.surfaceVariant};
+  }
+`;
+
+const InsightText = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const InsightTitle = styled.div`
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  font-weight: 700;
+  color: ${({ theme }) => theme.colors.text.main};
+`;
+
+const InsightBody = styled.div`
+  margin-top: 0.15rem;
+  font-size: ${({ theme }) => theme.fontSizes.xs};
+  line-height: 1.35;
+  color: ${({ theme }) => theme.colors.text.muted};
+`;
+
+const InsightChevron = styled(ChevronRight)`
+  flex-shrink: 0;
   color: ${({ theme }) => theme.colors.text.muted};
 `;
 
@@ -150,20 +207,6 @@ const Chip = styled.button`
     border-color: ${({ theme }) => theme.colors.border};
     background: ${({ theme }) => theme.colors.background.surfaceVariant};
   }
-`;
-
-const PendingRow = styled.div`
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin: 0 1rem 0.5rem;
-  padding: 0.45rem 0.5rem 0.45rem 0.75rem;
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  background: ${({ theme }) => theme.colors.background.surfaceVariant};
-  font-size: ${({ theme }) => theme.fontSizes.xs};
-  color: ${({ theme }) => theme.colors.text.muted};
 `;
 
 const Composer = styled.form`
@@ -217,362 +260,39 @@ const AssistantPanel = () => {
   const open = useAssistantStore((s) => s.open);
   const initialQuestion = useAssistantStore((s) => s.initialQuestion);
   const openAssistant = useAssistantStore((s) => s.openAssistant);
-  const clearInitial = useAssistantStore((s) => s.clearInitial);
   const closeAssistant = useAssistantStore((s) => s.closeAssistant);
+  const clearInitial = useAssistantStore((s) => s.clearInitial);
+  const navigate = useNavigate();
 
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
   const [context, setContext] = useState(null);
   const [ready, setReady] = useState(false);
-  const [thinking, setThinking] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
   const [lastAuto, setLastAuto] = useState(null);
-  // The card whose blank fields the assistant just asked about. While it is set,
-  // the next thing the user types is read as an answer to that question rather
-  // than as a fresh record.
-  const [pending, setPending] = useState(null);
-  // The card waiting on an inventory item to be added before it can be saved.
-  // While it is set, a bare number is read as that item's stock level — no round
-  // trip, because "40" is not a sentence for the parser to interpret.
-  const [pendingAdd, setPendingAdd] = useState(null);
   const builtRef = useRef(false);
   const endRef = useRef(null);
 
-  const patchCard = useCallback(
-    (key, patch) =>
-      setMessages((prev) =>
-        prev.map((message) =>
-          message.card && message.card.key === key ? { ...message, card: { ...message.card, ...patch } } : message
-        )
-      ),
-    []
+  const insights = useMemo(
+    () => (context ? buildInsights({ mode: context.mode, currency: context.currency, statsByScope: context.statsByScope }) : []),
+    [context]
   );
 
-  const mode = context?.mode === 'services' ? 'services' : 'retail';
-  const currency = context?.currency || 'GHS';
-  const inventory = context?.inventory;
-
-  /**
-   * Builds the payload, shows the card, and asks about whatever the record is
-   * still missing. `replaceKey` re-renders an existing card in place, which is
-   * how an answer to the follow-up question lands: same card, fuller record.
-   * `inventory` overrides the loaded rows so a card can be re-presented against
-   * an item that was just added.
-   */
-  const presentCard = useCallback(
-    ({ recordType, fields, confidence, parseId, replaceKey, inventory: inventoryRows }) => {
-      const rows = Array.isArray(inventoryRows) ? inventoryRows : inventory;
-      const built = buildRecordPayload(recordType || '', fields, { mode, currency, inventory: rows });
-      if (!built.ok) {
-        setMessages((prev) => [...prev, { role: 'assistant', text: built.error }]);
-        if (!replaceKey) setPending(null);
-        return;
-      }
-
-      // A sale moves stock, and stock only exists on an inventory row. When the
-      // spoken item matches none, the card is shown but cannot be saved: the
-      // assistant names the problem and offers to add the item, rather than
-      // writing a sale that quietly skips the shelf (or inventing an item with no
-      // cost the owner never sees). `null` (loaded, no match) is the block;
-      // `undefined` (retail context not loaded) is not, and saveParsedRecord
-      // re-checks so a stale card still cannot slip through.
-      const unresolvedItem =
-        built.recordType === 'sale' && Array.isArray(rows) && !built.inventoryMatch;
-
-      const missing = missingFields(built.recordType, built.payload, mode);
-      const cardKey = replaceKey || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const card = {
-        key: cardKey,
-        parseId,
-        recordType: built.recordType,
-        payload: built.payload,
-        summary: built.summary,
-        missing,
-        confidence,
-        status: 'pending',
-        fields,
-        inventoryMatch: built.inventoryMatch || null,
-        unresolvedItem,
-      };
-
-      if (replaceKey) {
-        // Keep the original parse row: the feedback the user gives when they save
-        // or reject belongs to the sentence that started the record, not to the
-        // answer that finished it.
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.card && message.card.key === replaceKey
-              ? {
-                  ...message,
-                  card: {
-                    ...card,
-                    parseId: message.card.parseId,
-                    status: message.card.status,
-                    // A re-present (stock added, item re-named) does not re-read
-                    // the model, so the original confidence stands.
-                    confidence: card.confidence ?? message.card.confidence,
-                  },
-                }
-              : message
-          )
-        );
-      } else {
-        setMessages((prev) => [...prev, { role: 'assistant', card }]);
-      }
-
-      // The unresolved item is the more urgent question, so it replaces the
-      // "anything missing?" one instead of arriving beside it.
-      if (unresolvedItem) {
-        setPendingAdd(null);
-        setPending({
-          cardKey,
-          recordType: built.recordType,
-          fields,
-          label: built.payload.item || RECORD_TYPE_LABELS[built.recordType] || 'this record',
-        });
-        setMessages((prev) => [
-          ...prev,
-          { role: 'assistant', text: unknownItemPrompt(built.payload.item) },
-        ]);
-        return;
-      }
-
-      setPending(
-        missing.length
-          ? {
-              cardKey,
-              recordType: built.recordType,
-              fields,
-              label:
-                built.payload.title || built.payload.item || built.payload.client_name ||
-                RECORD_TYPE_LABELS[built.recordType] ||
-                'this record',
-            }
-          : null
-      );
-
-      const question = clarifyPrompt(missing);
-      if (question) setMessages((prev) => [...prev, { role: 'assistant', text: question }]);
-    },
-    [mode, currency, inventory]
-  );
-
-  const ask = useCallback(
-    async (raw) => {
-      const q = String(raw || '').trim();
-      if (!q) return;
-      setMessages((prev) => [...prev, { role: 'user', text: q }]);
-
-      const safeContext = context || { mode: 'retail', currency: 'GHS', statsByScope: {} };
-      const answering = pending;
-
-      // The one thing the assistant asks that is not a sentence: "how many do you
-      // have in stock?" is answered with a number. A bare count is read here and
-      // the item is created locally, so no model round trip is spent on it. Any
-      // other reply means they changed their mind, so the flow is abandoned and
-      // the message carries on as an ordinary one.
-      const stockLevel = pendingAdd ? parseStockAnswer(q) : null;
-      if (pendingAdd && stockLevel === null) setPendingAdd(null);
-
-      if (pendingAdd && stockLevel !== null) {
-        const target = pendingAdd;
-        setThinking(true);
-        try {
-          await addInventoryItem({
-            name: target.item,
-            category: target.category,
-            stock: stockLevel,
-          });
-          const fresh = await buildAssistantContext();
-          setContext(fresh);
-          setPendingAdd(null);
-          // Re-present the same card against the new inventory: it is the same
-          // sentence and the same parse row, now resolvable.
-          presentCard({
-            recordType: target.recordType,
-            fields: target.fields,
-            replaceKey: target.cardKey,
-            inventory: fresh.inventory,
-          });
-        } catch (error) {
-          console.error('Failed to add inventory item from assistant', error);
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              text: `I couldn\u2019t add \u201c${target.item}\u201d to inventory. You can add it in Inventory, then say the sale again.`,
-            },
-          ]);
-        } finally {
-          setThinking(false);
-        }
-        return;
-      }
-
-      // A sentence with no number and a question word in it can only be a
-      // question, so it is answered from the on-device stats without a round trip.
-      // An answer to the assistant's own question is exempt: "Adobe" carries no
-      // number, but it is an answer, and it has to reach the parser.
-      if (!answering && !shouldParseSentence(q)) {
-        const result = answer(q, safeContext);
-        setMessages((prev) => [...prev, { role: 'assistant', text: result.text }]);
-        return;
-      }
-
-      setThinking(true);
-      try {
-        const parsed = await parseSentence({
-          text: q,
-          mode: safeContext.mode,
-          currency: safeContext.currency,
-          categories: safeContext.categories,
-          items: safeContext.items,
-          merge: answering ? { recordType: answering.recordType, fields: answering.fields } : null,
-        });
-
-        if (!parsed.ok) {
-          const text =
-            parsed.reason === 'not_configured'
-              ? NOT_CONFIGURED_MESSAGE
-              : parsed.reason === 'unauthorized'
-                ? 'Your session has expired. Sign in again and I can record that for you.'
-                : 'Something went wrong on the record service just now. I can still answer questions about your business.';
-          setMessages((prev) => [...prev, { role: 'assistant', text }]);
-          return;
-        }
-
-        if (answering) {
-          // The reply may have been a question of their own instead of an answer.
-          // Answer it and leave the card, and the question, standing.
-          if (parsed.kind !== 'record' || !parsed.recordType) {
-            const result = answer(q, safeContext);
-            setMessages((prev) => [...prev, { role: 'assistant', text: result.text }]);
-            return;
-          }
-          presentCard({
-            recordType: parsed.recordType,
-            fields: mergeFields(answering.fields, parsed.fields),
-            confidence: parsed.confidence,
-            replaceKey: answering.cardKey,
-          });
-          return;
-        }
-
-        if (parsed.kind !== 'record' || !parsed.recordType) {
-          const result = answer(q, safeContext);
-          const text = parsed.kind === 'unknown' && parsed.clarify ? parsed.clarify : result.text;
-          setMessages((prev) => [...prev, { role: 'assistant', text }]);
-          return;
-        }
-
-        // The attempt is logged either way: a sentence the model got wrong is the
-        // exact material the weekly review turns into a new FEW_SHOT example. An
-        // answer to a follow-up question is deliberately NOT logged — detached
-        // from the sentence it was answering it would read as a broken example.
-        const parseId = await logParse({
-          input: q,
-          kind: 'record',
-          recordType: parsed.recordType,
-          parsed: {
-            recordType: parsed.recordType,
-            confidence: parsed.confidence,
-            fields: parsed.fields,
-            source: parsed.source || 'model',
-          },
-        });
-
-        presentCard({
-          recordType: parsed.recordType,
-          fields: parsed.fields,
-          confidence: parsed.confidence,
-          parseId,
-        });
-      } finally {
-        setThinking(false);
-      }
-    },
-    [context, pending, pendingAdd, presentCard]
-  );
-
-  /**
-   * Starts the add-to-inventory flow for a sale whose item is not stocked. The
-   * card is left standing: once the item exists the same card is re-presented,
-   * still bound to the sentence that created it.
-   */
-  const handleAddToInventory = useCallback((card) => {
-    setPendingAdd({
-      cardKey: card.key,
-      recordType: card.recordType,
-      fields: card.fields || {},
-      item: card.payload?.item || '',
-      category: card.payload?.category || '',
-    });
-    setMessages((prev) => [
-      ...prev,
-      { role: 'assistant', text: inventoryStockPrompt(card.payload?.item, card.payload?.quantity) },
-    ]);
-  }, []);
-
-  const handleSaveCard = useCallback(
-    async (card) => {
-      if (pending?.cardKey === card.key) setPending(null);
-      if (pendingAdd?.cardKey === card.key) setPendingAdd(null);
-      patchCard(card.key, { status: 'saving' });
-      try {
-        const result = await saveParsedRecord({
-          recordType: card.recordType,
-          payload: card.payload,
-        });
-        patchCard(card.key, {
-          status: 'saved',
-          shortfall: result?.shortfall || null,
-          item: card.payload?.item || null,
-        });
-        updateParse(card.parseId, { saved: true, feedback: 'up' });
-        // A saved record is new input for any follow-up question, so rebuild the
-        // stats the engine answers from rather than leaving it a record behind.
-        buildAssistantContext().then(setContext).catch(() => {});
-      } catch (error) {
-        console.error('Failed to save assistant record', error);
-        // The item went missing between the card being built and being saved —
-        // an inventory row was renamed or deleted in another tab. Rather than a
-        // bare "something went wrong", put the card back into the blocked state
-        // and offer the same way out.
-        if (error?.code === 'unknown_item') {
-          patchCard(card.key, { status: 'pending', unresolvedItem: true, inventoryMatch: null });
-          setMessages((prev) => [
-            ...prev,
-            { role: 'assistant', text: unknownItemPrompt(card.payload?.item) },
-          ]);
-          return;
-        }
-        patchCard(card.key, { status: 'error' });
-      }
-    },
-    [patchCard, pending, pendingAdd]
-  );
-
-  const handleDiscardCard = useCallback(
-    (card) => {
-      if (pending?.cardKey === card.key) setPending(null);
-      if (pendingAdd?.cardKey === card.key) setPendingAdd(null);
-      patchCard(card.key, { status: 'rejected' });
-      updateParse(card.parseId, { feedback: 'down' });
-      const section = RECORD_TYPE_SECTIONS[card.recordType] || 'your records';
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-            text: `No problem \u2014 nothing was saved. You can add it by hand in ${section}, or say it another way.`,
-        },
-      ]);
-    },
-    [patchCard, pending, pendingAdd]
-  );
+  const ask = (question) => {
+    const text = String(question || '').trim();
+    if (!text) return;
+    const reply = answer(text, context || { mode: 'retail', currency: 'GHS', statsByScope: {} }).text;
+    setMessages((prev) => [...prev, { role: 'user', text }, { role: 'assistant', text: reply }]);
+  };
 
   const onSubmit = (event) => {
     event.preventDefault();
     ask(input);
     setInput('');
+  };
+
+  const onInsight = (insight) => {
+    navigate(insight.route);
+    closeAssistant();
   };
 
   useEffect(() => {
@@ -596,132 +316,122 @@ const AssistantPanel = () => {
     };
   }, [open]);
 
-  // A doorway question is answered once its context has finished loading. The
-  // append happens during render (the React-sanctioned "adjust state when a
-  // value changes" pattern) rather than in an effect, so the seeded answer uses
-  // real numbers. `lastAuto` back-stops the append so a later open of the same
-  // session never replays it; the effect below then clears the pending question
-  // from the store.
+  // A doorway button opens the panel primed with that screen's question. The same
+  // setState-during-render pattern the store test pins down: an effect here would
+  // be the naive version the react-hooks rule forbids.
   if (open && ready && initialQuestion && lastAuto !== initialQuestion) {
     setLastAuto(initialQuestion);
-    const safeContext = context || { mode: 'retail', currency: 'GHS', statsByScope: {} };
-    const result = answer(initialQuestion, safeContext);
-    setMessages((prev) => [
-      ...prev,
+    const reply = answer(initialQuestion, context || { mode: 'retail', currency: 'GHS', statsByScope: {} }).text;
+    setMessages([
       { role: 'user', text: initialQuestion },
-      { role: 'assistant', text: result.text },
+      { role: 'assistant', text: reply },
     ]);
   }
 
   useEffect(() => {
-    if (open && initialQuestion && lastAuto === initialQuestion) clearInitial();
+    if (!open || !initialQuestion || lastAuto !== initialQuestion) return;
+    clearInitial();
   }, [open, initialQuestion, lastAuto, clearInitial]);
 
   useEffect(() => {
-    if (endRef.current) endRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, thinking]);
+    if (endRef.current) endRef.current.scrollIntoView({ block: 'nearest' });
+  }, [messages]);
 
   if (!open) {
     return (
-      <Fab type="button" onClick={() => openAssistant()} aria-label="Ask the KaisySales assistant">
+      <Fab type="button" onClick={() => openAssistant()} aria-label="Open the KaisySales assistant">
         <Sparkles size={18} />
-        Ask
+        Assistant
       </Fab>
     );
   }
 
   const suggestions = suggestedQuestions(context?.mode || 'retail');
-  const recordExample = context?.mode === 'services' ? 'Received 5,000 from Kwame' : 'Paid 800 for fuel';
+  const showLanding = messages.length === 0;
 
   return (
-    <>
-      <Panel>
-        <Header>
-          <Title>
-            <MessageCircle size={18} />
-            KaisySales Assistant
-          </Title>
-          <Close type="button" onClick={closeAssistant} aria-label="Close assistant">
-            <X size={20} />
-          </Close>
-        </Header>
+    <Panel>
+      <Header>
+        <Title>
+          <Sparkles size={18} />
+          KaisySales Assistant
+        </Title>
+        <Close type="button" onClick={closeAssistant} aria-label="Close assistant">
+          <X size={20} />
+        </Close>
+      </Header>
 
-        <Messages>
-          {messages.length === 0 && (
-            <Bubble $assistant>
-              Hi! Tell me what happened — “paid 800 for fuel” — and I&apos;ll read it back for you to confirm
-              before anything is saved. Or ask about your numbers; those are answered right here on your device.
-            </Bubble>
-          )}
-          {messages.map((message, index) =>
-            message.card ? (
-              <RecordCard
-                key={message.card.key}
-                card={message.card}
-                onSave={handleSaveCard}
-                onDiscard={handleDiscardCard}
-                onAddToInventory={handleAddToInventory}
-                addingToInventory={pendingAdd?.cardKey === message.card.key}
-              />
-            ) : (
-              <Bubble key={index} $assistant={message.role === 'assistant'}>
-                {message.text}
-              </Bubble>
-            )
-          )}
-          {thinking && <Thinking>Reading your sentence…</Thinking>}
-          <div ref={endRef} />
-        </Messages>
+      <Messages>
+        {showLanding && (
+          <Bubble $assistant>
+            For keeping your books, use each screen&apos;s own form — that&apos;s the quickest way. Ask me here about your
+            numbers instead, or look below for what needs your attention.
+          </Bubble>
+        )}
 
-        {messages.length === 0 && (
-          <Suggestions>
-            <Chip key={recordExample} type="button" onClick={() => ask(recordExample)}>
-              {recordExample}
-            </Chip>
-            {suggestions.slice(0, 3).map((suggestion) => (
-              <Chip key={suggestion} type="button" onClick={() => ask(suggestion)}>
-                {suggestion}
-              </Chip>
+        {showLanding && ready && context && insights.length === 0 && (
+          <Bubble $assistant>Everything looks settled right now — nothing needs your attention.</Bubble>
+        )}
+
+        {showLanding && insights.length > 0 && (
+          <>
+            <SectionLabel>Needs attention</SectionLabel>
+            {insights.map((insight) => (
+              <InsightCard key={insight.id} type="button" $severity={insight.severity} onClick={() => onInsight(insight)}>
+                <InsightText>
+                  <InsightTitle>{insight.title}</InsightTitle>
+                  <InsightBody>{insight.body}</InsightBody>
+                </InsightText>
+                <InsightChevron size={16} />
+              </InsightCard>
             ))}
-          </Suggestions>
+          </>
         )}
 
-        {(pending || pendingAdd) && (
-          <PendingRow>
-            <span>
-              Adding to &ldquo;{pendingAdd ? pendingAdd.item : pending.label}&rdquo;
-            </span>
-            <Chip
-              type="button"
-              onClick={() => {
-                setPending(null);
-                setPendingAdd(null);
-              }}
-            >
-              New record instead
+        {!showLanding &&
+          messages.map((message, index) => (
+            <Bubble key={index} $assistant={message.role === 'assistant'}>
+              {message.text}
+            </Bubble>
+          ))}
+        <div ref={endRef} />
+      </Messages>
+
+      {showLanding && (
+        <Suggestions>
+          {suggestions.slice(0, 3).map((suggestion) => (
+            <Chip key={suggestion} type="button" onClick={() => ask(suggestion)}>
+              {suggestion}
             </Chip>
-          </PendingRow>
-        )}
+          ))}
+        </Suggestions>
+      )}
 
-        <Composer onSubmit={onSubmit}>
-          <Input
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder={
-              pendingAdd
-                ? 'How many in stock?'
-                : pending
-                  ? 'Answer, or say something else…'
-                  : 'Type a record or ask a question…'
-            }
-            aria-label="Type a record or a question for the assistant"
-          />
-          <SendButton type="submit" disabled={!input.trim()} aria-label="Send to the assistant">
-            <Send size={16} />
-          </SendButton>
-        </Composer>
-      </Panel>
-    </>
+      {!showLanding && (
+        <Suggestions>
+          <Chip type="button" onClick={() => setMessages([])}>
+            What needs attention?
+          </Chip>
+          {suggestions.slice(0, 2).map((suggestion) => (
+            <Chip key={suggestion} type="button" onClick={() => ask(suggestion)}>
+              {suggestion}
+            </Chip>
+          ))}
+        </Suggestions>
+      )}
+
+      <Composer onSubmit={onSubmit}>
+        <Input
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder="Ask about your numbers…"
+          aria-label="Ask the assistant about your numbers"
+        />
+        <SendButton type="submit" disabled={!input.trim()} aria-label="Send to the assistant">
+          <Send size={16} />
+        </SendButton>
+      </Composer>
+    </Panel>
   );
 };
 

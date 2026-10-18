@@ -373,18 +373,15 @@ test('answer: wanting to record an expense gives directions, not an empty month'
   const { text, intent } = answer('I want to record an expenses', retail({}));
   assert.equal(intent, 'recordGuide');
   assert.match(text, /Add Expense/);
-  assert.match(text, /800 for fuel today/);
   assert.doesNotMatch(text, /haven.t recorded any expenses/);
 });
 
 test('answer: record guidance names a screen that exists in that mode', () => {
   const servicesExpense = answer('I want to record an expense', services({})).text;
   assert.match(servicesExpense, /Add Expense/);
-  assert.match(servicesExpense, /500 for design work today/);
 
   const retailSale = answer('I want to record a sale', retail({})).text;
   assert.match(retailSale, /Record sale/);
-  assert.match(retailSale, /3 bags of cement/);
 
   const servicesSale = answer('I want to record a sale', services({})).text;
   assert.doesNotMatch(servicesSale, /In Sales/);
@@ -409,9 +406,9 @@ test('answer: help lists example questions', () => {
   assert.match(text, /Is anything running low\?/);
 });
 
-test('answer: greeting promises local-only processing', () => {
+test('answer: greeting says the assistant works from your own records', () => {
   const { text } = answer('hello', retail({}));
-  assert.match(text, /nothing leaves this device/);
+  assert.match(text, /flag what needs your attention/);
 });
 
 test('answer: numbers come only from the supplied stats, never recomputed', () => {

@@ -1,7 +1,7 @@
 import { parseAmount } from '../currency.js';
 import { serviceRowReceived, serviceProfit } from '../serviceFinance.js';
 import { buildOutstandingRows, summariseByCustomer, isOverdue } from '../serviceOutstanding.js';
-import { resolveStock, resolveMinStock } from '../inventory.js';
+import { resolveStock, resolveMinStock, countItemsMissingCost } from '../inventory.js';
 
 /**
  * Assistant stats builder.
@@ -71,6 +71,7 @@ const emptyStats = () => ({
   profit: 0,
   inventoryCount: 0,
   lowStock: [],
+  unpricedCount: 0,
   customerCount: 0,
   topCustomer: null,
   outstandingTotal: 0,
@@ -103,6 +104,7 @@ const allTimeFacts = ({ mode, inventory, customers, serviceIncome, recurring, in
   return {
     inventoryCount: inventory.length,
     lowStock,
+    unpricedCount: countItemsMissingCost(inventory),
     customerCount: customers.length,
     topCustomer: groupTop(serviceIncome, (i) => i.clientName || 'Unnamed client', serviceRowReceived),
     outstandingTotal: sum(byCustomer.map((row) => row.total)),

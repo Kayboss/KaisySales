@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { Plus, Edit2, Trash2, RefreshCw, DollarSign } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
@@ -327,6 +327,20 @@ const IncomeTracking = () => {
     setModalOpen(true);
   };
 
+  // Recording a new payment had no entry point of its own on this screen — new
+  // income only ever arrived through a customer's "Mark Paid". The form already
+  // supports adding (submit reads "Add" when editId is null); this is the button.
+  const openAddIncome = useCallback((seed = {}) => {
+    setEditId(null);
+    setIncomeForm({
+      clientName: '', amount: '', platformFee: '', netAmount: '',
+      platformTag: 'direct', milestoneLabel: '', paymentDate: '', notes: '', category: '',
+      ...seed,
+    });
+    setTab('income');
+    setModalOpen(true);
+  }, []);
+
   const handleSaveIncome = async (e) => {
     e.preventDefault();
     setSavingIncome(true);
@@ -459,6 +473,7 @@ const IncomeTracking = () => {
         <Title>Dashboard</Title>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <SearchInput placeholder="Search..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+{tab === 'income' && <AddButton onClick={() => openAddIncome()}><Plus size={18} /> Add Income</AddButton>}
 {tab === 'recurring' && <AddButton onClick={openAddRecur}><Plus size={18} /> Add Recurring</AddButton>}
         </div>
       </Header>
@@ -598,7 +613,7 @@ const IncomeTracking = () => {
           )}
 
           <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
-            <h2 style={{ marginBottom: '1.5rem', color: '#6F240A' }}>Edit Income</h2>
+            <h2 style={{ marginBottom: '1.5rem', color: '#6F240A' }}>{editId ? 'Edit Income' : 'Add Income'}</h2>
             <form onSubmit={handleSaveIncome}>
               <Label>Client</Label>
               {customers.length > 0 ? (

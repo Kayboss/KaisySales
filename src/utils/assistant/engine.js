@@ -1,5 +1,7 @@
 import { formatCurrency, parseAmount } from '../currency.js';
-import { RECORDING_INTENT_RE } from './route.js';
+import { RECORDING_INTENT_RE } from './recordingIntent.js';
+
+/**
 
 /**
  * KaisySales assistant engine.
@@ -83,7 +85,7 @@ const HOWTO_TOPICS = [
     modes: ['services'],
     re: /\bincome\b|\bpay(ment)?\b|\breceiv|\bmoney (\bin|coming)|(input|enter|log|record) (it|this|the (payment|income|sale))\b|(record|add|enter|log) (an? |one |the |some )?(payment|income|sale|money)\b/,
     text:
-      'In Income Tracking, add one-off payments on the Income tab, or ongoing amounts under Recurring.\n\u2022 Net income is worked out as amount minus any platform fee.',
+      "In Income Tracking, tap 'Add Income' on the Income tab for a one-off payment, or add ongoing amounts under Recurring.\n\u2022 Net income is worked out as amount minus any platform fee.",
   },
   {
     key: 'invoices',
@@ -109,29 +111,9 @@ const fallbackHowto = (mode) =>
 const pickHowtoTopic = (text, mode) =>
   HOWTO_TOPICS.find((candidate) => (!candidate.modes || candidate.modes.includes(mode)) && candidate.re.test(text)) || null;
 
-/**
- * The one-sentence form the assistant itself accepts, offered only where a
- * sentence would actually become a record (expense, sale, income).
- */
-const dictationHint = (topicKey, mode) => {
-  const example =
-    topicKey === 'expenses'
-      ? mode === 'services'
-        ? '500 for design work today'
-        : '800 for fuel today'
-      : topicKey === 'sales'
-        ? 'sold 3 bags of cement for 150'
-        : topicKey === 'income'
-          ? 'received 500 from Ama today'
-          : null;
-  if (!example) return '';
-  return `\n\u2022 Or just say it as one sentence \u2014 \u201c${example}\u201d \u2014 and I\u2019ll put the record in front of you to approve.`;
-};
-
 const guidanceAnswer = (meta) => {
   const topic = pickHowtoTopic(normalizeQuestion(meta.matchedText || ''), meta.mode);
-  const body = topic ? topic.text : fallbackHowto(meta.mode);
-  return `${body}${dictationHint(topic ? topic.key : null, meta.mode)}`;
+  return topic ? topic.text : fallbackHowto(meta.mode);
 };
 
 const unknownSuggestionsFor = (mode) =>
@@ -211,7 +193,7 @@ const pick = (stats, context, key) => {
 
 const intentAnswerers = {
   greeting: () =>
-    `Hi! I\u2019m your local assistant. I answer from your own records and nothing leaves this device. Ask me things like \u201chow much did I make this month?\u201d`,
+    `Hi! I\u2019m your local assistant. I look at your own records, answer your questions and flag what needs your attention \u2014 all worked out here on your device, nothing sent anywhere. Ask me things like \u201chow much did I make this month?\u201d`,
 
   thanks: () => 'You\u2019re welcome. Ask me about your sales, expenses, stock or who owes you.',
 
@@ -438,12 +420,11 @@ const INTENT_CHECKERS = [
     re: /^(i|we|just)( (just|today))? (made|sold|did|received|recorded|logged|entered|took in|took|collected|got) (a |an |one |the )?(sale|payment|income|cash|paid|\d)|^i (just )?sold (to|for)|^just (made|sold|received) /,
   },
   {
-    // The intention to record, shared with shouldParseSentence: a statement of
-    // intent must not fall through to the stats intents and be answered with
-    // "you haven't recorded any X this month" — that answers a question nobody
-    // asked. It sits after recordOne (which reads as already done) and before
-    // every stats intent (stats sentences start with a question word, which
-    // this pattern does not).
+    // The intention to record: a statement of intent must not fall through to the
+    // stats intents and be answered with "you haven't recorded any X this month"
+    // — that answers a question nobody asked. It sits after recordOne (which reads
+    // as already done) and before every stats intent (stats sentences start with a
+    // question word, which this pattern does not).
     key: 'recordGuide',
     re: RECORDING_INTENT_RE,
   },
