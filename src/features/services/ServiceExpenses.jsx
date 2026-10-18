@@ -4,6 +4,7 @@ import { Plus, Edit2, Trash2, Calendar } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import EmptyState from '../../components/ui/EmptyState';
+import AssistantDoorway from '../../components/assistant/AssistantDoorway';
 import Skeleton from '../../components/ui/Skeleton';
 import SkeletonCards from '../../components/ui/SkeletonCards';
 import SkeletonScreen from '../../components/ui/SkeletonScreen';
@@ -19,11 +20,33 @@ const Header = styled.div`
   margin-bottom: 2rem;
   flex-wrap: wrap;
   gap: 1rem;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+`;
+
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
 `;
 
 const Title = styled.h1`
   font-size: 1.5rem;
   color: ${({ theme }) => theme.colors.primary};
+
+  @media (max-width: 768px) { font-size: 1.35rem; }
 `;
 
 const SearchInput = styled.input`
@@ -48,6 +71,12 @@ const AddButton = styled.button`
   font-weight: 600;
   cursor: pointer;
   &:hover { filter: brightness(1.15); }
+
+  /* A primary action wants a full-width, thumb-sized target on a phone. */
+  @media (max-width: 768px) {
+    justify-content: center;
+    min-height: 46px;
+  }
 `;
 
 const Table = styled.table`
@@ -114,9 +143,18 @@ const ActionBtn = styled.button`
   border: none;
   cursor: pointer;
   padding: 0.35rem;
-  color: ${({ theme }) => theme.colors.text.muted};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ $danger, theme }) => ($danger ? '#C62828' : theme.colors.text.muted)};
   border-radius: 6px;
-  &:hover { background: ${({ theme }) => theme.colors.background.surfaceVariant}; color: ${({ theme }) => theme.colors.primary}; }
+  &:hover { background: ${({ theme }) => theme.colors.background.surfaceVariant}; color: ${({ $danger }) => ($danger ? '#C62828' : 'inherit')}; }
+
+  /* Fingers need 44px; a mouse does not. */
+  @media (max-width: 768px) {
+    min-width: 44px;
+    min-height: 44px;
+  }
 `;
 
 const MobileGrid = styled.div`
@@ -125,10 +163,12 @@ const MobileGrid = styled.div`
 `;
 
 const MobileCard = styled.div`
+  display: grid;
+  gap: 0.45rem;
   background: white;
   border-radius: 12px;
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
-  padding: 1rem;
+  padding: 0.9rem 1rem;
   border-left: 4px solid ${({ $type }) =>
     $type === 'saas' ? '#1565C0' :
     $type === 'subcontractor' ? '#E65100' :
@@ -136,13 +176,89 @@ const MobileCard = styled.div`
     $type === 'platform_fee' ? '#C62828' : '#D4AF37'};
 `;
 
-const MobileRow = styled.div`
+const MobileHead = styled.div`
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 0.75rem;
+`;
+
+const MobileTitle = styled.span`
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  color: ${({ theme }) => theme.colors.text.main};
+`;
+
+const MobileAmount = styled.span`
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  color: ${({ theme }) => theme.colors.text.main};
+`;
+
+const MobileTags = styled.div`
+  display: flex;
   align-items: center;
-  padding: 0.3rem 0;
-  font-size: 0.9rem;
-  span:first-child { color: ${({ theme }) => theme.colors.text.muted}; font-size: 0.8rem; }
+  flex-wrap: wrap;
+  gap: 0.35rem;
+`;
+
+const MobileMeta = styled.div`
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text.muted};
+`;
+
+const MobileRenewal = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #875200;
+`;
+
+const MobileActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  border-top: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  padding-top: 0.25rem;
+  margin-top: 0.1rem;
+`;
+
+/* Platform fees arrive from a client payment, so there is nothing to edit here
+   and an empty button row would just be dead space. */
+const FeeNote = styled.div`
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: ${({ theme }) => theme.colors.text.muted};
+`;
+
+const Pager = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text.muted};
+`;
+
+const PagerButton = styled.button`
+  padding: 0.5rem 1rem;
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  border-radius: 8px;
+  background: white;
+  color: ${({ theme }) => theme.colors.primary};
+  font-weight: 600;
+  cursor: pointer;
+
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  @media (max-width: 768px) { min-height: 44px; }
 `;
 
 const Label = styled.label`
@@ -181,11 +297,31 @@ const Checkbox = styled.label`
   cursor: pointer;
 `;
 
+/* Two half-width fields are enterable with a mouse and cramped with a thumb. */
+const FormRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+`;
+
 const StatRow = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
+
+  /* Four full-width cards push the list below the fold; two compact columns
+     keep the summary visible and the records one scroll away. */
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1.25rem;
+  }
 `;
 
 const StatCard = styled.div`
@@ -213,6 +349,15 @@ const StatCard = styled.div`
     color: ${({ theme }) => theme.colors.text.muted};
     margin-top: 0.25rem;
   }
+
+  @media (max-width: 768px) {
+    padding: 0.8rem 0.85rem;
+    border-radius: 10px;
+
+    h3 { font-size: 0.68rem; line-height: 1.2; }
+    .value { font-size: 1.05rem; }
+    .sub { font-size: 0.68rem; line-height: 1.25; }
+  }
 `;
 
 const PAGE_SIZE = 20;
@@ -224,6 +369,27 @@ const SUBCATEGORIES = [
   { value: 'hardware', label: 'Hardware & Assets', icon: '💻' },
   { value: 'platform_fee', label: 'Platform Fees', icon: '💸' },
 ];
+
+const formatShortDate = (iso) => {
+  if (!iso) return '';
+  const parsed = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return iso;
+  return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+/* An ISO date tells you nothing about whether money is about to leave. */
+const renewalHint = (iso) => {
+  if (!iso) return '';
+  const target = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((target - today) / 86400000);
+  if (days < 0) return `overdue by ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'}`;
+  if (days === 0) return 'due today';
+  if (days === 1) return 'due tomorrow';
+  return `in ${days} days`;
+};
 
 const ServiceExpenses = () => {
   const [expenses, setExpenses] = useState([]);
@@ -389,10 +555,10 @@ const ServiceExpenses = () => {
     <div>
       <Header>
         <Title>Expenses</Title>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <HeaderActions>
           <SearchInput placeholder="Search expenses..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
           <AddButton onClick={openAdd}><Plus size={18} /> Add Expense</AddButton>
-        </div>
+        </HeaderActions>
       </Header>
 
       <StatRow>
@@ -418,90 +584,118 @@ const ServiceExpenses = () => {
         </StatCard>
       </StatRow>
 
-      <Table>
-        <thead>
-          <tr>
-            <Th>Title</Th>
-            <Th>Client</Th>
-            <Th>Category</Th>
-            <Th>Amount</Th>
-            <Th>Vendor</Th>
-            <Th>Date</Th>
-            <Th>Renewal</Th>
-            <Th style={{ width: 80 }}></Th>
-          </tr>
-        </thead>
-        <tbody>
-          {paginated.map(e => {
-            const amt = parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0;
-            return (
-              <tr key={e.id}>
-                <Td><strong>{e.title}</strong></Td>
-                <Td>{e.clientName || '-'}</Td>
-                <Td>
-                  <SubCategoryTag $type={e.subcategory}>{e.category}</SubCategoryTag>
-                  {e.isAsset && <AssetBadge style={{ marginLeft: '0.35rem' }}>Asset</AssetBadge>}
-                </Td>
-                <Td>{formatCurrency(amt)}</Td>
-                <Td>{e.vendor || '-'}</Td>
-                <Td>{e.date || '-'}</Td>
-                <Td>
-                  {e.renewalDate ? (
-                    <RenewalBadge>
-                      <Calendar size={12} style={{ verticalAlign: 'middle', marginRight: '0.2rem' }} />
-                      {e.renewalDate}
-                    </RenewalBadge>
-                  ) : '-'}
-                </Td>
-                <Td>
-                  {!e._isFee && (
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                      <ActionBtn onClick={() => openEdit(e)}><Edit2 size={16} /></ActionBtn>
-                      <ActionBtn onClick={() => setDeleteTarget(e.id)}><Trash2 size={16} /></ActionBtn>
-                    </div>
-                  )}
-                </Td>
+      {allItems.length === 0 ? (
+        <EmptyState $boxed>
+          {search.trim() ? (
+            <>
+              <p style={{ fontWeight: 700, color: '#55423D' }}>No expenses match "{search.trim()}"</p>
+              <p style={{ fontSize: '0.85rem' }}>Try a different word, or clear the search to see everything.</p>
+            </>
+          ) : (
+            <>
+              <p style={{ fontWeight: 700, color: '#55423D' }}>No expenses yet</p>
+              <p style={{ fontSize: '0.85rem' }}>Record subscriptions, subcontractors and hardware here to see what the business costs to run.</p>
+              <AssistantDoorway question="Where is my money going?">Ask the assistant about your expenses</AssistantDoorway>
+            </>
+          )}
+        </EmptyState>
+      ) : (
+        <>
+          <Table>
+            <thead>
+              <tr>
+                <Th>Title</Th>
+                <Th>Client</Th>
+                <Th>Category</Th>
+                <Th>Amount</Th>
+                <Th>Vendor</Th>
+                <Th>Date</Th>
+                <Th>Renewal</Th>
+                <Th style={{ width: 80 }}></Th>
               </tr>
-            );
-          })}
-        </tbody>
-      </Table>
+            </thead>
+            <tbody>
+              {paginated.map(e => {
+                const amt = parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0;
+                return (
+                  <tr key={e.id}>
+                    <Td style={{ fontWeight: 700, color: '#1C1C18' }}>{e.title}</Td>
+                    <Td>{e.clientName || '—'}</Td>
+                    <Td>{e.category ? <SubCategoryTag $type={e.subcategory}>{e.category}</SubCategoryTag> : '—'} {e.isAsset && <AssetBadge>Asset</AssetBadge>}</Td>
+                    <Td className="data-tabular">{formatCurrency(amt)}</Td>
+                    <Td>{e.vendor || '—'}</Td>
+                    <Td>{e.date || '—'}</Td>
+                    <Td>
+                      {e.renewalDate ? (
+                        <RenewalBadge>
+                          <Calendar size={14} style={{ verticalAlign: '-2px', marginRight: '0.25rem' }} />
+                          {e.renewalDate}
+                        </RenewalBadge>
+                      ) : '—'}
+                    </Td>
+                    <Td>
+                      {!e._isFee && (
+                        <div style={{ display: 'flex', gap: '0.25rem' }}>
+                          <ActionBtn onClick={() => openEdit(e)} aria-label={`Edit ${e.title}`}><Edit2 size={16} /></ActionBtn>
+                          <ActionBtn $danger onClick={() => setDeleteTarget(e.id)} aria-label={`Delete ${e.title}`}><Trash2 size={16} /></ActionBtn>
+                        </div>
+                      )}
+                    </Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
 
-      <MobileGrid>
-        {paginated.map(e => {
-          const amt = parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0;
-          return (
-            <MobileCard key={e.id} $type={e.subcategory}>
-              <MobileRow><span>Title</span><span><strong>{e.title}</strong></span></MobileRow>
-              <MobileRow><span>Client</span><span>{e.clientName || '-'}</span></MobileRow>
-              <MobileRow>
-                <span>Category</span>
-                <span><SubCategoryTag $type={e.subcategory}>{e.category}</SubCategoryTag> {e.isAsset && <AssetBadge>Asset</AssetBadge>}</span>
-              </MobileRow>
-              <MobileRow><span>Amount</span><span>{formatCurrency(amt)}</span></MobileRow>
-              <MobileRow><span>Vendor</span><span>{e.vendor || '-'}</span></MobileRow>
-              <MobileRow><span>Date</span><span>{e.date || '-'}</span></MobileRow>
-              {e.renewalDate && <MobileRow><span>Renewal</span><span>{e.renewalDate}</span></MobileRow>}
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', justifyContent: 'flex-end' }}>
-                {!e._isFee && (
-                  <>
-                    <ActionBtn onClick={() => openEdit(e)}><Edit2 size={16} /></ActionBtn>
-                    <ActionBtn onClick={() => setDeleteTarget(e.id)}><Trash2 size={16} /></ActionBtn>
-                  </>
-                )}
-              </div>
-            </MobileCard>
-          );
-        })}
-        {paginated.length === 0 && <EmptyState>No expenses yet.</EmptyState>}
-      </MobileGrid>
+          <MobileGrid>
+            {paginated.map(e => {
+              const amt = parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0;
+              // A card reads title -> amount -> what it was -> when. The fields
+              // that used to be printed as six "Label value" rows (client,
+              // vendor, date) join one scannable line instead.
+              const meta = [
+                e.clientName ? `For ${e.clientName}` : null,
+                e.vendor || null,
+                formatShortDate(e.date) || null,
+              ].filter(Boolean).join(' · ');
+              return (
+                <MobileCard key={e.id} $type={e.subcategory}>
+                  <MobileHead>
+                    <MobileTitle>{e.title}</MobileTitle>
+                    <MobileAmount className="data-tabular">{formatCurrency(amt)}</MobileAmount>
+                  </MobileHead>
+                  <MobileTags>
+                    <SubCategoryTag $type={e.subcategory}>{e.category || 'General'}</SubCategoryTag>
+                    {e.isAsset && <AssetBadge>Asset</AssetBadge>}
+                  </MobileTags>
+                  {meta && <MobileMeta>{meta}</MobileMeta>}
+                  {e.renewalDate && (
+                    <MobileRenewal>
+                      <Calendar size={14} />
+                      Renews {formatShortDate(e.renewalDate)} · {renewalHint(e.renewalDate)}
+                    </MobileRenewal>
+                  )}
+                  {e._isFee ? (
+                    <FeeNote>Auto-recorded from a client payment</FeeNote>
+                  ) : (
+                    <MobileActions>
+                      <ActionBtn onClick={() => openEdit(e)} aria-label={`Edit ${e.title}`}><Edit2 size={18} /></ActionBtn>
+                      <ActionBtn $danger onClick={() => setDeleteTarget(e.id)} aria-label={`Delete ${e.title}`}><Trash2 size={18} /></ActionBtn>
+                    </MobileActions>
+                  )}
+                </MobileCard>
+              );
+            })}
+          </MobileGrid>
 
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '1.5rem' }}>
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ padding: '0.5rem 1rem', border: '1px solid #ddd', borderRadius: 6, background: 'white', cursor: page <= 1 ? 'not-allowed' : 'pointer', opacity: page <= 1 ? 0.5 : 1 }}>Prev</button>
-          <span style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}>{page} / {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ padding: '0.5rem 1rem', border: '1px solid #ddd', borderRadius: 6, background: 'white', cursor: page >= totalPages ? 'not-allowed' : 'pointer', opacity: page >= totalPages ? 0.5 : 1 }}>Next</button>
-        </div>
+          {totalPages > 1 && (
+            <Pager>
+              <PagerButton type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</PagerButton>
+              <span>Page {page} of {totalPages}</span>
+              <PagerButton type="button" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</PagerButton>
+            </Pager>
+          )}
+        </>
       )}
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
@@ -514,7 +708,7 @@ const ServiceExpenses = () => {
             <option value="">— General / Not attributed —</option>
             {customers.map(c => <option key={c.id} value={c.name}>{c.name}{c.company ? ` (${c.company})` : ''}</option>)}
           </Select>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <FormRow>
             <div>
               <Label>Amount (GHS)</Label>
               <Input type="number" step="0.01" required value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
@@ -534,8 +728,8 @@ const ServiceExpenses = () => {
                 <button type="button" onClick={() => setShowCatInput(true)} style={{ padding: '0.5rem 0.75rem', border: '1px dashed #ddd', borderRadius: '8px', background: 'transparent', color: '#6F240A', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem', width: '100%' }}>+ New Category</button>
               )}
             </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          </FormRow>
+          <FormRow>
             <div>
               <Label>Subcategory</Label>
               <Select value={form.subcategory} onChange={e => setForm(f => ({ ...f, subcategory: e.target.value }))}>
@@ -546,8 +740,8 @@ const ServiceExpenses = () => {
               <Label>Vendor</Label>
               <Input value={form.vendor} onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))} placeholder="Vendor name" />
             </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          </FormRow>
+          <FormRow>
             <div>
               <Label>Date</Label>
               <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
@@ -556,7 +750,7 @@ const ServiceExpenses = () => {
               <Label>Renewal Date</Label>
               <Input type="date" value={form.renewalDate} onChange={e => setForm(f => ({ ...f, renewalDate: e.target.value }))} />
             </div>
-          </div>
+          </FormRow>
           <Checkbox>
             <input type="checkbox" checked={form.isAsset} onChange={e => setForm(f => ({ ...f, isAsset: e.target.value === 'true' ? false : true }))} />
             This is a depreciating asset (laptop, tablet, server, etc.)
