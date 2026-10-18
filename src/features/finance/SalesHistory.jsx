@@ -85,6 +85,35 @@ const DateInput = styled.input`
   color: ${({ theme }) => theme.colors.text.main};
 `;
 
+const DateField = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  @media (max-width: 768px) {
+    flex: 1 1 140px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+
+    input { width: 100%; }
+  }
+`;
+
+/* Two bare date pickers read as a mystery on a phone; name them there. */
+const DateFieldLabel = styled.span`
+  display: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: ${({ theme }) => theme.colors.text.muted};
+
+  @media (max-width: 768px) {
+    display: block;
+  }
+`;
+
 const SearchBox = styled.div`
   display: flex;
   align-items: center;
@@ -180,6 +209,17 @@ const DayHeader = styled.button`
   color: ${({ theme }) => theme.colors.text.main};
 
   &:hover { background: ${({ theme }) => theme.colors.background.surface}; }
+
+  /* Desktop fits the date and all four figures on one line. On a phone that
+     line wraps into an unreadable jumble, so the header becomes a 2x2 grid:
+     date and revenue on top, the counts and profit beneath. */
+  @media (max-width: 768px) {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0.35rem 0.75rem;
+    padding: 0.9rem 1rem;
+  }
 `;
 
 const DayTitle = styled.div`
@@ -188,6 +228,11 @@ const DayTitle = styled.div`
   gap: 0.6rem;
   font-weight: 700;
   font-size: 0.95rem;
+
+  @media (max-width: 768px) {
+    grid-row: 1;
+    grid-column: 1;
+  }
 `;
 
 const DayMeta = styled.div`
@@ -198,8 +243,53 @@ const DayMeta = styled.div`
   color: ${({ theme }) => theme.colors.text.muted};
   font-weight: 600;
 
-  @media (max-width: 640px) {
-    gap: 0.75rem;
+  /* Let the three figures be placed directly into the header grid on mobile. */
+  @media (max-width: 768px) {
+    display: contents;
+  }
+`;
+
+const DayCounts = styled.span`
+  display: contents;
+
+  @media (max-width: 768px) {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    grid-row: 2;
+    grid-column: 1;
+    font-size: 0.8rem;
+  }
+`;
+
+const DayCountDot = styled.span`
+  display: none;
+
+  @media (max-width: 768px) {
+    display: inline;
+  }
+`;
+
+const DayRevenue = styled.span`
+  color: ${({ theme }) => theme.colors.text.main};
+  font-weight: 700;
+
+  @media (max-width: 768px) {
+    grid-row: 1;
+    grid-column: 2;
+    text-align: right;
+    font-size: 1rem;
+  }
+`;
+
+const DayProfit = styled.span`
+  color: ${({ $positive }) => ($positive ? '#25432F' : '#BA1A1A')};
+
+  @media (max-width: 768px) {
+    grid-row: 2;
+    grid-column: 2;
+    text-align: right;
+    font-size: 0.8rem;
   }
 `;
 
@@ -238,18 +328,52 @@ const MobileCard = styled.div`
   }
 `;
 
-const MobileRow = styled.div`
-  padding: 0.9rem 1.25rem;
+const MobileSale = styled.div`
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.85rem 1rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.outlineVariant};
-  font-size: 0.85rem;
 
   &:last-child { border-bottom: none; }
 `;
 
-const MobileLabel = styled.span`
-  color: ${({ theme }) => theme.colors.text.muted};
+const MobileSaleHead = styled.div`
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+
+const MobileSaleItem = styled.span`
   font-weight: 700;
-  margin-right: 0.4rem;
+  color: ${({ theme }) => theme.colors.text.main};
+`;
+
+const MobileSaleAmount = styled.span`
+  margin-left: auto;
+  font-weight: 700;
+  white-space: nowrap;
+  color: ${({ theme }) => theme.colors.text.main};
+`;
+
+const MobileSaleFoot = styled.div`
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+`;
+
+const MobileSaleDetail = styled.span`
+  color: ${({ theme }) => theme.colors.text.muted};
+  font-weight: 600;
+`;
+
+const MobileSaleProfit = styled.span`
+  margin-left: auto;
+  font-weight: 700;
+  white-space: nowrap;
+  color: ${({ $positive }) => ($positive ? '#25432F' : '#BA1A1A')};
 `;
 
 const Badge = styled.span`
@@ -500,20 +624,26 @@ const SalesHistory = () => {
             {option.label}
           </PresetButton>
         ))}
-        <DateInput
-          type="date"
-          aria-label="From date"
-          value={startDate}
-          max={endDate || undefined}
-          onChange={e => onStartChange(e.target.value)}
-        />
-        <DateInput
-          type="date"
-          aria-label="To date"
-          value={endDate}
-          min={startDate || undefined}
-          onChange={e => onEndChange(e.target.value)}
-        />
+        <DateField>
+          <DateFieldLabel>From</DateFieldLabel>
+          <DateInput
+            type="date"
+            aria-label="From date"
+            value={startDate}
+            max={endDate || undefined}
+            onChange={e => onStartChange(e.target.value)}
+          />
+        </DateField>
+        <DateField>
+          <DateFieldLabel>To</DateFieldLabel>
+          <DateInput
+            type="date"
+            aria-label="To date"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={e => onEndChange(e.target.value)}
+          />
+        </DateField>
         <SearchBox style={{ flex: '1 1 220px' }}>
           <Search size={16} color="#89726C" />
           <input
@@ -572,14 +702,15 @@ const SalesHistory = () => {
                     {formatDayLabel(day.date)}
                   </DayTitle>
                   <DayMeta>
-                    <span>{day.rows.length} sale(s)</span>
-                    <span>{day.units} unit(s)</span>
-                    <span style={{ color: '#1C1C18', fontWeight: 700 }}>
-                      {formatCurrency(day.revenue, currency)}
-                    </span>
-                    <span style={{ color: day.profit >= 0 ? '#25432F' : '#BA1A1A' }}>
+                    <DayCounts>
+                      <span>{day.rows.length} {day.rows.length === 1 ? 'sale' : 'sales'}</span>
+                      <DayCountDot aria-hidden="true">·</DayCountDot>
+                      <span>{day.units} {day.units === 1 ? 'unit' : 'units'}</span>
+                    </DayCounts>
+                    <DayRevenue className="data-tabular">{formatCurrency(day.revenue, currency)}</DayRevenue>
+                    <DayProfit $positive={day.profit >= 0} className="data-tabular">
                       {formatCurrency(day.profit, currency)} profit
-                    </span>
+                    </DayProfit>
                   </DayMeta>
                 </DayHeader>
 
@@ -624,28 +755,35 @@ const SalesHistory = () => {
                     </SalesTable>
 
                     <MobileCard>
-                      {dayRows.map(sale => (
-                        <MobileRow key={sale.id}>
-                          <div>
-                            <MobileLabel>Item</MobileLabel>
-                            <strong>{sale.item}</strong>
-                          </div>
-                          <div style={{ marginTop: '0.35rem' }}>
-                            <MobileLabel>Amount</MobileLabel>
-                            {formatCurrency(sale.amount || sale.totalAmount, currency)}
-                            <MobileLabel style={{ marginLeft: '0.75rem' }}>Qty</MobileLabel>
-                            {sale.quantity}
-                          </div>
-                          <div style={{ marginTop: '0.35rem' }}>
-                            <MobileLabel>Profit</MobileLabel>
-                            <span style={{ color: profitOf(sale) >= 0 ? '#25432F' : '#BA1A1A' }}>
-                              {formatCurrency(profitOf(sale), currency)}
-                            </span>
-                            <MobileLabel style={{ marginLeft: '0.75rem' }}>Paid</MobileLabel>
-                            {sale.paymentMethod || '—'}
-                          </div>
-                        </MobileRow>
-                      ))}
+                      {dayRows.map(sale => {
+                        const quantity = parseInt(sale.quantity) || 1;
+                        const unitPrice = parseAmount(sale.unitPrice);
+                        const profit = profitOf(sale);
+                        // Time, unit price and payment were all invisible on a
+                        // phone; join them so each row is identifiable on its own.
+                        const detail = [
+                          sale.time,
+                          unitPrice > 0 ? `${quantity} × ${formatCurrency(unitPrice, currency)}` : `Qty ${quantity}`,
+                          sale.paymentMethod,
+                        ].filter(Boolean).join(' · ');
+                        return (
+                          <MobileSale key={sale.id}>
+                            <MobileSaleHead>
+                              <MobileSaleItem>{sale.item}</MobileSaleItem>
+                              {sale.category ? <Badge>{sale.category}</Badge> : null}
+                              <MobileSaleAmount className="data-tabular">
+                                {formatCurrency(sale.amount || sale.totalAmount, currency)}
+                              </MobileSaleAmount>
+                            </MobileSaleHead>
+                            <MobileSaleFoot>
+                              <MobileSaleDetail>{detail}</MobileSaleDetail>
+                              <MobileSaleProfit $positive={profit >= 0} className="data-tabular">
+                                {formatCurrency(profit, currency)} profit
+                              </MobileSaleProfit>
+                            </MobileSaleFoot>
+                          </MobileSale>
+                        );
+                      })}
                     </MobileCard>
 
                     {day.rows.length > PAGE_SIZE && (
