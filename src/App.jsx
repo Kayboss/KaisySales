@@ -64,6 +64,10 @@ const Sidebar = styled.nav`
   position: sticky;
   top: 0;
   height: 100vh;
+  /* Ten nav links plus Sign Out are taller than a short laptop viewport. Let the
+     rail scroll instead of pushing Sign Out past the bottom edge, where it cannot
+     be reached because the rail itself does not scroll. */
+  overflow-y: auto;
   z-index: 100;
   transition: transform 0.3s ease;
 
@@ -159,15 +163,15 @@ const CloseButton = styled.button`
 const NavLink = styled(Link)`
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.85rem;
+  gap: 0.65rem;
+  padding: 0.7rem;
   text-decoration: none;
   color: ${props => props.$active ? '#FFFFFF' : props.theme.colors.text.onPrimary};
   background: ${props => props.$active ? 'rgba(255,255,255,0.15)' : 'transparent'};
   border-radius: ${themeTokens.borderRadius.md};
   font-weight: 600;
-  font-size: 0.95rem;
-  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  margin-bottom: 0.2rem;
   transition: ${themeTokens.transitions.fast};
 
   &:hover {
@@ -263,7 +267,7 @@ const App = () => {
                 <Overlay $isOpen={isMobileOpen} onClick={closeMobileMenu} />
 
                 <Sidebar $isOpen={isMobileOpen}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.75rem' }}>
                     <Logo style={{ marginBottom: 0 }}>
                       <span style={{ fontWeight: 900 }}>{businessName || 'KaisySales'}</span>
                     </Logo>
@@ -290,14 +294,14 @@ const App = () => {
                       style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
-                        gap: '0.75rem', 
-                        padding: '0.85rem', 
+                        gap: '0.65rem', 
+                        padding: '0.7rem', 
                         background: 'none', 
                         border: 'none', 
                         color: 'rgba(255,255,255,0.85)',
                         cursor: 'pointer',
                         fontWeight: 600,
-                        fontSize: '0.95rem',
+                        fontSize: '0.875rem',
                         borderRadius: '8px',
                         width: '100%'
                       }}
