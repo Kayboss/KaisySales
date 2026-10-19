@@ -717,15 +717,14 @@ export const dbService = {
     try {
       const { data: existing } = await supabase.from('profiles').select('subscription_plan').eq('id', userId).maybeSingle();
       if (existing?.subscription_plan && existing.subscription_plan !== 'none') return;
-      const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
       await supabase.from('profiles').update({
         subscription_plan: 'free',
         subscription_status: 'active',
-        subscription_expires_at: expiresAt,
+        subscription_expires_at: null,
         subscription_updated_at: new Date().toISOString(),
       }).eq('id', userId);
     } catch (err) {
-      console.error('Failed to assign free trial:', err);
+      console.error('Failed to assign free plan:', err);
     }
   },
 
