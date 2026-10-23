@@ -111,4 +111,16 @@
       }
     });
   });
+
+  // --- FAQ accordion (Help page) ---
+  document.querySelectorAll('.faq-question').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const item = this.parentElement;
+      const isOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item.open').forEach(function (el) {
+        el.classList.remove('open');
+      });
+      if (!isOpen) item.classList.add('open');
+    });
+  });
 })();
