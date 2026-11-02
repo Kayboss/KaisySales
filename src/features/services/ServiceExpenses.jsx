@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Plus, Edit2, Trash2, Calendar } from 'lucide-react';
+import { Plus, Edit2, Trash2, Calendar, RefreshCw } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import EmptyState from '../../components/ui/EmptyState';
@@ -12,6 +12,15 @@ import SkeletonTable from '../../components/ui/SkeletonTable';
 import { fetchExpenses, createExpense, updateExpense, deleteExpense, fetchServiceIncome, fetchCategories, createCategory, fetchCustomers } from '../../services/api';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
 import { formatCurrency } from '../../utils/currency';
+import {
+  RENEWAL_WINDOW_DAYS,
+  localTodayIso,
+  daysUntil,
+  renewalHint,
+  renewalTone,
+  nextRenewalDate,
+  summariseRenewals,
+} from '../../utils/renewals';
 
 const Header = styled.div`
   display: flex;
@@ -124,9 +133,18 @@ const SubCategoryTag = styled.span`
     $type === 'platform_fee' ? '#C62828' : '#555'};
 `;
 
+/* A renewal that has already passed is not "upcoming", but it is still money
+   about to leave, so it keeps a colour of its own instead of disappearing. */
+const renewalColor = ({ $tone }) =>
+  $tone === 'overdue' ? '#C62828' : $tone === 'soon' ? '#875200' : undefined;
+
 const RenewalBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   font-size: 0.75rem;
-  color: ${({ theme }) => theme.colors.text.muted};
+  font-weight: ${({ $tone }) => ($tone ? 700 : 400)};
+  color: ${({ $tone, theme }) => renewalColor({ $tone }) || theme.colors.text.muted};
 `;
 
 const AssetBadge = styled.span`
@@ -216,16 +234,35 @@ const MobileRenewal = styled.div`
   gap: 0.3rem;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #875200;
+  color: ${({ $tone }) => renewalColor({ $tone }) || '#875200'};
 `;
 
 const MobileActions = styled.div`
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 0.25rem;
   border-top: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   padding-top: 0.25rem;
   margin-top: 0.1rem;
+`;
+
+/* The text action sits on the left of the icon pair: it is the only one that
+   writes a change, so it should not read as another icon in a row. */
+const RenewButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-right: auto;
+  padding: 0.4rem 0.6rem;
+  border: 1px dashed ${({ theme }) => theme.colors.outlineVariant};
+  border-radius: 8px;
+  background: transparent;
+  color: #875200;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
 `;
 
 /* Platform fees arrive from a client payment, so there is nothing to edit here
@@ -377,20 +414,6 @@ const formatShortDate = (iso) => {
   return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-/* An ISO date tells you nothing about whether money is about to leave. */
-const renewalHint = (iso) => {
-  if (!iso) return '';
-  const target = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(target.getTime())) return '';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const days = Math.round((target - today) / 86400000);
-  if (days < 0) return `overdue by ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'}`;
-  if (days === 0) return 'due today';
-  if (days === 1) return 'due tomorrow';
-  return `in ${days} days`;
-};
-
 const ServiceExpenses = () => {
   const [expenses, setExpenses] = useState([]);
   const [serviceIncome, setServiceIncome] = useState([]);
@@ -404,6 +427,7 @@ const ServiceExpenses = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [renewingId, setRenewingId] = useState(null);
   const [showCatInput, setShowCatInput] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [form, setForm] = useState({
@@ -488,6 +512,21 @@ const ServiceExpenses = () => {
     }
   };
 
+  /* A renewal is a dateless chore: nothing in the app will ever remind you, so
+     the bill is advanced by hand the moment it is paid. Only the date moves. */
+  const handleMarkRenewed = async (expense) => {
+    const next = nextRenewalDate(expense, todayIso);
+    setRenewingId(expense.id);
+    try {
+      await updateExpense(expense.id, { renewal_date: next });
+      await load();
+    } catch (error) {
+      console.error('Failed to advance renewal', error);
+    } finally {
+      setRenewingId(null);
+    }
+  };
+
   const handleAddCategory = async () => {
     const name = sanitizeInput(newCatName.trim(), 50);
     if (!name) return;
@@ -537,9 +576,16 @@ const ServiceExpenses = () => {
   const totalAmt = expenses.reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
   const saasTotal = expenses.filter(e => e.subcategory === 'saas').reduce((s, e) => s + (parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0), 0);
   const totalFees = serviceIncome.reduce((s, i) => s + (parseFloat(i.platformFee) || 0), 0);
-  // eslint-disable-next-line react-hooks/purity
-  const now = useMemo(() => Date.now(), []);
-  const upcomingRenewals = expenses.filter(e => e.renewalDate && new Date(e.renewalDate) >= new Date() && new Date(e.renewalDate) <= new Date(now + 30 * 24 * 60 * 60 * 1000));
+
+  // One fixed "today" for the whole render: comparing each row against a fresh
+  // Date() would let the table and the cards disagree mid-render.
+  const [todayIso] = useState(localTodayIso);
+
+  /* A renewal that has already passed is not "upcoming", but dropping it from
+     the count is how a monthly subscription went silent: the date stayed in the
+     past and the card read 0 forever. Overdue rows are now surfaced first. */
+  const { overdue: overdueRenewals, dueSoon: dueRenewals, needsAttention: upcomingRenewals } =
+    summariseRenewals(expenses, todayIso);
 
   if (loading) {
     return (
@@ -575,12 +621,21 @@ const ServiceExpenses = () => {
         <StatCard>
           <h3>SaaS & Subscriptions</h3>
           <div className="value">{formatCurrency(saasTotal)}</div>
-          <div className="sub">{upcomingRenewals.length} renewals due in 30 days</div>
+          <div className="sub">{dueRenewals} renewals due in {RENEWAL_WINDOW_DAYS} days</div>
         </StatCard>
         <StatCard>
           <h3>Upcoming Renewals</h3>
-          <div className="value" style={{ fontSize: '1.25rem' }}>{upcomingRenewals.length}</div>
-          <div className="sub">Next 30 days</div>
+          <div
+            className="value"
+            style={{ fontSize: '1.25rem', color: overdueRenewals ? '#C62828' : undefined }}
+          >
+            {upcomingRenewals}
+          </div>
+          <div className="sub">
+            {overdueRenewals > 0
+              ? `${overdueRenewals} overdue · ${dueRenewals} due in ${RENEWAL_WINDOW_DAYS} days`
+              : `Next ${RENEWAL_WINDOW_DAYS} days`}
+          </div>
         </StatCard>
       </StatRow>
 
@@ -617,6 +672,7 @@ const ServiceExpenses = () => {
             <tbody>
               {paginated.map(e => {
                 const amt = parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0;
+                const renewalDays = daysUntil(e.renewalDate, todayIso);
                 return (
                   <tr key={e.id}>
                     <Td style={{ fontWeight: 700, color: '#1C1C18' }}>{e.title}</Td>
@@ -627,15 +683,26 @@ const ServiceExpenses = () => {
                     <Td>{e.date || '—'}</Td>
                     <Td>
                       {e.renewalDate ? (
-                        <RenewalBadge>
-                          <Calendar size={14} style={{ verticalAlign: '-2px', marginRight: '0.25rem' }} />
-                          {e.renewalDate}
+                        <RenewalBadge $tone={renewalTone(renewalDays)}>
+                          <Calendar size={14} />
+                          {formatShortDate(e.renewalDate)} · {renewalHint(renewalDays)}
                         </RenewalBadge>
                       ) : '—'}
                     </Td>
                     <Td>
                       {!e._isFee && (
                         <div style={{ display: 'flex', gap: '0.25rem' }}>
+                          {e.renewalDate && renewalDays !== null && renewalDays <= 0 && (
+                            <ActionBtn
+                              onClick={() => handleMarkRenewed(e)}
+                              disabled={renewingId === e.id}
+                              title={`Mark renewed — moves the next date to ${formatShortDate(nextRenewalDate(e, todayIso))}`}
+                              aria-label={`Mark ${e.title} renewed`}
+                              style={{ opacity: renewingId === e.id ? 0.5 : 1 }}
+                            >
+                              <RefreshCw size={16} />
+                            </ActionBtn>
+                          )}
                           <ActionBtn onClick={() => openEdit(e)} aria-label={`Edit ${e.title}`}><Edit2 size={16} /></ActionBtn>
                           <ActionBtn $danger onClick={() => setDeleteTarget(e.id)} aria-label={`Delete ${e.title}`}><Trash2 size={16} /></ActionBtn>
                         </div>
@@ -650,6 +717,7 @@ const ServiceExpenses = () => {
           <MobileGrid>
             {paginated.map(e => {
               const amt = parseFloat(String(e.amount).replace(/[^\d.-]/g, '')) || 0;
+              const renewalDays = daysUntil(e.renewalDate, todayIso);
               // A card reads title -> amount -> what it was -> when. The fields
               // that used to be printed as six "Label value" rows (client,
               // vendor, date) join one scannable line instead.
@@ -670,15 +738,25 @@ const ServiceExpenses = () => {
                   </MobileTags>
                   {meta && <MobileMeta>{meta}</MobileMeta>}
                   {e.renewalDate && (
-                    <MobileRenewal>
+                    <MobileRenewal $tone={renewalTone(renewalDays)}>
                       <Calendar size={14} />
-                      Renews {formatShortDate(e.renewalDate)} · {renewalHint(e.renewalDate)}
+                      Renews {formatShortDate(e.renewalDate)} · {renewalHint(renewalDays)}
                     </MobileRenewal>
                   )}
                   {e._isFee ? (
                     <FeeNote>Auto-recorded from a client payment</FeeNote>
                   ) : (
                     <MobileActions>
+                      {renewalDays !== null && renewalDays <= 0 && (
+                        <RenewButton
+                          type="button"
+                          onClick={() => handleMarkRenewed(e)}
+                          disabled={renewingId === e.id}
+                        >
+                          <RefreshCw size={14} />
+                          {renewingId === e.id ? 'Renewing…' : 'Mark renewed'}
+                        </RenewButton>
+                      )}
                       <ActionBtn onClick={() => openEdit(e)} aria-label={`Edit ${e.title}`}><Edit2 size={18} /></ActionBtn>
                       <ActionBtn $danger onClick={() => setDeleteTarget(e.id)} aria-label={`Delete ${e.title}`}><Trash2 size={18} /></ActionBtn>
                     </MobileActions>
@@ -752,7 +830,7 @@ const ServiceExpenses = () => {
             </div>
           </FormRow>
           <Checkbox>
-            <input type="checkbox" checked={form.isAsset} onChange={e => setForm(f => ({ ...f, isAsset: e.target.value === 'true' ? false : true }))} />
+            <input type="checkbox" checked={form.isAsset} onChange={e => setForm(f => ({ ...f, isAsset: e.target.checked }))} />
             This is a depreciating asset (laptop, tablet, server, etc.)
           </Checkbox>
           {form.isAsset && (
