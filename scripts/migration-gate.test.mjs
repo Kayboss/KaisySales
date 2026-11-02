@@ -9,6 +9,11 @@ import {
   unwrapRows,
   hasBlockingProblems,
   formatReport,
+  isRetryableStatus,
+  retryDelayMs,
+  describeFetchError,
+  READ_ATTEMPTS,
+  READ_TIMEOUT_MS,
 } from './migration-gate.mjs';
 
 const diskOf = (...names) => loadDiskMigrations(names).migrations;
@@ -150,4 +155,48 @@ test('a read failure is reported as a blocker with its reason', () => {
   });
   assert.match(lines[0], /BLOCKED — could not read production migrations/);
   assert.match(lines.join('\n'), /SUPABASE_ACCESS_TOKEN/);
+});
+
+// The gate blocked a release that was in fact in order, because the Management
+// API answered the same query in 1.0 s, 9.8 s and 52.8 s on three consecutive
+// runs while the per-attempt timeout was 15 s. A transient slow read must not
+// look like a pending migration.
+test('the read is retried with a per-attempt timeout well above the observed latency', () => {
+  assert.ok(READ_ATTEMPTS >= 3, 'a single attempt turns a hiccup into a blocked release');
+  assert.ok(READ_TIMEOUT_MS >= 30000, `observed latency exceeded ${READ_TIMEOUT_MS}ms`);
+});
+
+test('a transport failure or a server wobble is retried, an auth failure is not', () => {
+  for (const status of [408, 425, 429, 500, 502, 503, 504]) {
+    assert.equal(isRetryableStatus(status), true, `${status} should be retryable`);
+  }
+  for (const status of [400, 401, 403, 404, 422]) {
+    assert.equal(isRetryableStatus(status), false, `${status} should block immediately`);
+  }
+});
+
+test('retry delays back off and then stay bounded', () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 9].map(retryDelayMs), [1000, 2000, 4000, 8000, 8000, 8000]);
+});
+
+test('a fetch failure is reported with the cause, not the bare "fetch failed"', () => {
+  const timeout = Object.assign(new Error('The operation was aborted due to timeout'), {
+    name: 'TimeoutError',
+  });
+  const failure = Object.assign(new TypeError('fetch failed'), { cause: timeout });
+  const text = describeFetchError(failure);
+  assert.match(text, /fetch failed/);
+  assert.match(text, /TimeoutError/);
+  assert.match(text, /aborted due to timeout/);
+
+  const socket = Object.assign(new TypeError('fetch failed'), {
+    cause: Object.assign(new Error('getaddrinfo ENOTFOUND api.supabase.com'), { code: 'ENOTFOUND' }),
+  });
+  assert.match(describeFetchError(socket), /ENOTFOUND/);
+
+  // A cyclic cause chain must not loop forever.
+  const looping = new Error('outer');
+  looping.cause = looping;
+  assert.match(describeFetchError(looping), /outer/);
+  assert.equal(describeFetchError(null), 'unknown network error');
 });

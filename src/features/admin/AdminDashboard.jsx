@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Shield, Users, Activity, Crown, LogOut, ArrowLeft, History, Inbox, RefreshCw } from 'lucide-react';
+import { Shield, Users, Activity, Crown, LogOut, ArrowLeft, History, Inbox, RefreshCw, TrendingUp } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import AdminOverview from './AdminOverview';
 import AdminInbox from './AdminInbox';
+import AdminGrowth from './AdminGrowth';
 import AdminUsers from './AdminUsers';
 import AdminActivity from './AdminActivity';
 import AdminSubscriptions from './AdminSubscriptions';
@@ -208,6 +209,7 @@ const TabBadge = styled.span`
 const TABS = [
   { id: 'inbox', label: 'Inbox', icon: Inbox },
   { id: 'overview', label: 'Overview', icon: Shield },
+  { id: 'growth', label: 'Growth', icon: TrendingUp },
   { id: 'users', label: 'Users', icon: Users },
   { id: 'activity', label: 'Activity', icon: Activity },
   { id: 'audit', label: 'Audit', icon: History },
@@ -285,6 +287,7 @@ const AdminDashboard = () => {
           <TabPanel key={`${tab.id}-${reloadKey}`} $hidden={activeTab !== tab.id}>
             {tab.id === 'inbox' && <AdminInbox onOpenUser={openUser} onAttentionCount={setAttentionCount} />}
             {tab.id === 'overview' && <AdminOverview />}
+            {tab.id === 'growth' && <AdminGrowth />}
             {tab.id === 'users' && <AdminUsers onOpenUser={openUser} />}
             {tab.id === 'activity' && <AdminActivity onOpenUser={openUser} />}
             {tab.id === 'audit' && <AdminAudit onOpenUser={openUser} />}

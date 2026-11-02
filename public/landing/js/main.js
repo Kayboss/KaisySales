@@ -5,6 +5,50 @@
 (function () {
   'use strict';
 
+  // --- First-touch attribution ---
+  // The app can only say which channel brought a business if this page writes
+  // it down: the campaign parameters disappear the moment someone clicks
+  // through to /login, and there is no user to attach them to yet. Same key and
+  // shape as src/utils/growth.js, and the same rule: the first touch of the
+  // session wins, so a later page cannot overwrite where someone really came
+  // from.
+  (function () {
+    var KEY = 'kaisysales_acquisition';
+    try {
+      if (window.sessionStorage.getItem(KEY)) return;
+
+      var params = new URLSearchParams(window.location.search);
+      var read = function (name) {
+        var value = params.get('utm_' + name);
+        return value ? String(value).trim().slice(0, 120) : '';
+      };
+
+      var refHost = '';
+      try {
+        refHost = new URL(document.referrer).hostname.replace(/^www\./i, '').toLowerCase();
+      } catch {
+        refHost = '';
+      }
+      var own = window.location.host.replace(/^www\./i, '').toLowerCase();
+
+      window.sessionStorage.setItem(
+        KEY,
+        JSON.stringify({
+          source: read('source') || (refHost && refHost !== own ? refHost : 'direct'),
+          medium: read('medium'),
+          campaign: read('campaign'),
+          content: read('content'),
+          term: read('term'),
+          referrer: String(document.referrer || '').slice(0, 120),
+          landingPage: window.location.pathname || '/',
+          capturedAt: new Date().toISOString()
+        })
+      );
+    } catch {
+      /* storage refused: attribution is lost, the page still works */
+    }
+  })();
+
   // --- Scroll Reveal ---
   const revealObserver = new IntersectionObserver(
     (entries) => {

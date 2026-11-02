@@ -89,6 +89,44 @@ export const unwrapRows = (payload) => {
   return null;
 };
 
+// A gate that blocks on a hiccup teaches people to bypass it with
+// MIGRATION_GATE=skip, which is the same as having no gate. The Management API
+// is normally answered in ~1 s but has been measured at 10 s and 52 s on the
+// same query, and a fresh connection occasionally fails outright — so the read
+// is attempted a few times with a generous per-attempt timeout before the gate
+// blocks. Fail-closed is preserved: retries only delay the block, they never
+// turn an unreadable production into a pass.
+export const READ_ATTEMPTS = 4;
+export const READ_TIMEOUT_MS = 30000;
+export const RETRYABLE_STATUSES = [408, 425, 429, 500, 502, 503, 504];
+
+/** A transport hiccup or a server-side wobble is worth another try; a 401 is not. */
+export const isRetryableStatus = (status) => RETRYABLE_STATUSES.includes(Number(status));
+
+export const retryDelayMs = (attempt) =>
+  Math.min(8000, 1000 * 2 ** Math.max(0, Number(attempt) - 1));
+
+/**
+ * `error.message` for a failed fetch is the useless string "fetch failed"; the
+ * reason (DNS, TLS, timeout) lives in `error.cause`. The gate prints this, so a
+ * red release step must say what actually happened.
+ */
+export const describeFetchError = (error) => {
+  const parts = [];
+  let current = error;
+  let depth = 0;
+  while (current && depth < 5) {
+    const name = current.name && current.name !== 'Error' ? `${current.name}` : '';
+    const code = current.code ? ` ${current.code}` : '';
+    const message = String(current.message || '').trim();
+    const piece = `${name}${code}${message ? `${name || code ? ': ' : ''}${message}` : ''}`.trim();
+    if (piece && !parts.includes(piece)) parts.push(piece);
+    current = current.cause;
+    depth += 1;
+  }
+  return parts.join(' <- ') || 'unknown network error';
+};
+
 export const hasBlockingProblems = (report = {}) =>
   Boolean(report.verificationFailed) ||
   (report.malformed?.length ?? 0) > 0 ||

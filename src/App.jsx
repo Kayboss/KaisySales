@@ -8,6 +8,7 @@ import { useAuthStore } from './store/authStore';
 import { useSettingsStore } from './store/settingsStore';
 import { dbService, isSupabaseConfigured, isMockFallbackEnabled } from './services/supabase';
 import { detectDevice, detectLocation } from './utils/visitTracking';
+import { readTouch } from './utils/growth';
 import CheckAuth from './middleware/CheckAuth';
 import AdminCheck from './middleware/AdminCheck';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -186,6 +187,11 @@ const NavLink = styled(Link)`
   }
 `;
 
+// One flush per signed-in account per page load. The row is write-once on the
+// server, so this is only about not repeating a round-trip that cannot change
+// anything (StrictMode mounts effects twice in development).
+let acquisitionFlushedFor = null;
+
 const App = () => {
   const { user, logout } = useAuthStore();
   const { businessName, avatarColor, businessType, role } = useSettingsStore();
@@ -208,6 +214,15 @@ const App = () => {
       // `auth.uid() = user_id` evaluates to NULL, so every visit insert failed
       // with 42501 and nothing was ever recorded.
       dbService.trackPageVisit(user.uid, page, deviceType, loc);
+
+      // The one moment a signup can be attributed: a user exists AND this
+      // browser still remembers where it came from. Written once per account
+      // (the row is write-once), so a repeat is a no-op on the server.
+      if (acquisitionFlushedFor !== user.uid) {
+        acquisitionFlushedFor = user.uid;
+        const touch = readTouch(window.sessionStorage);
+        if (touch) dbService.recordAcquisition(user.uid, touch);
+      }
     }
   }, [user, location.pathname]);
 

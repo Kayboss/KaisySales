@@ -103,12 +103,23 @@ A frontend and its schema have to agree, and only ordering makes that true. Gate
 - **Apply this migration before deploying the frontend** — the report insert and the Audit tab need the new columns/table. `scripts/test-authz.mjs` auto-discovers `user_actions`; its `writeProbes` gained `entity` so the E check runs against it rather than skipping.
 - **Admin performance**: the dashboard keeps every visited tab mounted and hides inactive ones with CSS (`AdminDashboard`), so switching back does not re-fetch. `requireAdmin()` memoizes the verify-admin edge-function call per access token for 60 s (single-flight, so a tab's concurrent fetches share one call). `src/services/adminCache.js` (`cached`) backs the shared feeds (`fetchAllProfiles`, `fetchUsersWithStats`) with a 60 s TTL + in-flight dedupe; admin writes call `invalidateAdminCache()`, which clears data keys but preserves `admin:verify:*`. The Inbox fetches `fetchNeverSignedInUsers` (a filtered query) instead of scanning all profiles, and `fetchErrorLogs` no longer runs its 30-day cleanup `DELETE` (error_logs has no DELETE policy, so it was a no-op round-trip). A global **Refresh** button remounts visited tabs.
 
+### Growth: acquisition & activation
+- Two questions, one tab (**Admin → Growth**, `src/features/admin/AdminGrowth.jsx`): *which channel brings accounts that actually get used*, and *where do new accounts fall out*.
+- **Attribution is write-once, in `public.acquisition`** (migration `20261102120000_acquisition.sql`), not a column on `profiles`. `profiles` is updatable by its owner, so a later settings save could overwrite — or forge — where the business came from. Here `authenticated` holds INSERT + SELECT on its own row and nothing else: there is **no UPDATE policy**, so the first touch is the only touch. `anon` is REVOKEd explicitly (a new table inherits the default ACL's full DML for `anon`).
+- **Capture**: `rememberTouch()` (`src/utils/growth.js`) runs at app boot in `src/main.jsx` and writes the touch to `sessionStorage` (`kaisysales_acquisition`); `public/landing/js/main.js` does the same on the landing page before someone clicks through to `/login`. First touch of the session wins, so a later page cannot replace the channel that actually brought them. UTM (`utm_source|medium|campaign|content|term`) beats referrer, referrer host beats `direct`, and a referrer pointing at our own host is `direct`, never a fake "kaisy-sales" channel.
+- **Flush**: `App.jsx` writes the stored touch once per signed-in account per page load (`acquisitionFlushedFor` module guard). `dbService.recordAcquisition` treats `23505` as success, so a repeat is a no-op rather than an error, and an unavailable table degrades to "not attributed" instead of breaking the app.
+- **The funnel is four nested sets of people**, from data the admin screens already read: `Signed up` (all profiles) → `Signed in` (`last_sign_in_at`) → `First record` (any count in `fetchUsersWithStats`) → `Came back` (a **second day** in `page_visits`, 90 days; `fetchVisitDays`). A stage can never exceed the one before it, and `rate` is `null` (rendered "—") rather than 0 when the denominator is empty.
+- **Coming back is a second day, not a second page view.** `page_visits` writes a row per route change, so counting rows would call someone a returning user on their first afternoon.
+- Accounts with no `acquisition` row are shown as **Not attributed** and sorted last — never guessed at from another signal. `src/utils/growth.js` is pure (storage injected) and pinned by `scripts/growth.test.mjs` (17 tests).
+- **Apply the migration before deploying the frontend**: without the table the funnel reads "Not attributed" and signup attribution is simply lost — no crash, but no data either. The deploy-ordering gate blocks it anyway (`disk N` vs `applied N-1`).
+
 ### Key tables
 - `service_income`: id, user_id, client_name, amount, platform_fee, net_amount, platform_tag, milestone_label, payment_date, notes, **category** (TEXT, added by migration), created_at
 - `recurring_income`: id, user_id, client_name, amount, frequency (monthly/quarterly/yearly), next_due_date, category (TEXT free text), active, timestamps
 - `expenses`: id, user_id, title, amount (TEXT with a `GHS ` prefix — read it with `parseAmount()` from `src/utils/currency.js`, never `parseFloat` on the raw string), category, date, vendor, subcategory, renewal_date, is_asset, asset_lifetime_years, transaction_fee
 - `categories`: id, user_id, name, type (income/expense/inventory/sales), created_at
 - `profiles`: includes business_type, business_name, logo_url, avatar_color, currency
+- `acquisition`: user_id (PK), source, medium, campaign, content, term, referrer, landing_page, created_at — write-once first touch (see "Growth" above)
 - `assistant_parses`: id, user_id, input, kind (record/question/unknown), record_type (expense/sale/service_income), parsed (JSONB), saved, feedback (up/down), error, created_at, updated_at — telemetry for the retired extractor (see the Assistant section; it now has no writer).
 
 ## Architecture Map
@@ -158,6 +169,7 @@ Deciding what needs attention is a reading job, and it is the one thing the dash
 
 ## Gotchas
 
+- **The Management API only runs DDL for a token that can write.** `POST /v1/projects/<ref>/database/query` answers `25006 cannot execute CREATE TABLE in a read-only transaction` when `SUPABASE_ACCESS_TOKEN` is a fine-grained token holding only read permissions: the request is executed as `supabase_read_only_user` (`default_transaction_read_only=on`), and `read_only: false` in the body does **not** override it. `POST /v1/projects/<ref>/database/migrations` answers `403 Missing required permission(s): database_migrations_write`. This is a token-scope problem, not a project problem: `GET /v1/projects/<ref>/readonly` still reports `enabled: false`, so sign-in and every app write through PostgREST keep working. Fix by creating a PAT with `database_write` (+ `database_migrations_write`) and putting it in `.env`, or by pasting the migration into the dashboard SQL editor.
 - Vercel webhook auto-deploy unreliable → always `vercel --prod --yes` manually.
 - Branch is `master`, not `main`.
 - PowerShell environment (Windows): no `&&` chaining; use `;` or `if ($?) { }`.

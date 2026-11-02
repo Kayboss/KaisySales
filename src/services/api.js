@@ -589,6 +589,40 @@ export const fetchVisitStats = async () => {
 };
 
 // ====================================================
+// 14b. GROWTH (acquisition + activation)
+// ====================================================
+
+// Records where this account first came from. Fails soft: a business losing its
+// signup attribution must never interrupt the app it just signed into.
+export const recordAcquisition = async (touch) => {
+  try {
+    const uid = getUid();
+    return await dbService.recordAcquisition(uid, touch);
+  } catch (error) {
+    console.error('Failed to record acquisition', error);
+    return false;
+  }
+};
+
+export const fetchAcquisition = async () => {
+  try {
+    return await dbService.fetchAcquisition();
+  } catch (error) {
+    console.error('Failed to fetch acquisition', error);
+    return [];
+  }
+};
+
+export const fetchVisitDays = async (days = 90) => {
+  try {
+    return await dbService.fetchVisitDays(days);
+  } catch (error) {
+    console.error('Failed to fetch visit days', error);
+    return [];
+  }
+};
+
+// ====================================================
 // 15. LOGO UPLOAD (Supabase Storage)
 // ====================================================
 

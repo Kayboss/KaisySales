@@ -385,7 +385,9 @@ export const dbService = {
       expenseTotal: expensesMap[p.id]?.total || 0,
       inventoryCount: inventoryMap[p.id]?.count || 0,
       customerCount: customersMap[p.id]?.count || 0,
+      serviceIncomeCount: serviceIncomeMap[p.id]?.count || 0,
       serviceIncomeTotal: serviceIncomeMap[p.id]?.total || 0,
+      recurringIncomeCount: recurringIncomeMap[p.id]?.count || 0,
       recurringIncomeTotal: recurringIncomeMap[p.id]?.total || 0,
     }));
   },
@@ -885,6 +887,65 @@ export const dbService = {
     } catch (err) {
       console.warn('trackPageVisit insert failed:', err?.message || err);
     }
+  },
+
+  // Writes the first touch of a browser session, once. The row is write-once by
+  // design (there is no UPDATE policy), so a repeat is a unique violation and
+  // not an error worth showing anyone: the first touch already recorded is the
+  // answer. Returns true when the touch is safely on the server or already was,
+  // so the caller knows it can stop holding it in sessionStorage.
+  async recordAcquisition(userId, touch) {
+    if (!supabase) return false;
+    if (!userId || !touch?.source) return false;
+    try {
+      const { error } = await supabase.from('acquisition').insert({
+        user_id: userId,
+        source: touch.source,
+        medium: touch.medium || '',
+        campaign: touch.campaign || '',
+        content: touch.content || '',
+        term: touch.term || '',
+        referrer: touch.referrer || '',
+        landing_page: touch.landingPage || '',
+      });
+      if (!error) return true;
+      // 23505 = unique violation: this account was already attributed.
+      if (error.code === '23505') return true;
+      console.warn('recordAcquisition insert failed:', error.message);
+      return false;
+    } catch (err) {
+      console.warn('recordAcquisition insert failed:', err?.message || err);
+      return false;
+    }
+  },
+
+  // Admin-only by RLS. Reads every attribution row, newest first.
+  async fetchAcquisition(limit = 2000) {
+    assertBackendAvailable();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('acquisition')
+      .select('user_id, source, medium, campaign, content, term, referrer, landing_page, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data || []).map(r => toCamelCase(r));
+  },
+
+  // Distinct days, not distinct page views: retention is measured from these,
+  // so only the two columns the funnel needs are fetched.
+  async fetchVisitDays(days = 90, limit = 5000) {
+    assertBackendAvailable();
+    if (!supabase) return [];
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('page_visits')
+      .select('user_id, created_at')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data || []).map(r => toCamelCase(r));
   },
 
   async fetchVisitStats() {

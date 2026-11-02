@@ -5,6 +5,17 @@ import App from './App';
 import { ThemeContextProvider } from './context/ThemeContext';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { logClientError } from './services/supabase';
+import { rememberTouch } from './utils/growth';
+
+// Capture this session's first touch before React mounts anything: the URL and
+// referrer that brought someone here are gone the moment a route changes, and
+// the signup flow navigates several times before there is a user to attach it
+// to. Remembering is a no-op when a touch is already stored.
+rememberTouch(window.sessionStorage, {
+  href: window.location.href,
+  referrer: document.referrer,
+  ownHost: window.location.host,
+});
 
 // Rate-limit client error logging (max 1 per 5 seconds)
 let lastErrorLog = 0;

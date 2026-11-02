@@ -13,8 +13,10 @@
  * warns: blocking would trap the release behind the very inconsistency it found.
  *
  * Needs SUPABASE_ACCESS_TOKEN — the same personal access token that applies
- * migrations through the Management API. Read-only: the single query selects
- * from supabase_migrations.schema_migrations and writes nothing.
+ * migrations through the Management API. Read-only: the query selects from
+ * supabase_migrations.schema_migrations and writes nothing. The read is retried
+ * a few times because the API is intermittently slow, but a failure that
+ * survives the retries still blocks the deploy.
  *
  * Exit 0 = safe to deploy. 1 = do not deploy.
  */
@@ -29,6 +31,11 @@ import {
   unwrapRows,
   hasBlockingProblems,
   formatReport,
+  isRetryableStatus,
+  retryDelayMs,
+  describeFetchError,
+  READ_ATTEMPTS,
+  READ_TIMEOUT_MS,
 } from './migration-gate.mjs';
 
 // Same .env handling as scripts/test-authz.mjs: real environment wins, then
@@ -77,34 +84,69 @@ if (!ref) {
     'SUPABASE_ACCESS_TOKEN is not set — add it to .env (gitignored) or export it before releasing';
 }
 
-if (!report.verificationFailed) {
-  try {
-    const response = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: 'select version, name from supabase_migrations.schema_migrations order by version',
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
+// One read attempt. Returns either the applied rows, or a reason plus whether
+// another try could plausibly answer differently.
+const readApplied = async () => {
+  const response = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      query: 'select version, name from supabase_migrations.schema_migrations order by version',
+    }),
+    signal: AbortSignal.timeout(READ_TIMEOUT_MS),
+  });
 
-    const text = await response.text();
-    if (!response.ok) {
-      report.verificationFailed = `management API answered ${response.status}`;
-    } else {
-      const rows = unwrapRows(JSON.parse(text));
-      if (rows === null) {
-        report.verificationFailed = 'unexpected response shape from the management API';
-      } else {
-        report.applied = rows.map((row) => ({ version: String(row.version), name: String(row.name) }));
-        report.diff = diffMigrations(disk, report.applied);
-      }
+  const text = await response.text();
+  if (!response.ok) {
+    const hint = text.trim().slice(0, 200);
+    return {
+      retryable: isRetryableStatus(response.status),
+      reason: `management API answered ${response.status}${hint ? `: ${hint}` : ''}`,
+    };
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    return { retryable: true, reason: 'management API returned a body that is not JSON' };
+  }
+
+  const rows = unwrapRows(payload);
+  if (rows === null) {
+    return { retryable: false, reason: 'unexpected response shape from the management API' };
+  }
+  return { rows };
+};
+
+if (!report.verificationFailed) {
+  for (let attempt = 1; attempt <= READ_ATTEMPTS; attempt += 1) {
+    let outcome;
+    try {
+      outcome = await readApplied();
+    } catch (error) {
+      outcome = { retryable: true, reason: describeFetchError(error) };
     }
-  } catch (error) {
-    report.verificationFailed = error?.message || String(error);
+
+    if (Array.isArray(outcome.rows)) {
+      report.applied = outcome.rows.map((row) => ({ version: String(row.version), name: String(row.name) }));
+      report.diff = diffMigrations(disk, report.applied);
+      break;
+    }
+
+    const last = attempt === READ_ATTEMPTS || !outcome.retryable;
+    if (last) {
+      const tries = `${attempt} attempt${attempt === 1 ? '' : 's'}, ${READ_TIMEOUT_MS / 1000}s timeout each`;
+      report.verificationFailed = `${outcome.reason} (${tries})`;
+      break;
+    }
+
+    const delay = retryDelayMs(attempt);
+    say(`attempt ${attempt}/${READ_ATTEMPTS} failed: ${outcome.reason} — retrying in ${delay}ms`);
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
 }
 

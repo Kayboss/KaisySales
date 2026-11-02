@@ -245,5 +245,43 @@ CREATE POLICY "Users can insert own visits"
 
 GRANT SELECT, INSERT ON page_visits TO authenticated;
 
+-- Acquisition: where an account first came from (write-once, see
+-- supabase/migrations/20261102120000_acquisition.sql). No UPDATE policy on
+-- purpose: the first touch is the only touch.
+CREATE TABLE IF NOT EXISTS acquisition (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  source TEXT NOT NULL DEFAULT 'direct',
+  medium TEXT DEFAULT '',
+  campaign TEXT DEFAULT '',
+  content TEXT DEFAULT '',
+  term TEXT DEFAULT '',
+  referrer TEXT DEFAULT '',
+  landing_page TEXT DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE acquisition ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can record their own acquisition" ON acquisition;
+CREATE POLICY "Users can record their own acquisition"
+  ON acquisition FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can read their own acquisition" ON acquisition;
+CREATE POLICY "Users can read their own acquisition"
+  ON acquisition FOR SELECT
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Admins can read all acquisition" ON acquisition;
+CREATE POLICY "Admins can read all acquisition"
+  ON acquisition FOR SELECT
+  USING (auth.uid() IN (SELECT id FROM profiles WHERE role = 'admin'));
+
+-- A new table in public inherits an ACL that grants anon AND authenticated full
+-- DML. A GRANT is additive, so both roles must be revoked explicitly — revoking
+-- anon alone leaves authenticated holding UPDATE/DELETE that only RLS refuses.
+REVOKE ALL ON acquisition FROM anon, authenticated;
+GRANT SELECT, INSERT ON acquisition TO authenticated;
+
 -- Reload PostgREST schema cache so tables are immediately available via REST API
 NOTIFY pgrst, 'reload schema';
