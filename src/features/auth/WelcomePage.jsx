@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { useAuthStore } from '../../store/authStore';
+import { describeAuthError, describeSignUp } from '../../utils/authMessages';
 import { ArrowRight, AlertCircle, CheckCircle2, Loader, Eye, EyeOff } from 'lucide-react';
 
 const Container = styled.div`
@@ -292,7 +293,18 @@ const WelcomePage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [blockedUntil] = useState(null);
+
+  // A real client-side wait, for the one case the server tells us about: the
+  // email throttle answers "you can only request this after N seconds". The old
+  // state here had no setter at all, so the check below could never be true and
+  // the countdown existed only in the message.
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return undefined;
+    const id = setTimeout(() => setCooldown((seconds) => seconds - 1), 1000);
+    return () => clearTimeout(id);
+  }, [cooldown]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -300,9 +312,8 @@ const WelcomePage = () => {
     setSuccess('');
 
     // Rate limiting
-    if (blockedUntil && Date.now() < blockedUntil) {
-      const waitSeconds = Math.ceil((blockedUntil - Date.now()) / 1000);
-      setError(`Too many attempts. Please wait ${waitSeconds} seconds.`);
+    if (cooldown > 0) {
+      setError(`Too many attempts. Please wait ${cooldown} seconds, then try again.`);
       return;
     }
 
@@ -331,8 +342,11 @@ const WelcomePage = () => {
     try {
       if (isSignUp) {
         const result = await signup(email, password);
-        if (result) {
-          setSuccess('Account created! Check your email for the confirmation link, then log in.');
+        const outcome = describeSignUp(result, email);
+        if (outcome.tone === 'error') {
+          setError(outcome.message);
+        } else {
+          setSuccess(outcome.message);
           setPassword('');
           setConfirmPassword('');
         }
@@ -341,21 +355,9 @@ const WelcomePage = () => {
       }
     } catch (err) {
       console.error('🔥 Authentication error:', err);
-      let msg = err?.message || err?.error_description || 'Something went wrong. Please try again.';
-      
-      if (/already registered|email already in use|already exists/i.test(msg)) {
-        msg = 'This email is already registered. Please log in instead.';
-      } else if (/invalid login credentials|wrong password|invalid-credential|user not found/i.test(msg)) {
-        msg = 'Invalid business email or secret passphrase. Please review your entries.';
-      } else if (/invalid email/i.test(msg)) {
-        msg = 'Please enter a valid business email address.';
-      } else if (/weak password|password is too weak/i.test(msg)) {
-        msg = 'The passphrase is too weak. Please use a stronger combination.';
-      } else if (/rate limit/i.test(msg)) {
-        msg = 'Too many attempts. Please wait a moment and try again.';
-      }
-      
-      setError(msg);
+      const { message, retryAfterSeconds } = describeAuthError(err);
+      if (retryAfterSeconds) setCooldown(retryAfterSeconds);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -391,13 +393,9 @@ const WelcomePage = () => {
       setSuccess('A secure reset link has been woven and sent to your email address!');
     } catch (err) {
       console.error('🔥 Password reset error:', err);
-      let msg = err.message;
-      if (msg.includes('auth/user-not-found')) {
-        msg = 'No registered account was found with this business email address.';
-      } else if (msg.includes('auth/invalid-email')) {
-        msg = 'Please enter a valid business email address.';
-      }
-      setError(msg);
+      const { message, retryAfterSeconds } = describeAuthError(err);
+      if (retryAfterSeconds) setCooldown(retryAfterSeconds);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -558,12 +556,14 @@ const WelcomePage = () => {
             </>
           )}
 
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading || cooldown > 0}>
             {loading ? (
               <>
                 <Loader size={20} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
                 Connecting...
               </>
+            ) : cooldown > 0 ? (
+              <>Wait {cooldown}s</>
             ) : (
               <>
                 {isSignUp ? 'Create Account' : 'Enter KaisySales'}

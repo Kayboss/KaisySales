@@ -143,22 +143,63 @@ async function migrateLocalData(newUid) {
 // ----------------------------------------------------------------
 
 export const authService = {
+  /**
+   * Creates an account and reports which of three things actually happened.
+   *
+   * Returning the bare user was the bug behind "I clicked Create and nothing
+   * happened": GoTrue answers a repeat signup for an address that already has
+   * an account with `{ user: null, error: null }`, so the caller's `if (result)`
+   * was false and the screen neither succeeded nor failed. The caller now gets
+   * an explicit status, and `describeSignUp` turns it into words.
+   *
+   * @returns {Promise<{ status: string, user: object|null }>}
+   */
   async signUp(email, password) {
     if (supabase) {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          // Without this the confirmation link lands on Auth's `site_url` root,
+          // which this deployment 308-redirects to the static landing page —
+          // a page with no supabase-js on it, so the token in the URL fragment
+          // is never consumed and the visitor stays logged out. `/login` mounts
+          // the app, which picks the session out of the URL.
+          emailRedirectTo: `${window.location.origin}/login`,
+        },
+      });
       if (error) throw error;
-      if (data.user) {
+
+      // An existing address comes back as `user: null` (older GoTrue) or as a
+      // user whose `identities` array is empty (current GoTrue). Both mean
+      // "nothing was created", and both used to read as success.
+      const identities = data.user?.identities;
+      const isObfuscated =
+        !data.user || (Array.isArray(identities) && identities.length === 0);
+      if (isObfuscated) {
+        return { status: 'already_registered', user: null };
+      }
+
+      // A session only exists when email confirmation is switched off. With it
+      // on there is no JWT here, so every write from this point would be refused
+      // by RLS and rolled back; the free plan is assigned on the first signed-in
+      // load instead (authStore calls ensureFreeTrial on every auth change).
+      if (data.session) {
         migrateLocalData(data.user.id);
         this.ensureFreeTrial(data.user.id);
       }
-      return mapUser(data.user);
+
+      return {
+        status: data.session ? 'signed_in' : 'needs_confirmation',
+        user: mapUser(data.user),
+      };
     }
     // Mock
     assertBackendAvailable();
     await new Promise(r => setTimeout(r, 300));
     const user = { id: mockUid(), email };
     notifyListeners(mapUser(user));
-    return mapUser(user);
+    return { status: 'signed_in', user: mapUser(user) };
   },
 
   async signIn(email, password) {
@@ -239,7 +280,11 @@ export const authService = {
 
   async resetPassword(email) {
     if (supabase) {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      // Same reason as signUp: the reset link's default target is the static
+      // landing page, which cannot consume the recovery token.
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login`,
+      });
       if (error) throw error;
     }
   },

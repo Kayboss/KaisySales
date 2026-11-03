@@ -31,11 +31,12 @@ export const useAuthStore = create((set) => {
     isInitialized: false,
 
     /**
-     * Supabase signup wrapper
+     * Supabase signup wrapper. Returns `{ status, user }` — the status is what
+     * the form needs, because "already registered" arrives with no error and no
+     * user. See describeSignUp in utils/authMessages.
      */
     signup: async (email, password) => {
-      const user = await authService.signUp(email, password);
-      return user;
+      return authService.signUp(email, password);
     },
 
     /**
