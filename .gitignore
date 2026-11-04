@@ -32,5 +32,8 @@ SECURITY.md
 # Disposable test-account credentials for the authz suite (never commit)
 .env.authz
 
+# Rendered ad output (frames are big and reproducible)
+marketing/ads/out/
+
 .vercel
 .env*

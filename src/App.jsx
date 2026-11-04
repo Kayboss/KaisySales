@@ -43,6 +43,7 @@ import ServiceOutstanding from './features/services/ServiceOutstanding';
 
 // Icons
 import { LayoutDashboard, Package, CreditCard, ShoppingCart, LogOut, FileText, Store, Settings, Receipt, Menu, X, Users, BarChart3, Shield, History, AlertCircle, LifeBuoy } from 'lucide-react';
+import { canSeeReports } from './utils/tenancy';
 
 const Layout = styled.div`
   display: flex;
@@ -194,11 +195,30 @@ let acquisitionFlushedFor = null;
 
 const App = () => {
   const { user, logout } = useAuthStore();
-  const { businessName, avatarColor, businessType, role } = useSettingsStore();
+  const {
+    businessName,
+    avatarColor,
+    businessType,
+    role,
+    businessRole,
+    modules,
+    branches,
+    activeBranchId,
+    setActiveBranchId,
+  } = useSettingsStore();
   const location = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const isServices = businessType === 'services';
+  // `role` is the platform admin flag; `businessRole` is this login's role in
+  // the business. Keep them separate: an admin is not automatically an owner.
+  const isStaff = !isServices && businessRole === 'staff';
+  // Reporting is the single staff toggle and it covers the Reporting screen,
+  // Expenses, Overview totals and assistant insights. The rule itself lives in
+  // utils/tenancy.js so the assistant and the nav cannot disagree. Only a staff
+  // login is ever limited: an owner (and services mode, which has no staff) keeps
+  // every screen.
+  const canReport = isStaff ? canSeeReports({ role: businessRole, modules }) : true;
   const theme = avatarColor ? getThemeForColor(avatarColor) : themeTokens;
 
   const toggleMobileMenu = () => setIsMobileOpen(!isMobileOpen);
@@ -238,20 +258,36 @@ const App = () => {
     { to: '/settings', icon: Settings, label: 'Settings' },
   ];
 
-  const retailNavLinks = [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/sales', icon: ShoppingCart, label: 'Daily Sales' },
-    { to: '/sales-history', icon: History, label: 'Sales History' },
-    { to: '/retail-stores', icon: Store, label: 'Retail Stores' },
-    { to: '/expenses', icon: CreditCard, label: 'Expenses' },
-    { to: '/invoices', icon: Receipt, label: 'Invoices' },
-    { to: '/inventory', icon: Package, label: 'Inventory' },
-    { to: '/reporting', icon: FileText, label: 'Reporting' },
-    { to: '/help', icon: LifeBuoy, label: 'Get Help' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
-  ];
+  const retailNavLinks = isStaff
+    ? [
+        ...(canReport ? [{ to: '/', icon: LayoutDashboard, label: 'Dashboard' }] : []),
+        { to: '/sales', icon: ShoppingCart, label: 'Daily Sales' },
+        { to: '/sales-history', icon: History, label: 'Sales History' },
+        { to: '/retail-stores', icon: Store, label: 'Retail Stores' },
+        ...(canReport ? [{ to: '/expenses', icon: CreditCard, label: 'Expenses' }] : []),
+        { to: '/invoices', icon: Receipt, label: 'Invoices' },
+        { to: '/inventory', icon: Package, label: 'Inventory' },
+        ...(canReport ? [{ to: '/reporting', icon: FileText, label: 'Reporting' }] : []),
+        { to: '/help', icon: LifeBuoy, label: 'Get Help' },
+      ]
+    : [
+        { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+        { to: '/sales', icon: ShoppingCart, label: 'Daily Sales' },
+        { to: '/sales-history', icon: History, label: 'Sales History' },
+        { to: '/retail-stores', icon: Store, label: 'Retail Stores' },
+        { to: '/expenses', icon: CreditCard, label: 'Expenses' },
+        { to: '/invoices', icon: Receipt, label: 'Invoices' },
+        { to: '/inventory', icon: Package, label: 'Inventory' },
+        { to: '/reporting', icon: FileText, label: 'Reporting' },
+        { to: '/help', icon: LifeBuoy, label: 'Get Help' },
+        { to: '/settings', icon: Settings, label: 'Settings' },
+      ];
 
   const navLinks = isServices ? serviceNavLinks : retailNavLinks;
+
+  // Owner-only branch switcher. Staff are pinned to one branch by the database,
+  // so showing them a picker would only produce empty screens.
+  const showBranchSwitcher = !isServices && businessRole === 'owner' && branches.length > 1;
 
   // A production build without Supabase credentials must not run. Falling back to
   // localStorage would accept a sign-in and keep real records in one browser, so
@@ -265,7 +301,7 @@ const App = () => {
       <ErrorBoundary>
         <GlobalStyles />
         <Routes>
-          <Route path="/login" element={!user ? <WelcomePage /> : <Navigate to="/dashboard" />} />
+          <Route path="/login" element={!user ? <WelcomePage /> : <Navigate to="/" />} />
           
           <Route element={<CheckAuth />}>
             <Route path="/*" element={
@@ -303,6 +339,50 @@ const App = () => {
                       Admin Dashboard
                     </NavLink>
                   )}
+                  {showBranchSwitcher && (
+                    <div style={{ marginTop: '1rem' }}>
+                      <label
+                        htmlFor="branch-switcher"
+                        style={{
+                          display: 'block',
+                          fontSize: '0.7rem',
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          color: 'rgba(255,255,255,0.6)',
+                          fontWeight: 700,
+                          marginBottom: '0.35rem',
+                        }}
+                      >
+                        Viewing branch
+                      </label>
+                      <select
+                        id="branch-switcher"
+                        value={activeBranchId == null ? '' : String(activeBranchId)}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setActiveBranchId(value === '' ? null : Number(value));
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '0.55rem 0.65rem',
+                          borderRadius: themeTokens.borderRadius.md,
+                          border: '1px solid rgba(255,255,255,0.25)',
+                          background: 'rgba(255,255,255,0.12)',
+                          color: '#FFFFFF',
+                          fontWeight: 600,
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <option value="" style={{ color: '#1C1B1F' }}>All branches</option>
+                        {branches.map((branch) => (
+                          <option key={branch.id} value={String(branch.id)} style={{ color: '#1C1B1F' }}>
+                            {branch.name}{branch.isDefault ? ' (default)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div style={{ marginTop: 'auto' }}>
                     <button 
                       onClick={logout}
@@ -330,7 +410,9 @@ const App = () => {
                 </Sidebar>
                 <Main>
                   <IdleTimer />
-                  <Routes>
+                  {/* Re-mount the screen when the owner changes branch so every
+                      list refetches against the new scope. */}
+                  <Routes key={`${activeBranchId ?? 'all'}`}>
                     {isServices ? (
                       <>
                         <Route index element={<IncomeTracking />} />
@@ -341,28 +423,34 @@ const App = () => {
                         <Route path="service-invoices" element={<ServiceInvoices />} />
                         <Route path="service-reporting" element={<ServiceReporting />} />
                         <Route path="service-revenue-history" element={<RevenueHistory />} />
-      <Route path="service-outstanding" element={<ServiceOutstanding />} />
+                        <Route path="service-outstanding" element={<ServiceOutstanding />} />
                         <Route path="help" element={<HelpSupport />} />
                         <Route path="settings" element={<SettingsPage />} />
                         <Route path="*" element={<IncomeTracking />} />
                       </>
                     ) : (
                       <>
-                        <Route index element={<BusinessOverview />} />
+                        <Route index element={canReport ? <BusinessOverview /> : <Navigate to="/sales" replace />} />
                         <Route path="inventory" element={<InventoryManagement />} />
                         <Route path="sales" element={<DailySales />} />
-          <Route path="sales-history" element={<SalesHistory />} />
+                        <Route path="sales-history" element={<SalesHistory />} />
                         <Route path="invoices" element={<Invoices />} />
-                        <Route path="expenses" element={<ExpenseTracking />} />
-                        <Route path="reporting" element={<AutomatedReporting />} />
+                        <Route path="expenses" element={canReport ? <ExpenseTracking /> : <Navigate to="/sales" replace />} />
+                        <Route path="reporting" element={canReport ? <AutomatedReporting /> : <Navigate to="/sales" replace />} />
                         <Route path="retail-stores" element={<RetailStores />} />
                         <Route path="help" element={<HelpSupport />} />
-                        <Route path="settings" element={<SettingsPage />} />
-                        <Route path="*" element={<BusinessOverview />} />
+                        <Route path="settings" element={isStaff ? <Navigate to="/sales" replace /> : <SettingsPage />} />
+                        <Route path="*" element={<Navigate to={canReport ? '/' : '/sales'} replace />} />
                       </>
                     )}
                   </Routes>
                 </Main>
+                {/* Mounted for everyone, not just `canReport`: a cashier without
+                    the reporting module still has a branch to restock, and the
+                    panel is a reading surface on their own records. What it will
+                    not do for them is state a money figure it cannot see — that
+                    gate lives inside the panel (`canSeeFinancials`), because
+                    hiding the panel would also hide the stock list. */}
                 {ASSISTANT_ENABLED && <AssistantPanel />}
               </Layout>
             } />

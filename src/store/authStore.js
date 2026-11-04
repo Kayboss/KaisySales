@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authService, dbService } from '../services/supabase';
+import { authService } from '../services/supabase';
 
 /**
  * Auth Store
@@ -15,7 +15,9 @@ export const useAuthStore = create((set) => {
         isAuthenticated: true, 
         isInitialized: true 
       });
-      dbService.ensureFreeTrial(user.uid);
+      // Deliberately nothing else here. Provisioning a business must only happen
+      // from onboarding, because a login that was invited as staff already has
+      // one and must not be given a second.
     } else {
       set({ 
         user: null, 

@@ -71,7 +71,7 @@ const SuspendedContainer = styled.div`
 
 const CheckAuth = () => {
   const { isAuthenticated, isInitialized, user } = useAuthStore();
-  const { isOnboarded, loadSettings, isLoading, clearSettings, status, role, subscriptionPlan, subscriptionStatus, subscriptionExpiresAt } = useSettingsStore();
+  const { isOnboarded, loadSettings, isLoading, clearSettings, status, role, businessRole, subscriptionPlan, subscriptionStatus, subscriptionExpiresAt } = useSettingsStore();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -113,7 +113,10 @@ const CheckAuth = () => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Gatekeeper: if the authenticated user is not onboarded, lock them inside the Wizard
+  // Gatekeeper: if the authenticated user is not onboarded, lock them inside the
+  // Wizard. `isOnboarded` is false when the profile is complete but the login has
+  // no active membership, which is exactly the state that needs the create/join
+  // fork (tenant columns are NOT NULL, so such a login cannot write anything).
   if (!isOnboarded) {
     return <OnboardingWizard />;
   }
@@ -134,8 +137,11 @@ const CheckAuth = () => {
     );
   }
 
-  // Block expired subscriptions (skip admins)
-  if (role !== 'admin' && isSubscriptionExpired(subscriptionPlan, subscriptionStatus, subscriptionExpiresAt)) {
+  // Subscription is paid by the owner of the business. A staff login has its own
+  // profile (and its own unused trial), so checking it here would lock a cashier
+  // out of a perfectly active shop. Only the owner (and platform admins) are
+  // gated; staff inherit the owner's plan.
+  if (role !== 'admin' && businessRole !== 'staff' && isSubscriptionExpired(subscriptionPlan, subscriptionStatus, subscriptionExpiresAt)) {
     const expiredMsg = subscriptionPlan === 'free' || subscriptionPlan === 'none'
       ? 'Your free trial has ended. Please upgrade to continue using KaisySales.'
       : 'Your subscription has expired. Please renew to continue using KaisySales.';

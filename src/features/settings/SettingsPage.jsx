@@ -8,9 +8,10 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import EmptyState from '../../components/ui/EmptyState';
 import Skeleton from '../../components/ui/Skeleton';
 import SkeletonScreen from '../../components/ui/SkeletonScreen';
-import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, DollarSign, Upload, FileUp } from 'lucide-react';
+import { Save, User, Building, Mail, Phone, CheckCircle, MapPin, Briefcase, Tag, Edit2, Trash2, X, Check, Palette, DollarSign, Upload, FileUp, Users } from 'lucide-react';
 import ServiceCatalog from '../services/ServiceCatalog';
 import ImportData from './ImportData';
+import TeamSettings from './TeamSettings';
 import { IMPORT_ENABLED } from '../../utils/features';
 import { CURRENCY_OPTIONS } from '../../utils/currency';
 import { sanitizeInput } from '../../utils/sanitize';
@@ -268,6 +269,7 @@ const avatarColors = ['#6F240A', '#1E3A8A', '#25432F', '#D4AF37', '#8B5E7C'];
 
 const SETTINGS_TABS = [
   { id: 'profile', label: 'Business Profile', icon: Building },
+  { id: 'team', label: 'Team', icon: Users },
   { id: 'services', label: 'Service Catalog', icon: Briefcase },
   { id: 'import', label: 'Import Data', icon: FileUp },
 ];
@@ -285,12 +287,22 @@ const SettingsPage = () => {
       setActiveTab('services');
     } else if (tabParam === 'import') {
       setActiveTab('import');
+    } else if (tabParam === 'team') {
+      setActiveTab('team');
     }
   }, [location.search]);
   const settings = useSettingsStore();
   const isServices = settings.businessType === 'services';
-  const settingsTabs = isServices ? SETTINGS_TABS : SETTINGS_TABS.filter(t => t.id !== 'services');
-  const visibleTabs = settingsTabs.filter((tab) => tab.id !== 'import' || IMPORT_ENABLED);
+  const settingsTabs = isServices
+    ? SETTINGS_TABS.filter(t => t.id !== 'team')
+    : SETTINGS_TABS.filter(t => t.id !== 'services');
+  // Team is owner-only. Staff never reach Settings (the route redirects them),
+  // but the tab is hidden here too so a direct link cannot flash it.
+  const visibleTabs = settingsTabs.filter((tab) => {
+    if (tab.id === 'import') return IMPORT_ENABLED;
+    if (tab.id === 'team') return settings.businessRole === 'owner';
+    return true;
+  });
   
   const [formData, setFormData] = useState({
     businessName: settings.businessName,
@@ -468,6 +480,8 @@ const SettingsPage = () => {
       </TabsRow>
 
       {activeTab === 'services' && isServices && <ServiceCatalog />}
+
+      {activeTab === 'team' && settings.businessRole === 'owner' && <TeamSettings />}
 
       {activeTab === 'import' && IMPORT_ENABLED && <ImportData />}
 

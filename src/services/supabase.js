@@ -182,11 +182,11 @@ export const authService = {
 
       // A session only exists when email confirmation is switched off. With it
       // on there is no JWT here, so every write from this point would be refused
-      // by RLS and rolled back; the free plan is assigned on the first signed-in
-      // load instead (authStore calls ensureFreeTrial on every auth change).
+      // by RLS and rolled back. The free plan is assigned from explicit
+      // onboarding instead (never on every auth change: an invited cashier must
+      // not be handed a business of their own).
       if (data.session) {
         migrateLocalData(data.user.id);
-        this.ensureFreeTrial(data.user.id);
       }
 
       return {
@@ -310,6 +310,43 @@ const toCamelCase = (obj) => {
   return result;
 };
 
+// `my_permissions()` returns a nested JSON object. toCamelCase is shallow, so
+// the business and branch rows inside it would keep their snake_case keys and
+// every consumer would have to remember which shape it was holding.
+const normalizeTenant = (data) => {
+  if (!data) {
+    return { businessId: null, role: null, branchId: null, modules: [], business: null, branches: [] };
+  }
+  return {
+    businessId: data.business_id || null,
+    role: data.role || null,
+    branchId: data.branch_id != null ? Number(data.branch_id) : null,
+    modules: Array.isArray(data.modules) ? data.modules : [],
+    business: data.business ? toCamelCase(data.business) : null,
+    branches: Array.isArray(data.branches)
+      ? data.branches.map((branch) => ({ ...toCamelCase(branch), id: Number(branch.id) }))
+      : [],
+  };
+};
+
+const emptyMockTenant = {
+  businessId: null,
+  role: null,
+  branchId: null,
+  modules: [],
+  business: null,
+  branches: [],
+};
+
+function mockTenant() {
+  const raw = localStorage.getItem('kaisysales_mock_tenant');
+  return raw ? JSON.parse(raw) : { ...emptyMockTenant };
+}
+
+function saveMockTenant(tenant) {
+  localStorage.setItem('kaisysales_mock_tenant', JSON.stringify(tenant));
+}
+
 // ----------------------------------------------------------------
 // DATABASE SERVICE
 // ----------------------------------------------------------------
@@ -344,6 +381,474 @@ export const dbService = {
   },
 
   // ---------------------------------------------------
+  // TENANCY (business, membership, branches, team)
+  // ---------------------------------------------------
+
+  /**
+   * The single source of truth for "who am I here": membership role, assigned
+   * branch, module list, the business row and its live branches. Returns empty
+   * fields (not an error) when the login has no business yet, because that is
+   * the state onboarding needs to see.
+   */
+  async myPermissions() {
+    assertBackendAvailable();
+    if (supabase) {
+      const { data, error } = await supabase.rpc('my_permissions');
+      if (error) throw error;
+      return normalizeTenant(data);
+    }
+    return mockTenant();
+  },
+
+  /**
+   * Creates the business for a login that has none, then fills the fields the
+   * RPC does not take. `create_business` deliberately stays minimal (name and
+   * type) so a future RPC change cannot silently widen what the client sets.
+   */
+  async createBusiness({ name, type, currency, category, phone, location, logoUrl }) {
+    assertBackendAvailable();
+    if (supabase) {
+      const { data, error } = await supabase.rpc('create_business', {
+        p_name: name,
+        p_type: type || 'retail',
+      });
+      if (error) throw error;
+      const patch = {};
+      if (currency !== undefined) patch.currency = currency;
+      if (category !== undefined) patch.category = category;
+      if (phone !== undefined) patch.phone = phone;
+      if (location !== undefined) patch.location = location;
+      if (logoUrl !== undefined) patch.logo_url = logoUrl;
+      if (Object.keys(patch).length > 0) {
+        await this.updateBusiness(data, patch);
+      }
+      return data;
+    }
+    const businessId = 'mock-business-' + Math.random().toString(36).slice(2, 9);
+    saveMockTenant({
+      businessId,
+      role: 'owner',
+      branchId: 1,
+      modules: ['sales', 'reporting'],
+      business: {
+        id: businessId,
+        name: name || 'My Business',
+        businessType: type || 'retail',
+        currency: currency || 'GHS',
+        category: category || '',
+        phone: phone || '',
+        location: location || '',
+        logoUrl: logoUrl || '',
+      },
+      branches: [{ id: 1, name: 'Main', isDefault: true }],
+    });
+    return businessId;
+  },
+
+  async updateBusiness(businessId, fields) {
+    assertBackendAvailable();
+    if (supabase) {
+      if (!businessId) throw new Error('No business to update');
+      const snake = toSnakeCase(fields);
+      delete snake.id;
+      const { data, error } = await supabase
+        .from('businesses')
+        .update({ ...snake, updated_at: new Date().toISOString() })
+        .eq('id', businessId)
+        .select()
+        .single();
+      if (error) throw error;
+      return toCamelCase(data);
+    }
+    const tenant = mockTenant();
+    tenant.business = { ...(tenant.business || {}), ...fields };
+    saveMockTenant(tenant);
+    return tenant.business;
+  },
+
+  async redeemInvite(code) {
+    assertBackendAvailable();
+    if (supabase) {
+      const { data, error } = await supabase.rpc('redeem_invite', { p_code: String(code || '').trim().toUpperCase() });
+      if (error) throw error;
+      return data;
+    }
+    throw new Error('Joining a business requires a configured backend.');
+  },
+
+  async fetchBranches() {
+    assertBackendAvailable();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('branches')
+        .select('*')
+        .is('archived_at', null)
+        .order('is_default', { ascending: false })
+        .order('id');
+      if (error) throw error;
+      return (data || []).map((row) => ({ ...toCamelCase(row), id: Number(row.id) }));
+    }
+    return mockTenant().branches || [];
+  },
+
+  async createBranch({ businessId, name, location, phone }) {
+    assertBackendAvailable();
+    if (supabase) {
+      if (!businessId) throw new Error('No business to add a branch to');
+      const { data, error } = await supabase
+        .from('branches')
+        .insert({
+          business_id: businessId,
+          name,
+          location: location || '',
+          phone: phone || '',
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return { ...toCamelCase(data), id: Number(data.id) };
+    }
+    const tenant = mockTenant();
+    const branch = { id: Date.now(), name, location: location || '', phone: phone || '', isDefault: false };
+    tenant.branches = [...(tenant.branches || []), branch];
+    saveMockTenant(tenant);
+    return branch;
+  },
+
+  async updateBranch(branchId, fields) {
+    assertBackendAvailable();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('branches')
+        .update(toSnakeCase(fields))
+        .eq('id', branchId)
+        .select()
+        .single();
+      if (error) throw error;
+      return { ...toCamelCase(data), id: Number(data.id) };
+    }
+    const tenant = mockTenant();
+    tenant.branches = (tenant.branches || []).map((branch) =>
+      String(branch.id) === String(branchId) ? { ...branch, ...fields } : branch
+    );
+    saveMockTenant(tenant);
+    return tenant.branches.find((branch) => String(branch.id) === String(branchId));
+  },
+
+  // Branches are archived, never deleted: sales and stock rows point at them.
+  async archiveBranch(branchId) {
+    assertBackendAvailable();
+    if (supabase) {
+      const { error } = await supabase
+        .from('branches')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', branchId);
+      if (error) throw error;
+      return true;
+    }
+    const tenant = mockTenant();
+    tenant.branches = (tenant.branches || []).filter((branch) => String(branch.id) !== String(branchId));
+    saveMockTenant(tenant);
+    return true;
+  },
+
+  async listMembers() {
+    assertBackendAvailable();
+    if (!supabase) return [];
+    const { data, error } = await supabase.rpc('list_business_members');
+    if (error) throw error;
+    return (data || []).map((row) => toCamelCase(row));
+  },
+
+  async memberDirectory() {
+    assertBackendAvailable();
+    if (!supabase) return [];
+    const { data, error } = await supabase.rpc('member_directory');
+    if (error) throw error;
+    return (data || []).map((row) => toCamelCase(row));
+  },
+
+  async createInvite(branchId) {
+    assertBackendAvailable();
+    if (!supabase) throw new Error('Invites require a configured backend.');
+    const { data, error } = await supabase.rpc('create_invite', { p_branch_id: branchId ?? null });
+    if (error) throw error;
+    return data ? toCamelCase(data) : data;
+  },
+
+  async listInvites() {
+    assertBackendAvailable();
+    if (!supabase) return [];
+    const { data, error } = await supabase.rpc('list_invites');
+    if (error) throw error;
+    return (data || []).map((row) => toCamelCase(row));
+  },
+
+  async revokeInvite(inviteId) {
+    assertBackendAvailable();
+    if (!supabase) return false;
+    const { data, error } = await supabase.rpc('revoke_invite', { p_invite_id: inviteId });
+    if (error) throw error;
+    return data === true;
+  },
+
+  async setMemberModules(userId, modules) {
+    assertBackendAvailable();
+    if (!supabase) return null;
+    const { data, error } = await supabase.rpc('set_member_modules', {
+      p_user_id: userId,
+      p_modules: modules,
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async setMemberBranch(userId, branchId) {
+    assertBackendAvailable();
+    if (!supabase) return null;
+    const { data, error } = await supabase.rpc('set_member_branch', {
+      p_user_id: userId,
+      p_branch_id: branchId,
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async removeMember(userId) {
+    assertBackendAvailable();
+    if (!supabase) return false;
+    const { data, error } = await supabase.rpc('remove_member', { p_user_id: userId });
+    if (error) throw error;
+    return data === true;
+  },
+
+  async transferOwnership(userId) {
+    assertBackendAvailable();
+    if (!supabase) return null;
+    const { data, error } = await supabase.rpc('transfer_ownership', { p_user_id: userId });
+    if (error) throw error;
+    return data;
+  },
+
+  // ---------------------------------------------------
+  // TENANT-SCOPED RECORDS
+  //
+  // RLS already limits every table to the caller's business (and branch, for
+  // branch-scoped tables). These helpers therefore must NOT filter by user_id:
+  // a cashier has to see the sales they recorded and the stock their owner
+  // stocked, and an owner has to see the whole business.
+  // ---------------------------------------------------
+
+  async fetchTenantRecords(collection, { branchId } = {}) {
+    assertBackendAvailable();
+    if (supabase) {
+      let query = supabase
+        .from(collection)
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (branchId != null) query = query.eq('branch_id', branchId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []).map((r) => ({ ...toCamelCase(r), id: String(r.id) }));
+    }
+    return mockGet(collection);
+  },
+
+  async createTenantRecord(collection, recordData) {
+    assertBackendAvailable();
+    if (supabase) {
+      const row = toSnakeCase(recordData);
+      delete row.id;
+      delete row.user_id;
+      const { data, error } = await supabase.from(collection).insert(row).select().single();
+      if (error) throw error;
+      return { ...toCamelCase(data), id: String(data.id) };
+    }
+    const records = mockGet(collection);
+    const created = { ...recordData, id: 'rec-' + Math.random().toString(36).slice(2, 9) };
+    mockSet(collection, [...records, created]);
+    return created;
+  },
+
+  async updateTenantRecord(collection, recordId, recordData) {
+    assertBackendAvailable();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from(collection)
+        .update(toSnakeCase(recordData))
+        .eq('id', parseInt(recordId) || recordId)
+        .select()
+        .single();
+      if (error) throw error;
+      return { ...toCamelCase(data), id: String(data.id) };
+    }
+    const records = mockGet(collection);
+    const idx = records.findIndex((r) => String(r.id) === String(recordId));
+    if (idx === -1) throw new Error('Record not found');
+    records[idx] = { ...records[idx], ...recordData };
+    mockSet(collection, records);
+    return records[idx];
+  },
+
+  async deleteTenantRecord(collection, recordId) {
+    assertBackendAvailable();
+    if (supabase) {
+      const { error } = await supabase
+        .from(collection)
+        .delete()
+        .eq('id', parseInt(recordId) || recordId);
+      if (error) throw error;
+      return true;
+    }
+    const records = mockGet(collection);
+    mockSet(collection, records.filter((r) => String(r.id) !== String(recordId)));
+    return true;
+  },
+
+  // ---------------------------------------------------
+  // INVENTORY (products + per-branch stock)
+  // ---------------------------------------------------
+
+  async fetchProducts() {
+    assertBackendAvailable();
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('products').select('*').order('name');
+    if (error) throw error;
+    return (data || []).map((r) => ({ ...toCamelCase(r), id: String(r.id) }));
+  },
+
+  /**
+   * Stock rows joined to their product identity. `branchId` narrows the list;
+   * omitting it returns every branch the caller can see (owner reports).
+   */
+  async fetchBranchInventory(branchId = null) {
+    assertBackendAvailable();
+    if (!supabase) return [];
+    let query = supabase
+      .from('branch_inventory')
+      .select('*, products(name, category, unit)')
+      .order('id');
+    if (branchId != null) query = query.eq('branch_id', branchId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []).map((row) => {
+      const { products, ...rest } = row;
+      return {
+        ...toCamelCase(rest),
+        id: String(row.id),
+        productId: String(row.product_id),
+        branchId: Number(row.branch_id),
+        name: products?.name || '',
+        category: products?.category || '',
+        unit: products?.unit || 'pcs',
+      };
+    });
+  },
+
+  async createProduct({ name, category, unit, price, cost, minStock, branchId, stock }) {
+    assertBackendAvailable();
+    if (!supabase) throw new Error('Inventory requires a configured backend.');
+    const { data, error } = await supabase.rpc('create_product', {
+      p_name: name,
+      p_category: category || '',
+      p_unit: unit || 'pcs',
+      p_price: price || '',
+      p_cost: cost || '',
+      p_min_stock: minStock ?? 5,
+      p_branch_id: branchId ?? null,
+      p_stock: stock ?? 0,
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async updateProduct(productId, fields) {
+    assertBackendAvailable();
+    if (!supabase) throw new Error('Inventory requires a configured backend.');
+    const { data, error } = await supabase
+      .from('products')
+      .update(toSnakeCase(fields))
+      .eq('id', productId)
+      .select()
+      .single();
+    if (error) throw error;
+    return { ...toCamelCase(data), id: String(data.id) };
+  },
+
+  async deleteProduct(productId) {
+    assertBackendAvailable();
+    if (!supabase) throw new Error('Inventory requires a configured backend.');
+    const { error } = await supabase.from('products').delete().eq('id', productId);
+    if (error) throw error;
+    return true;
+  },
+
+  async setBranchStock({ productId, branchId, stock, price, cost, minStock }) {
+    assertBackendAvailable();
+    if (!supabase) throw new Error('Inventory requires a configured backend.');
+    const { data, error } = await supabase.rpc('set_branch_stock', {
+      p_product_id: productId,
+      p_branch_id: branchId,
+      p_stock: stock,
+      p_price: price ?? null,
+      p_cost: cost ?? null,
+      p_min_stock: minStock ?? null,
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async updateBranchStock(stockRowId, fields) {
+    assertBackendAvailable();
+    if (!supabase) throw new Error('Inventory requires a configured backend.');
+    const { data, error } = await supabase
+      .from('branch_inventory')
+      .update(toSnakeCase(fields))
+      .eq('id', stockRowId)
+      .select()
+      .single();
+    if (error) throw error;
+    return { ...toCamelCase(data), id: String(data.id) };
+  },
+
+  // ---------------------------------------------------
+  // SALES / INVOICES (RPCs that move stock atomically)
+  // ---------------------------------------------------
+
+  async recordSale({ productId, quantity, paymentMethod, date, unitPrice, cost, branchId, discount }) {
+    assertBackendAvailable();
+    if (!supabase) throw new Error('Recording a sale requires a configured backend.');
+    const { data, error } = await supabase.rpc('record_sale', {
+      p_product_id: productId,
+      p_quantity: quantity,
+      p_payment_method: paymentMethod || 'Cash',
+      p_date: date || null,
+      p_unit_price: unitPrice != null ? String(unitPrice) : null,
+      p_cost: cost != null ? Number(cost) : null,
+      p_branch_id: branchId ?? null,
+      p_discount: discount ?? 0,
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async recordInvoiceSale(invoiceId) {
+    assertBackendAvailable();
+    if (!supabase) throw new Error('Converting an invoice requires a configured backend.');
+    const { data, error } = await supabase.rpc('record_invoice_sale', { p_invoice_id: invoiceId });
+    if (error) throw error;
+    return data;
+  },
+
+  async voidSale(saleId, reason = '') {
+    assertBackendAvailable();
+    if (!supabase) throw new Error('Voiding a sale requires a configured backend.');
+    const { data, error } = await supabase.rpc('void_sale', { p_sale_id: saleId, p_reason: reason });
+    if (error) throw error;
+    return data;
+  },
+
+  // ---------------------------------------------------
   // ADMIN METHODS (RLS-enforced: only admin role can read)
   // ---------------------------------------------------
 
@@ -373,6 +878,25 @@ export const dbService = {
       return (data || []).map(r => toCamelCase(r));
     }
     return [];
+  },
+
+  /**
+   * Logins that are staff of somebody else's business.
+   *
+   * The admin screens count accounts per profile, and a cashier has a profile of
+   * their own, so without this they read as a new business in the Growth funnel
+   * and as a separate "user with errors" in the Inbox. Read-only; the policy is
+   * `is_admin()` (migration `20261103150000`).
+   */
+  async fetchStaffUserIds() {
+    assertBackendAvailable();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('business_members')
+      .select('user_id, role, status')
+      .eq('role', 'staff');
+    if (error) throw error;
+    return (data || []).filter(row => row.status !== 'removed').map(row => row.user_id);
   },
 
   async fetchAllRecords(collection) {
@@ -566,10 +1090,12 @@ export const dbService = {
   async fetchUserRecords(uid, collection) {
     assertBackendAvailable();
     if (supabase) {
+      // RLS scopes this to the caller's business (and branch, where the table is
+      // branch-scoped). Filtering by user_id as well would hide an owner's stock
+      // and a cashier's shared sales from each other.
       const { data, error } = await supabase
         .from(collection)
         .select('*')
-        .eq('user_id', uid)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data.map(r => ({ ...toCamelCase(r), id: String(r.id) }));
@@ -641,7 +1167,6 @@ export const dbService = {
         .from(collection)
         .update(toSnakeCase(recordData))
         .eq('id', recordId)
-        .eq('user_id', uid)
         .select()
         .single();
       if (error) throw error;
@@ -661,8 +1186,7 @@ export const dbService = {
       const { error } = await supabase
         .from(collection)
         .delete()
-        .eq('id', parseInt(recordId) || recordId)
-        .eq('user_id', uid);
+        .eq('id', parseInt(recordId) || recordId);
       if (error) throw error;
       return true;
     }

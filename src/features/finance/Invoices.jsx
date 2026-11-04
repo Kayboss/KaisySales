@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Plus, Search, CheckCircle, Clock, Download, Edit2, Trash2, X, PlusCircle, DollarSign, LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -6,7 +6,7 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import IconAction from '../../components/ui/IconAction';
 import InvoicePreview from '../../components/invoice/InvoicePreview';
-import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory, updateInventoryItem, createSale, deleteSale, deleteServiceIncome } from '../../services/api';
+import { fetchInvoices, createInvoice, updateInvoice, deleteInvoice, fetchStores, fetchInventory, recordInvoiceSale, voidSale, deleteServiceIncome } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../services/supabase';
@@ -14,7 +14,6 @@ import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { formatCurrency, getCurrencySymbol } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
-import { applyStockDelta, resolveMinStock, resolveStock } from '../../utils/inventory';
 import Skeleton from '../../components/ui/Skeleton';
 import SkeletonCards from '../../components/ui/SkeletonCards';
 import SkeletonScreen from '../../components/ui/SkeletonScreen';
@@ -398,6 +397,17 @@ const PageButton = styled.button`
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 `;
 
+// An invoice becomes a sale (and moves stock) exactly once. The marker is
+// written by `record_invoice_sale`: `_saleIds` for the current client, `_saleId`
+// for invoices converted by the pre-M1 client.
+const convertedSaleIds = (invoice) => {
+  const rawItems = Array.isArray(invoice?.items) ? invoice.items : [];
+  const many = rawItems.find((item) => item.type === '_saleIds')?.saleIds;
+  if (Array.isArray(many) && many.length > 0) return many;
+  const one = rawItems.find((item) => item.type === '_saleId')?.saleId;
+  return one != null ? [one] : [];
+};
+
 const Invoices = () => {
   const { currency, subscriptionPlan } = useSettingsStore();
   const { businessName, phone: businessPhone, location: businessLocation } = useSettingsStore();
@@ -408,9 +418,6 @@ const Invoices = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
-  // Retained so an edit can correct the stock movement the original save made,
-  // rather than deducting the whole invoice a second time.
-  const [editingInvoice, setEditingInvoice] = useState(null);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [previewInvoice, setPreviewInvoice] = useState(null);
@@ -418,7 +425,6 @@ const Invoices = () => {
   const [deleting, setDeleting] = useState(false);
   const [inventoryItems, setInventoryItems] = useState([]);
   const [limitError, setLimitError] = useState(null);
-  const prevStatus = useRef('pending');
   // Cleared by the first fetch only — loadData also runs after save/delete, where a skeleton flash would be wrong.
   const [loading, setLoading] = useState(true);
 
@@ -556,6 +562,9 @@ const Invoices = () => {
     };
     
     try {
+      // Creating or editing an invoice never touches stock. Units leave the
+      // shelf only when the invoice is paid and `record_invoice_sale` runs, so a
+      // pending wholesale order cannot silently empty inventory.
       let invoiceId = isEditing ? editId : null;
       if (isEditing) {
         await updateInvoice(editId, invoicePayload);
@@ -564,108 +573,51 @@ const Invoices = () => {
         invoiceId = created?.id;
       }
 
-      // Deduct inventory.
-      //
-      // On create each line is taken out of stock. On edit only the difference
-      // is applied: the original save already deducted those units, so
-      // deducting the whole invoice again silently lost stock every time an
-      // invoice was corrected. Lines removed by an edit are returned in full.
-      try {
-        const inv = await fetchInventory();
-        const previousLines = (Array.isArray(editingInvoice?.items) ? editingInvoice.items : [])
-          .filter(i => !i.type);
-        const nextLines = items.filter(i => i.name);
-
-        const movementFor = (name) => {
-          const nextQty = parseInt(nextLines.find(i => i.name.toLowerCase() === name.toLowerCase())?.quantity) || 0;
-          const previousQty = isEditing
-            ? (parseInt(previousLines.find(i => i.name?.toLowerCase() === name.toLowerCase())?.quantity) || 0)
-            : 0;
-          // Units leaving stock: the increase against what was already deducted.
-          return { delta: nextQty - previousQty };
-        };
-
-        const touchedNames = new Set(nextLines.map(i => i.name));
-        if (isEditing) previousLines.forEach(i => touchedNames.add(i.name));
-
-        const shortfalls = [];
-        for (const name of touchedNames) {
-          const match = inv.find(i => i.name.toLowerCase() === name.toLowerCase());
-          if (!match) continue;
-          const { delta } = movementFor(name);
-          if (delta === 0) continue;
-          const applied = applyStockDelta(resolveStock(match), delta, resolveMinStock(match));
-          await updateInventoryItem(match.id, {
-            ...match,
-            stock: applied.stock,
-            status: applied.status
-          });
-          if (applied.shortfall > 0) {
-            shortfalls.push(`${match.name} is short by ${applied.shortfall} unit(s)`);
-          }
-        }
-        if (shortfalls.length > 0) {
-          alert(`Stock was set to 0 for the affected item(s) because there were not enough units:\n\n${shortfalls.join('\n')}`);
-        }
-      } catch (invErr) {
-        console.warn('Inventory auto-deduct skipped:', invErr);
-      }
-
-      // Create sale if newly paid
-      const shouldCreateSale = isPaid && (!isEditing || prevStatus.current !== 'paid');
-      if (shouldCreateSale) {
+      if (isPaid && invoiceId) {
         try {
-          const inv = await fetchInventory();
-          const firstItem = items[0];
-          const invMatch = firstItem ? inv.find(i => i.name.toLowerCase() === firstItem.name.toLowerCase()) : null;
-          const saleResult = await createSale({
-            item: firstItem?.name || '',
-            category: invMatch?.category || '',
-            quantity: totalQty,
-            unitPrice: firstItem?.unitPrice || '',
-            paymentMethod: 'Invoice',
-            date: formData.date || new Date().toISOString().split('T')[0],
-            time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
-            amount: `GHS ${totalAmount.toFixed(2)}`
-          });
-          // Store sale reference back in invoice
-          if (invoiceId && saleResult?.id) {
-            const currentInvoice = await fetchInvoices().then(all => all.find(i => String(i.id) === String(invoiceId)));
-            if (currentInvoice) {
-              const rawItems = Array.isArray(currentInvoice.items) ? currentInvoice.items : [];
-              const updatedItems = [...rawItems.filter(i => i.type !== '_saleId'), { type: '_saleId', saleId: saleResult.id }];
-              await updateInvoice(invoiceId, { items: updatedItems });
-            }
-          }
-        } catch (saleErr) {
-          console.warn('Sale creation from invoice skipped:', saleErr);
+          await recordInvoiceSale(invoiceId);
+        } catch (conversionError) {
+          // The invoice exists but could not become a sale (usually a line that
+          // no longer matches a stocked product). Put it back to pending so the
+          // lines can be corrected and the invoice marked paid again.
+          await updateInvoice(invoiceId, { status: 'pending' });
+          alert(
+            `Invoice saved as pending: ${conversionError?.message || 'stock could not be recorded'}. ` +
+            'Every line must match a stocked product at this branch before it can be paid.'
+          );
+          await loadData();
+          closeModal();
+          return;
         }
-
-        // No `service_income` row here. A retail invoice already writes its own
-        // `sales` row above, and writing a third row into the services-mode
-        // income table leaked retail revenue into Income Tracking and double
-        // counted it in the admin overview.
       }
 
       await loadData();
       closeModal();
     } catch (error) {
       console.error('Failed to save invoice', error);
-      alert('Failed to save invoice. Please try again.');
+      alert(error?.message || 'Failed to save invoice. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleEdit = (invoice) => {
+    // Once an invoice has been turned into sales, its lines are what the stock
+    // and revenue rows were built from. Editing it would silently disagree with
+    // them, so the conversion has to be undone (void its sales) first.
+    if (convertedSaleIds(invoice).length > 0) {
+      alert(
+        'This invoice has already been recorded as a sale. Void its sales in Sales History first if you need to change it.'
+      );
+      return;
+    }
     const rawItems = Array.isArray(invoice.items) && invoice.items.length > 0 ? invoice.items : [];
     const metaItem = rawItems.find(i => i.type === '_meta');
     const discount = metaItem?.discount || 0;
-    const savedItems = rawItems.filter(i => i.type !== '_meta' && i.type !== '_saleId' && i.type !== '_incomeId');
+    const savedItems = rawItems.filter(i => i.type !== '_meta' && i.type !== '_saleIds' && i.type !== '_saleId' && i.type !== '_incomeId');
     const finalItems = savedItems.length > 0
       ? savedItems.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice }))
       : [{ name: '', quantity: invoice.quantity || 1, unitPrice: invoice.unitPrice || parseFloat(invoice.amount.replace(/[^\d.-]/g, '')) }];
-    prevStatus.current = invoice.status;
     setFormData({
       customer: invoice.customer,
       customerLocation: invoice.customerLocation || '',
@@ -676,7 +628,6 @@ const Invoices = () => {
       notes: invoice.notes || ''
     });
     setEditId(invoice.id);
-    setEditingInvoice(invoice);
     setIsEditing(true);
     setIsModalOpen(true);
   };
@@ -684,45 +635,42 @@ const Invoices = () => {
   const handleDelete = async (id) => {
     setDeleting(true);
     try {
-      try {
-        const allInvoices = await fetchInvoices();
-        const target = allInvoices.find(i => String(i.id) === String(id));
-        if (target) {
-          const rawItems = Array.isArray(target.items) ? target.items : [];
-          const saleRef = rawItems.find(i => i.type === '_saleId');
-          if (saleRef?.saleId) await deleteSale(saleRef.saleId);
-          const incomeRef = rawItems.find(i => i.type === '_incomeId');
-          if (incomeRef?.incomeId) await deleteServiceIncome(incomeRef.incomeId);
+      const allInvoices = await fetchInvoices();
+      const target = allInvoices.find(i => String(i.id) === String(id));
+      if (target) {
+        const rawItems = Array.isArray(target.items) ? target.items : [];
 
-          // Return the units this invoice took out of stock. Metadata markers are
-          // skipped so the discount row is never treated as a stock line.
-          const soldLines = rawItems.filter(i => !i.type && i.name);
-          if (soldLines.length > 0) {
-            const inv = await fetchInventory();
-            for (const line of soldLines) {
-              const match = inv.find(i => i.name.toLowerCase() === line.name.toLowerCase());
-              if (!match) continue;
-              const applied = applyStockDelta(
-                resolveStock(match),
-                -(parseInt(line.quantity) || 0),
-                resolveMinStock(match)
-              );
-              await updateInventoryItem(match.id, {
-                ...match,
-                stock: applied.stock,
-                status: applied.status
-              });
+        // Void the linked sales first: the RPC returns each sale's units to
+        // stock and keeps the audit trail. Deleting the sale rows would lose
+        // both. A pre-M1 marker can point at a sale the old client already
+        // deleted; that is not a reason to block deleting the invoice.
+        const failed = [];
+        for (const saleId of convertedSaleIds(target)) {
+          try {
+            await voidSale(Number(saleId), 'Invoice deleted');
+          } catch (voidError) {
+            if (!/not found/i.test(voidError?.message || '')) {
+              failed.push(voidError?.message || `Sale ${saleId}`);
             }
           }
         }
-      } catch (saleErr) {
-        console.warn('Associated sale/income delete skipped:', saleErr);
+        if (failed.length > 0) {
+          alert(
+            'Could not undo the sale(s) linked to this invoice, so it was not deleted:\n\n' + failed.join('\n')
+          );
+          setDeleteTarget(null);
+          return;
+        }
+
+        const incomeRef = rawItems.find(i => i.type === '_incomeId');
+        if (incomeRef?.incomeId) await deleteServiceIncome(incomeRef.incomeId);
       }
 
       await deleteInvoice(id);
       await loadData();
     } catch (error) {
       console.error('Failed to delete invoice', error);
+      alert(error?.message || 'Could not delete this invoice. Please try again.');
     } finally {
       setDeleteTarget(null);
       setDeleting(false);
@@ -730,32 +678,20 @@ const Invoices = () => {
   };
 
   const handleMarkPaid = async (invoice) => {
-    const rawItems = Array.isArray(invoice.items) ? invoice.items : [];
-    const firstItem = rawItems.find(i => !i.type) || {};
     try {
       await updateInvoice(invoice.id, { status: 'paid' });
-
       try {
-        const saleResult = await createSale({
-          item: firstItem.name || 'Wholesale Invoice',
-          category: 'Sales',
-          quantity: firstItem.quantity || 1,
-          unitPrice: firstItem.unitPrice || '',
-          paymentMethod: 'Invoice',
-          date: invoice.date || new Date().toISOString().split('T')[0],
-          time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
-          amount: invoice.amount,
-        });
-        if (saleResult?.id) {
-          const updatedItems = [...rawItems.filter(i => i.type !== '_saleId'), { type: '_saleId', saleId: saleResult.id }];
-          await updateInvoice(invoice.id, { items: updatedItems });
-        }
-      } catch (e) {
-        console.warn('Quick mark paid: sale creation skipped', e);
+        // One RPC writes the sale rows and decrements stock from the invoice's
+        // own lines, inside a transaction. A failure rolls back both, so the
+        // invoice is put back to pending rather than claiming to be paid.
+        await recordInvoiceSale(invoice.id);
+      } catch (conversionError) {
+        await updateInvoice(invoice.id, { status: 'pending' });
+        alert(
+          `Could not mark this invoice paid: ${conversionError?.message || 'stock could not be recorded'}. ` +
+          'Check that every line matches a stocked product at this branch.'
+        );
       }
-
-      // No `service_income` row here either, for the same reason as the save
-      // path: the mirrored `sales` row above is the retail record of this sale.
 
       await loadData();
     } catch (error) {
@@ -768,8 +704,6 @@ const Invoices = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
-    setEditingInvoice(null);
-    prevStatus.current = 'pending';
     setFormData({ customer: '', customerLocation: '', date: '', items: [{ name: '', quantity: 1, unitPrice: '' }], status: 'pending', discount: 0, notes: '' });
   };
 

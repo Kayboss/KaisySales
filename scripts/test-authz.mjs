@@ -17,6 +17,11 @@
  *   E. userA -> cannot update or delete userB's rows
  *   G. userA -> CAN update an audited column on their own row (liveness: the
  *              audit triggers must not reject a legitimate write)
+ *   H. userA -> cannot read or claim another business's rows, and an insert that
+ *              names another business_id is rewritten to the caller's own
+ *   I. staff  -> sees its own branch and not the sibling branch, cannot grant
+ *              itself a module, and its expenses are exactly what `reporting`
+ *              says they should be
  *
  * A skipped check is reported as SKIP, never as PASS, so a suite that cannot
  * prove something never looks like it did.
@@ -28,8 +33,12 @@
  *   SUPABASE_ANON_KEY   the public anon key (also read from .env / .env.local)
  *   AUTHZ_USER_A_EMAIL / AUTHZ_USER_A_PASSWORD / AUTHZ_USER_A_ID
  *   AUTHZ_USER_B_EMAIL / AUTHZ_USER_B_PASSWORD / AUTHZ_USER_B_ID
- *   AUTHZ_NO_WRITE=1    skip check E, the only check that could alter data if
- *                       permissions were already broken
+ *   AUTHZ_STAFF_EMAIL / AUTHZ_STAFF_PASSWORD   optional third account that is a
+ *                       staff member of user A's business. Section I skips
+ *                       without it, because a staff login is the only way to ask
+ *                       a branch- or module-scoped question.
+ *   AUTHZ_NO_WRITE=1    skip every check that could write: E, G, H's insert probe
+ *                       and all of I's row probes
  *
  * Only the anon key is needed for A, B and F. C, D and E need two real accounts;
  * point them at disposable test accounts, never at a customer's.
@@ -101,7 +110,26 @@ const users = {
     email: process.env.AUTHZ_USER_B_EMAIL || '',
     password: process.env.AUTHZ_USER_B_PASSWORD || '',
   },
+  // Optional. A staff login cannot be faked from an owner token: every branch and
+  // module rule in M1 asks `my_membership()`, which reads the caller's own row.
+  STAFF: {
+    id: process.env.AUTHZ_STAFF_ID || '',
+    email: process.env.AUTHZ_STAFF_EMAIL || '',
+    password: process.env.AUTHZ_STAFF_PASSWORD || '',
+  },
 };
+
+// The tables M1 gave a business_id to. H asks each one directly rather than
+// trusting C's owner-column filter, because a row whose user_id happens to be
+// right while its business_id points elsewhere would still pass C.
+const TENANT_TABLES = [
+  'sales', 'invoices', 'expenses', 'inventory', 'stores',
+  'categories', 'customers', 'services', 'service_income', 'recurring_income',
+];
+
+// A staff row is only meaningful if the tenant rules actually differ from the
+// owner's, so the probes pick a module the fixture does not already hold.
+const MODULE_NAMES = ['reporting', 'expenses', 'inventory', 'invoices', 'sales', 'customers'];
 
 // ------------------------------------------------------------------ reporting
 
@@ -556,6 +584,327 @@ async function main() {
         'G owner updates an audited column',
         `user A cannot write their own audited column (${codeOf(upd)}) — an audit trigger is rejecting a legitimate write, so subscription and free-trial writes are broken`,
       );
+    }
+  }
+
+  // ---- H + I: tenancy, needs the tenant columns M1 added -------------------
+  //
+  // The pre-tenancy suite asked "can A read B's rows". That question still had
+  // the right answer when every policy was `user_id = auth.uid()`. It stops
+  // being sufficient the moment a row belongs to a *business* rather than a
+  // person: a staff login's rows carry the staff's own user_id, so an owner
+  // reading them is not a cross-user read at all, and a row can be shared by
+  // several logins by design. These sections ask the tenant questions instead.
+  console.log('\nH. tenancy: one business cannot reach another business\'s rows');
+
+  const membershipOf = async (token, id) => {
+    if (!id) return null;
+    const res = await rest(
+      `/business_members?select=business_id,role,branch_id,modules&user_id=eq.${id}&status=eq.active&limit=1`,
+      { token },
+    );
+    return res.status === 200 ? res.json?.[0] || null : null;
+  };
+
+  let bizA = null;
+  let bizB = null;
+  if (!ready) {
+    skip('H cross-business reads', 'needs two signed-in users');
+    skip('H insert cannot claim another business', 'needs two signed-in users');
+  } else {
+    const [memberA, memberB] = [await membershipOf(tokenA, users.A.id), await membershipOf(tokenB, users.B.id)];
+    if (!memberA || !memberB) {
+      const missing = [!memberA ? 'A' : null, !memberB ? 'B' : null].filter(Boolean).join(' and ');
+      skip('H cross-business reads', `user ${missing} has no active business membership — sign in once after the M1–M4 migrations`);
+      skip('H insert cannot claim another business', `user ${missing} has no active business membership`);
+    } else {
+      bizA = memberA.business_id;
+      bizB = memberB.business_id;
+      if (bizA === bizB) {
+        fail('H distinct businesses', 'the two fixture accounts are in the same business, so there is nothing to isolate');
+      } else {
+        for (const table of TENANT_TABLES) {
+          const theirs = await rest(`/${table}?select=id&business_id=eq.${bizB}&limit=5`, { token: tokenA });
+          if (isMissingColumn(theirs) || isMissingTable(theirs)) {
+            skip(`H read ${table} of another business`, 'table has no business_id column in the database');
+          } else if (isDenied(theirs) || theirs.count === 0) {
+            pass(`H read ${table} of another business`, isDenied(theirs) ? `denied (${codeOf(theirs)})` : "0 of the other business's rows visible");
+          } else {
+            fail(`H read ${table} of another business`, `user A can read ${theirs.count}+ of another business's rows`);
+          }
+        }
+
+        if (process.env.AUTHZ_NO_WRITE === '1') {
+          skip('H insert cannot claim another business', 'AUTHZ_NO_WRITE=1');
+        } else {
+          // The FK does not consult RLS: a row may be shaped with any business_id
+          // that exists. The tenant trigger is what rewrites it to the caller's
+          // own business, so the check is not "was it refused" (refusal is also
+          // safe) but "did anything land in someone else's business".
+          const probeName = 'kaisysales-authz-probe';
+          const ins = await rest('/categories', {
+            method: 'POST',
+            token: tokenA,
+            body: { name: probeName, type: 'expense', business_id: bizB },
+            prefer: 'return=representation',
+          });
+          if (ins.status >= 200 && ins.status < 300) {
+            const row = Array.isArray(ins.json) ? ins.json[0] : ins.json;
+            if (row && row.business_id === bizB) {
+              fail('H insert cannot claim another business', 'the row was written into another business');
+            } else if (row && !row.business_id) {
+              skip('H insert cannot claim another business', 'insert accepted with business_id null — the legacy branch, not a tenancy decision');
+            } else {
+              pass('H insert cannot claim another business', "business_id was rewritten to the caller's own business");
+            }
+            if (row && row.id) {
+              await rest(`/categories?id=eq.${row.id}`, { method: 'DELETE', token: tokenA });
+            }
+          } else if (isDenied(ins)) {
+            pass('H insert cannot claim another business', `denied (${codeOf(ins)})`);
+          } else {
+            skip('H insert cannot claim another business', `rejected by ${codeOf(ins)} — not provably a tenancy decision`);
+          }
+        }
+      }
+    }
+  }
+
+  console.log('\nI. tenancy: a staff login is limited to its own branch and modules');
+  const sessionStaff = await signIn(users.STAFF);
+  const staffMember = sessionStaff ? await membershipOf(sessionStaff.token, sessionStaff.id) : null;
+  const staffReady = Boolean(
+    sessionStaff && staffMember && bizA && staffMember.business_id === bizA && staffMember.role === 'staff',
+  );
+
+  if (!staffReady) {
+    const why = !users.STAFF.email || !users.STAFF.password
+      ? 'set AUTHZ_STAFF_EMAIL + AUTHZ_STAFF_PASSWORD to a staff login of user A\'s business'
+      : !sessionStaff
+        ? `could not sign in as ${users.STAFF.email}`
+        : !staffMember
+          ? `${users.STAFF.email} has no active business membership`
+          : staffMember.role !== 'staff'
+            ? `${users.STAFF.email} is an owner, not a staff member`
+            : !bizA
+              ? "user A has no business to compare the staff login against"
+              : `${users.STAFF.email} belongs to a different business than user A`;
+    for (const id of [
+      'I staff reads its own branch (liveness)',
+      "I staff cannot read a sibling branch's sales",
+      "I staff cannot read a sibling branch's branch_inventory",
+      "I staff cannot write a sibling branch's branch_inventory",
+      "I staff cannot read a sibling branch's invoices",
+      'I staff cannot grant itself a module',
+      'I staff cannot reach expenses its modules exclude',
+    ]) {
+      skip(id, why);
+    }
+  } else {
+    const staffToken = sessionStaff.token;
+    const ownBranch = staffMember.branch_id;
+    const staffModules = Array.isArray(staffMember.modules) ? staffMember.modules : [];
+    const cleanup = [];
+    const track = (table, id) => id && cleanup.push({ table, id });
+
+    try {
+      const branches = await rest(`/branches?select=id&business_id=eq.${bizA}&archived_at=is.null`, { token: tokenA });
+      const sibling = (branches.json || []).map((b) => b.id).find((id) => id !== ownBranch) ?? null;
+
+      if (process.env.AUTHZ_NO_WRITE === '1') {
+        for (const id of [
+          'I staff reads its own branch (liveness)',
+          "I staff cannot read a sibling branch's sales",
+          "I staff cannot read a sibling branch's branch_inventory",
+          "I staff cannot write a sibling branch's branch_inventory",
+          "I staff cannot read a sibling branch's invoices",
+          'I staff cannot grant itself a module',
+        ]) {
+          skip(id, 'AUTHZ_NO_WRITE=1');
+        }
+      } else if (!sibling) {
+        for (const id of [
+          'I staff reads its own branch (liveness)',
+          "I staff cannot read a sibling branch's sales",
+          "I staff cannot read a sibling branch's branch_inventory",
+          "I staff cannot write a sibling branch's branch_inventory",
+          "I staff cannot read a sibling branch's invoices",
+        ]) {
+          skip(id, "user A's business has no second branch, so there is no sibling branch to isolate");
+        }
+      } else {
+        // Real rows, created as the owner, so a refusal cannot be confused with
+        // "there was nothing there to see". Everything is deleted again below.
+        const product = await rest('/products', {
+          method: 'POST',
+          token: tokenA,
+          body: { business_id: bizA, name: 'authz-probe-item', category: 'probe', unit: 'pcs' },
+          prefer: 'return=representation',
+        });
+        const productId = (Array.isArray(product.json) ? product.json[0] : product.json)?.id ?? null;
+        track('products', productId);
+
+        if (!productId) {
+          for (const id of [
+            'I staff reads its own branch (liveness)',
+            "I staff cannot read a sibling branch's sales",
+            "I staff cannot read a sibling branch's branch_inventory",
+            "I staff cannot write a sibling branch's branch_inventory",
+            "I staff cannot read a sibling branch's invoices",
+          ]) {
+            skip(id, `could not create a probe product (${codeOf(product)})`);
+          }
+        } else {
+          const stockAt = async (branchId, stock) => {
+            const res = await rest('/branch_inventory', {
+              method: 'POST',
+              token: tokenA,
+              body: { business_id: bizA, branch_id: branchId, product_id: productId, stock, price: '10', cost_price: '5', min_stock: 2, status: 'In Stock' },
+              prefer: 'return=representation',
+            });
+            const id = (Array.isArray(res.json) ? res.json[0] : res.json)?.id ?? null;
+            track('branch_inventory', id);
+            return id;
+          };
+          const saleAt = async (branchId) => {
+            const res = await rest('/sales', {
+              method: 'POST',
+              token: tokenA,
+              body: {
+                business_id: bizA, branch_id: branchId, product_id: productId,
+                item: 'authz-probe-item', category: 'probe', quantity: 1, unit_price: 10,
+                amount: 'GHS 10.00', payment_method: 'Cash', date: '2000-01-01', time: '00:00', cost: 5,
+              },
+              prefer: 'return=representation',
+            });
+            const id = (Array.isArray(res.json) ? res.json[0] : res.json)?.id ?? null;
+            track('sales', id);
+            return id;
+          };
+
+          const siblingStockId = await stockAt(sibling, 3);
+          const ownSaleId = ownBranch ? await saleAt(ownBranch) : null;
+          const siblingSaleId = await saleAt(sibling);
+
+          // Liveness first: a suite that only ever sees refusals proves nothing.
+          if (ownSaleId) {
+            const own = await rest(`/sales?select=id&id=eq.${ownSaleId}`, { token: staffToken });
+            if (own.count > 0) pass('I staff reads its own branch (liveness)', 'own-branch sale is visible to the staff login');
+            else fail('I staff reads its own branch (liveness)', `own-branch sale is NOT visible to the staff login (HTTP ${own.status}) — the branch rule is refusing the staff's own work`);
+          } else {
+            skip('I staff reads its own branch (liveness)', "could not create a sale at the staff's branch to prove visibility with");
+          }
+
+          for (const [label, id, table] of [
+            ["I staff cannot read a sibling branch's sales", siblingSaleId, 'sales'],
+            ["I staff cannot read a sibling branch's branch_inventory", siblingStockId, 'branch_inventory'],
+          ]) {
+            if (!id) {
+              skip(label, `could not create a ${table} row at the sibling branch to hide`);
+              continue;
+            }
+            const seen = await rest(`/${table}?select=id&id=eq.${id}`, { token: staffToken });
+            if (isDenied(seen) || seen.count === 0) {
+              pass(label, isDenied(seen) ? `denied (${codeOf(seen)})` : 'sibling-branch row is not visible');
+            } else {
+              fail(label, `the staff login read a ${table} row from another branch`);
+            }
+          }
+
+          if (!siblingStockId) {
+            skip("I staff cannot write a sibling branch's branch_inventory", 'could not create a sibling-branch stock row to aim at');
+          } else {
+            const before = await rest(`/branch_inventory?select=stock&id=eq.${siblingStockId}`, { token: tokenA });
+            const upd = await rest(`/branch_inventory?id=eq.${siblingStockId}`, {
+              method: 'PATCH',
+              token: staffToken,
+              body: { stock: 999 },
+              prefer: 'return=representation',
+            });
+            const after = await rest(`/branch_inventory?select=stock&id=eq.${siblingStockId}`, { token: tokenA });
+            const untouched = after.json?.[0]?.stock === before.json?.[0]?.stock;
+            if (isDenied(upd) || (upd.count === 0 && untouched)) {
+              pass("I staff cannot write a sibling branch's branch_inventory", isDenied(upd) ? `denied (${codeOf(upd)})` : '0 rows modified, stock unchanged');
+            } else {
+              fail("I staff cannot write a sibling branch's branch_inventory", `the staff login changed another branch's stock (${before.json?.[0]?.stock} -> ${after.json?.[0]?.stock})`);
+            }
+          }
+
+          // Invoices have no probe row builder here (their NOT NULL columns are
+          // dashboard-created), so this one is only meaningful when the owner
+          // already has an invoice at the sibling branch.
+          const ownerInvoices = await rest(`/invoices?select=id&branch_id=eq.${sibling}&limit=1`, { token: tokenA });
+          if (ownerInvoices.count > 0) {
+            const seen = await rest(`/invoices?select=id&branch_id=eq.${sibling}&limit=5`, { token: staffToken });
+            if (isDenied(seen) || seen.count === 0) {
+              pass("I staff cannot read a sibling branch's invoices", isDenied(seen) ? `denied (${codeOf(seen)})` : "0 of the sibling branch's invoices visible");
+            } else {
+              fail("I staff cannot read a sibling branch's invoices", `the staff login read ${seen.count} invoice(s) from another branch`);
+            }
+          } else {
+            skip("I staff cannot read a sibling branch's invoices", 'no invoice exists at the sibling branch to hide, and the suite does not build one');
+          }
+        }
+      }
+
+      // Self-grant. The write must either be refused or change nothing: the
+      // membership row is the whole permission model, so a staff login that can
+      // edit its own `modules` array can hand itself the owner's reports.
+      //
+      // A self-grant is only visible as a failure if it actually lands, so the row
+      // is re-read afterwards instead of trusting the response code — an RLS
+      // `using` clause that filters the row makes PostgREST answer 204 with 0 rows
+      // changed, which looks identical to a successful write.
+      const grantable = MODULE_NAMES.find((name) => !staffModules.includes(name));
+      if (process.env.AUTHZ_NO_WRITE === '1') {
+        skip('I staff cannot grant itself a module', 'AUTHZ_NO_WRITE=1');
+      } else if (!grantable) {
+        skip('I staff cannot grant itself a module', `the staff fixture already holds every module the suite knows (${MODULE_NAMES.join(',')})`);
+      } else {
+        const grant = await rest(`/business_members?business_id=eq.${bizA}&user_id=eq.${sessionStaff.id}`, {
+          method: 'PATCH',
+          token: staffToken,
+          body: { modules: [...staffModules, grantable] },
+          prefer: 'return=representation',
+        });
+        const after = await membershipOf(staffToken, sessionStaff.id);
+        const stillHas = Array.isArray(after?.modules) && after.modules.includes(grantable);
+        if (isDenied(grant)) {
+          pass('I staff cannot grant itself a module', `denied (${codeOf(grant)})`);
+        } else if (!stillHas) {
+          pass('I staff cannot grant itself a module', `modules stayed ${(after?.modules || []).join(',') || 'empty'}`);
+        } else {
+          fail('I staff cannot grant itself a module', `the staff login added "${grantable}" to its own modules`);
+        }
+      }
+
+      // The module gate, not the role gate, is what hides expenses. Whichever way
+      // this fixture sits, the expectation is the same rule: `reporting` decides.
+      const ownerExpenses = await rest(`/expenses?select=id&business_id=eq.${bizA}&limit=1`, { token: tokenA });
+      const staffHasReporting = staffModules.includes('reporting');
+      if (ownerExpenses.count === 0) {
+        skip('I staff cannot reach expenses its modules exclude', "the business has no expenses for the staff login to be denied");
+      } else {
+        const seen = await rest(`/expenses?select=id&business_id=eq.${bizA}&limit=5`, { token: staffToken });
+        if (staffHasReporting) {
+          if (seen.count > 0) pass('I staff cannot reach expenses its modules exclude', 'staff holds `reporting`, and reads expenses as the owner does');
+          else fail('I staff cannot reach expenses its modules exclude', `staff holds \`reporting\` but sees none of the business's expenses (HTTP ${seen.status}) — the module gate is refusing a module it was given`);
+        } else if (isDenied(seen) || seen.count === 0) {
+          pass('I staff cannot reach expenses its modules exclude', isDenied(seen) ? `denied (${codeOf(seen)})` : '0 expenses visible while the owner sees them');
+        } else {
+          fail('I staff cannot reach expenses its modules exclude', `staff without \`reporting\` read ${seen.count} of the business's expenses`);
+        }
+      }
+    } finally {
+      // Owner token, reverse order of creation. Failures here are loud because a
+      // probe that cannot clean up litters a real business.
+      for (const { table, id } of cleanup.reverse()) {
+        if (!id) continue;
+        const gone = await rest(`/${table}?id=eq.${id}`, { method: 'DELETE', token: tokenA });
+        if (!(gone.status >= 200 && gone.status < 300)) {
+          fail(`cleanup ${table} ${id}`, `probe row could not be removed (${codeOf(gone)}) — delete it by hand`);
+        }
+      }
     }
   }
 

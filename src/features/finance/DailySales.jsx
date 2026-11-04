@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { Plus, Search, Tag, TrendingUp, Calendar, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Search, Tag, TrendingUp, Calendar, Ban } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import AssistantDoorway from '../../components/assistant/AssistantDoorway';
-import { fetchSales, createSale, updateSale, deleteSale, fetchInventory, updateInventoryItem } from '../../services/api';
+import { fetchSales, fetchInventory, recordSale, voidSale } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
@@ -17,8 +16,7 @@ import Skeleton from '../../components/ui/Skeleton';
 import SkeletonCards from '../../components/ui/SkeletonCards';
 import SkeletonTable from '../../components/ui/SkeletonTable';
 import SkeletonScreen from '../../components/ui/SkeletonScreen';
-import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
-import { applyStockDelta, resolveMinStock, resolveStock } from '../../utils/inventory';
+import { sanitizeNumber } from '../../utils/sanitize';
 
 const Header = styled.div`
   display: flex;
@@ -377,7 +375,7 @@ const ModalActions = styled.div`
 `;
 
 const DailySales = () => {
-  const { currency, subscriptionPlan } = useSettingsStore();
+  const { currency, subscriptionPlan, businessRole, branches, activeBranchId } = useSettingsStore();
   const navigate = useNavigate();
   const user = useAuthStore(s => s.user);
   const [searchTerm, setSearchTerm] = useState('');
@@ -385,23 +383,32 @@ const DailySales = () => {
   const [page, setPage] = useState(1);
   const [inventoryItems, setInventoryItems] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editId, setEditId] = useState(null);
-  // The sale being edited is retained so its original item and quantity can be
-  // used to work out the stock correction an edit actually requires.
-  const [editingSale, setEditingSale] = useState(null);
-  
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [voidTarget, setVoidTarget] = useState(null);
+  const [voidReason, setVoidReason] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [limitError, setLimitError] = useState(null);
-  const [deleting, setDeleting] = useState(false);
+  const [voiding, setVoiding] = useState(false);
   // Cleared by the first fetch only — loadData also runs after save/delete, where a skeleton flash would be wrong.
   const [loading, setLoading] = useState(true);
 
-  const [formData, setFormData] = useState({
-    item: '', quantity: 1, unitPrice: '', paymentMethod: 'Cash', discount: 0
+  // An owner viewing "All branches" still needs one shelf to sell from; the RPC
+  // has the same fallback, but showing the chosen branch makes it explicit.
+  const defaultBranchId = activeBranchId
+    ?? branches.find((branch) => branch.isDefault)?.id
+    ?? branches[0]?.id
+    ?? null;
+  const showBranchPicker = businessRole === 'owner' && branches.length > 1;
+
+  const emptyForm = () => ({
+    productId: '',
+    quantity: 1,
+    unitPrice: '',
+    paymentMethod: 'Cash',
+    discount: 0,
+    branchId: defaultBranchId,
   });
+  const [formData, setFormData] = useState(emptyForm);
 
   const loadData = async () => {
     try {
@@ -421,21 +428,32 @@ const DailySales = () => {
     loadData().finally(() => setLoading(false));
   }, []);
 
+  const openModal = () => {
+    setFormData(emptyForm());
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setFormData(emptyForm());
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
     setLimitError(null);
 
-    if (!isEditing) {
-      const check = await checkCreateLimit(supabase, user?.uid, subscriptionPlan, 'sales');
-      if (!check.allowed) {
-        setLimitError(check);
-        setSaving(false);
-        return;
-      }
+    const check = await checkCreateLimit(supabase, user?.uid, subscriptionPlan, 'sales');
+    if (!check.allowed) {
+      setLimitError(check);
+      setSaving(false);
+      return;
     }
 
-    if (!formData.item) {
+    const selected = inventoryItems.find(
+      (item) => String(item.productId) === String(formData.productId)
+    );
+    if (!selected) {
       alert('Please choose an item before saving the sale.');
       setSaving(false);
       return;
@@ -458,151 +476,63 @@ const DailySales = () => {
       return;
     }
 
-    const subtotal = quantity * unitPrice;
     const discountPct = sanitizeNumber(formData.discount) || 0;
-    const totalAmount = subtotal * (1 - discountPct / 100);
-    
-    const invMatch = inventoryItems.find(i => i.name === formData.item);
-    const unitCost = invMatch?.costPrice
-      ? parseFloat(String(invMatch.costPrice).replace(/[^\d.-]/g, '')) || 0
-      : 0;
-    
-    const salePayload = {
-      item: sanitizeInput(formData.item, 100),
-      category: invMatch?.category || '',
-      quantity: quantity,
-      unitPrice: unitPrice,
-      cost: isEditing ? undefined : unitCost,
-      paymentMethod: formData.paymentMethod,
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
-      amount: `GHS ${totalAmount.toFixed(2)}`
-    };
-    
+    // An empty cost lets the RPC fall back to the stored per-branch cost instead
+    // of recording 0, which would report the whole sale as profit.
+    const rawCost = String(selected.costPrice ?? '').trim();
+    const unitCost = rawCost ? parseAmount(rawCost) : null;
+
     try {
-      if (isEditing) {
-        await updateSale(editId, salePayload);
-      } else {
-        await createSale(salePayload);
-      }
+      const result = await recordSale({
+        productId: Number(selected.productId),
+        quantity,
+        paymentMethod: formData.paymentMethod,
+        date: new Date().toISOString().split('T')[0],
+        unitPrice: String(unitPrice),
+        cost: unitCost,
+        branchId: formData.branchId ? Number(formData.branchId) : undefined,
+        discount: discountPct,
+      });
 
-      // Keep inventory in step with the sale that was just recorded.
-      //
-      // On create the movement is the quantity sold. On edit the movement is the
-      // difference against what the sale previously recorded, because the old
-      // quantity is already reflected in stock: deducting the new quantity again
-      // silently destroyed extra units on every edit. When the item itself is
-      // changed, the original item is returned in full and the new one is taken
-      // out.
-      try {
-        const inventory = await fetchInventory();
-        const previousQty = parseInt(editingSale?.quantity) || 0;
-        const previousItem = editingSale?.item || '';
-        const sameItem = !isEditing || previousItem.toLowerCase() === formData.item.toLowerCase();
-        const qty = parseInt(formData.quantity) || 0;
-
-        const movements = [];
-        if (isEditing && !sameItem && previousItem) {
-          const previousRow = inventory.find(i => i.name.toLowerCase() === previousItem.toLowerCase());
-          if (previousRow) movements.push({ row: previousRow, delta: -previousQty });
-        }
-        const match = inventory.find(i => i.name.toLowerCase() === formData.item.toLowerCase());
-        if (match) {
-          // Units leaving stock: on a same-item edit that is the increase in
-          // quantity, so shrinking a sale hands the difference back.
-          movements.push({ row: match, delta: sameItem ? qty - previousQty : qty });
-        }
-
-        const shortfalls = [];
-        for (const { row, delta } of movements) {
-          if (delta === 0) continue;
-          const applied = applyStockDelta(resolveStock(row), delta, resolveMinStock(row));
-          await updateInventoryItem(row.id, {
-            ...row,
-            stock: applied.stock,
-            status: applied.status
-          });
-          if (applied.shortfall > 0) {
-            shortfalls.push(`${row.name} is short by ${applied.shortfall} unit(s)`);
-          }
-        }
-        if (shortfalls.length > 0) {
-          alert(`Stock was set to 0 for the affected item(s) because there were not enough units:\n\n${shortfalls.join('\n')}`);
-        }
-      } catch (invErr) {
-        console.warn('Inventory auto-deduct skipped:', invErr);
+      // Stock is decremented inside the RPC under a row lock, so concurrent
+      // cashiers can no longer overwrite each other's counts. It never goes
+      // below zero; a shortfall is reported rather than silently invented.
+      if (result?.shortfall > 0) {
+        alert(`${selected.name} was short by ${result.shortfall} unit(s). Stock has been set to 0.`);
       }
 
       await loadData();
       closeModal();
     } catch (error) {
       console.error('Failed to save sale', error);
-      alert('Failed to save sale. Please try again.');
+      alert(error?.message || 'Failed to save sale. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleEdit = (sale) => {
-    const parsedAmt = sale.amount ? parseFloat(String(sale.amount).replace(/[^\d.-]/g, '')) : 0;
-    setFormData({
-      item: sale.item,
-      quantity: sale.quantity || 1,
-      unitPrice: sale.unitPrice || parsedAmt,
-      paymentMethod: sale.paymentMethod,
-      discount: 0
-    });
-    setEditId(sale.id);
-    setEditingSale(sale);
-    setIsEditing(true);
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (id) => {
-    setDeleting(true);
+  const handleVoid = async () => {
+    if (!voidTarget) return;
+    setVoiding(true);
     try {
-      const target = deleteTarget;
-      await deleteSale(id);
-
-      // Deleting a sale must give the units back. Without this, every deletion
-      // left inventory permanently short and the shop slowly sold stock it did
-      // not actually have.
-      if (target?.item) {
-        try {
-          const inventory = await fetchInventory();
-          const match = inventory.find(i => i.name.toLowerCase() === target.item.toLowerCase());
-          if (match) {
-            const returned = parseInt(target.quantity) || 0;
-            const applied = applyStockDelta(resolveStock(match), -returned, resolveMinStock(match));
-            await updateInventoryItem(match.id, {
-              ...match,
-              stock: applied.stock,
-              status: applied.status
-            });
-          }
-        } catch (invErr) {
-          console.warn('Stock restore on sale delete skipped:', invErr);
-        }
-      }
-
+      // Void, never delete: the RPC is audited, restores the stock and keeps the
+      // row so history still adds up.
+      await voidSale(Number(voidTarget.id), voidReason.trim());
+      setVoidTarget(null);
+      setVoidReason('');
       await loadData();
     } catch (error) {
-      console.error('Failed to delete sale', error);
+      console.error('Failed to void sale', error);
+      alert(error?.message || 'Could not void this sale. Please try again.');
     } finally {
-      setDeleteTarget(null);
-      setDeleting(false);
+      setVoiding(false);
     }
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setIsEditing(false);
-    setEditId(null);
-    setEditingSale(null);
-    setFormData({ item: '', quantity: 1, unitPrice: '', paymentMethod: 'Cash', discount: 0 });
-  };
+  // Voided rows stay in the table for the audit trail, but they are not takings.
+  const liveSales = sales.filter((sale) => !sale.voidedAt);
 
-  const filteredSales = sales.filter(sale => 
+  const filteredSales = liveSales.filter(sale => 
     (sale.item || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
     (sale.id || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -615,7 +545,7 @@ const DailySales = () => {
   // grow forever and disagree with the row list below them. Sales from previous
   // days are browsable on the Sales History page.
   const today = new Date().toISOString().split('T')[0];
-  const todaySales = sales.filter(s => s.date === today);
+  const todaySales = liveSales.filter(s => s.date === today);
 
   const todayRevenue = todaySales.reduce((acc, sale) => acc + parseAmount(sale.amount || sale.totalAmount), 0);
   const itemsSold = todaySales.reduce((acc, sale) => acc + (parseInt(sale.quantity) || 1), 0);
@@ -653,7 +583,7 @@ const DailySales = () => {
       totalAmount: 'Total Amount',
       profit: 'Profit'
     };
-    const exportRows = sales.map(s => ({
+    const exportRows = liveSales.map(s => ({
       ...s,
       cost: (s.cost != null && s.cost !== '') ? parseAmount(s.cost) : (costByItem[s.item] || 0),
       profit: profitOf(s)
@@ -684,14 +614,14 @@ const DailySales = () => {
           <ActionButton onClick={handleExport} style={{ background: 'white', color: '#6F240A', border: '1px solid #6F240A' }}>
             Export CSV
           </ActionButton>
-          <ActionButton onClick={() => { setIsEditing(false); setIsModalOpen(true); }}>
+          <ActionButton onClick={openModal}>
             <Plus size={18} />
             Add Sale
           </ActionButton>
         </div>
       </Header>
 
-      <Modal isOpen={isModalOpen} onClose={closeModal} title={isEditing ? "Edit Sale" : "Record New Sale"}>
+      <Modal isOpen={isModalOpen} onClose={closeModal} title="Record New Sale">
         <form onSubmit={handleSave}>
           {limitError && (
             <div style={{ padding: '1rem', background: '#FFF0F0', borderRadius: '8px', border: '1px solid #FFD0D0', marginBottom: '1rem', fontSize: '0.9rem', color: '#CC0000' }}>
@@ -718,20 +648,19 @@ const DailySales = () => {
             ) : (
               <select 
                 required 
-                value={formData.item}
+                value={formData.productId}
                 onChange={e => {
-                  const selected = inventoryItems.find(i => i.name === e.target.value);
+                  const selected = inventoryItems.find(i => String(i.productId) === e.target.value);
                   setFormData(prev => ({
                     ...prev,
-                    item: e.target.value,
-                    category: selected?.category || prev.category,
-                    unitPrice: selected?.price ? parseFloat(selected.price.replace(/[^0-9.]/g, '')) : prev.unitPrice
+                    productId: e.target.value,
+                    unitPrice: selected?.price ? parseAmount(selected.price) : prev.unitPrice
                   }));
                 }}
               >
                 <option value="">-- Select an item --</option>
                 {inventoryItems.map(item => (
-                  <option key={item.id} value={item.name}>
+                  <option key={item.productId || item.id} value={String(item.productId)}>
                     {item.name} {item.stock > 0 ? `(${item.stock} in stock)` : '(out of stock)'}
                   </option>
                 ))}
@@ -783,6 +712,24 @@ const DailySales = () => {
               </select>
             </FormGroup>
           </FormRow>
+          {showBranchPicker && (
+            <FormGroup>
+              <label>Branch</label>
+              <select
+                value={formData.branchId == null ? '' : String(formData.branchId)}
+                onChange={e => setFormData({
+                  ...formData,
+                  branchId: e.target.value === '' ? null : Number(e.target.value)
+                })}
+              >
+                {branches.map((branch) => (
+                  <option key={branch.id} value={String(branch.id)}>
+                    {branch.name}{branch.isDefault ? ' (default)' : ''}
+                  </option>
+                ))}
+              </select>
+            </FormGroup>
+          )}
           <FormGroup>
             <label>Total Amount ({getCurrencySymbol(currency)})</label>
             <input 
@@ -798,7 +745,7 @@ const DailySales = () => {
           </FormGroup>
           <ModalActions>
             <button type="button" className="cancel" onClick={closeModal}>Cancel</button>
-            <button type="submit" className="save" disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update Sale" : "Save Sale")}</button>
+            <button type="submit" className="save" disabled={saving}>{saving ? "Saving..." : "Save Sale"}</button>
           </ModalActions>
         </form>
       </Modal>
@@ -886,14 +833,9 @@ const DailySales = () => {
               </Td>
               <Td style={{ color: '#55423D', fontWeight: 600 }}>{sale.paymentMethod}</Td>
               <Td style={{ textAlign: 'right' }}>
-                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                  <IconAction label={`Edit sale of ${sale.item}`} onClick={() => handleEdit(sale)}>
-                    <Edit2 size={16} color="#89726C" />
-                  </IconAction>
-                  <IconAction label={`Delete sale of ${sale.item}`} onClick={() => setDeleteTarget(sale)}>
-                    <Trash2 size={16} color="#BA1A1A" />
-                  </IconAction>
-                </div>
+                <IconAction label={`Void sale of ${sale.item}`} onClick={() => { setVoidReason(''); setVoidTarget(sale); }}>
+                  <Ban size={16} color="#BA1A1A" />
+                </IconAction>
               </Td>
             </tr>
           ))}
@@ -927,11 +869,8 @@ const DailySales = () => {
             <CardFooterContent>
               <PaymentTag $method={sale.paymentMethod}>{sale.paymentMethod}</PaymentTag>
               <CardActions>
-                <ActionBtn onClick={() => handleEdit(sale)} style={{ color: '#6F240A' }}>
-                  <Edit2 size={13} /> Edit
-                </ActionBtn>
-                <ActionBtn onClick={() => setDeleteTarget(sale)} style={{ color: '#BA1A1A' }}>
-                  <Trash2 size={13} /> Delete
+                <ActionBtn onClick={() => { setVoidReason(''); setVoidTarget(sale); }} style={{ color: '#BA1A1A' }}>
+                  <Ban size={13} /> Void
                 </ActionBtn>
               </CardActions>
             </CardFooterContent>
@@ -952,17 +891,38 @@ const DailySales = () => {
         </PaginationRow>
       )}
 
-      {deleteTarget && (
-        <ConfirmDialog
-          isOpen={!!deleteTarget}
-          title="Delete Sale"
-          message={'Delete ' + deleteTarget.item + '? This cannot be undone.'}
-          confirmLabel="Delete"
-          onConfirm={() => handleDelete(deleteTarget.id)}
-          onCancel={() => setDeleteTarget(null)}
-          confirmLoading={deleting}
-        />
-      )}
+      <Modal
+        isOpen={!!voidTarget}
+        onClose={() => { if (!voiding) { setVoidTarget(null); setVoidReason(''); } }}
+        title="Void Sale"
+      >
+        <p style={{ color: '#55423D', marginTop: 0 }}>
+          Voiding returns the units to stock and keeps the row in history for the audit trail.
+          {voidTarget ? ` This void will be recorded against “${voidTarget.item}”.` : ''}
+        </p>
+        <FormGroup>
+          <label>Reason</label>
+          <input
+            type="text"
+            value={voidReason}
+            onChange={(e) => setVoidReason(e.target.value)}
+            placeholder="e.g. customer returned the item"
+          />
+        </FormGroup>
+        <ModalActions>
+          <button
+            type="button"
+            className="cancel"
+            onClick={() => { setVoidTarget(null); setVoidReason(''); }}
+            disabled={voiding}
+          >
+            Cancel
+          </button>
+          <button type="button" className="save" onClick={handleVoid} disabled={voiding}>
+            {voiding ? 'Voiding...' : 'Void sale'}
+          </button>
+        </ModalActions>
+      </Modal>
     </div>
   );
 };

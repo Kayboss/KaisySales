@@ -400,10 +400,16 @@ test('answer: unknown gives suggestions scoped to the mode', () => {
   assert.match(text, /How much did I make this month\?/);
 });
 
-test('answer: help lists example questions', () => {
-  const { text } = answer('what can you do', retail({}));
-  assert.match(text, /Who owes me money\?/);
-  assert.match(text, /Is anything running low\?/);
+test('answer: help lists example questions for the mode it is in', () => {
+  // Help reuses the mode's own suggestions, because a retail business has no
+  // "who owes me money" screen and a services business has no stock screen.
+  const retailHelp = answer('what can you do', retail({})).text;
+  assert.match(retailHelp, /What's my stock looking like\?/);
+  assert.doesNotMatch(retailHelp, /Who owes me money\?/);
+
+  const servicesHelp = answer('what can you do', services({})).text;
+  assert.match(servicesHelp, /Who owes me money\?/);
+  assert.doesNotMatch(servicesHelp, /stock looking like/);
 });
 
 test('answer: greeting says the assistant works from your own records', () => {
@@ -504,4 +510,45 @@ test('suggestedQuestions returns different prompts per mode', () => {
   const retailQuestions = suggestedQuestions('retail');
   assert.ok(retailQuestions.includes("What's my stock looking like?"));
   assert.ok(!servicesQuestions.includes("What's my stock looking like?"));
+});
+test('answer: a staff login without reporting is not told its expenses are zero', () => {
+  // RLS returns no expense rows for this login, so the honest stats say "nothing
+  // spent". Answering normally would state GHS 0.00 as a fact.
+  const context = {
+    ...retail({ incomeCount: 3, incomeTotal: 900 }),
+    canSeeFinancials: false,
+  };
+
+  for (const question of ['what are my expenses this month', 'am I making a profit', 'how is my business doing']) {
+    const { text } = answer(question, context);
+    assert.match(text, /aren't switched on|aren\u2019t switched on/, question);
+    assert.doesNotMatch(text, /GHS/, question);
+  }
+});
+
+test('answer: a staff login without reporting still gets sales and stock answers', () => {
+  const context = {
+    ...retail({
+      incomeCount: 2,
+      incomeTotal: 500,
+      inventoryCount: 3,
+      lowStock: [{ name: 'Cement', stock: 1, minStock: 5 }],
+    }),
+    canSeeFinancials: false,
+  };
+
+  const sales = answer('how much did I make this month', context);
+  assert.match(moneyish(sales.text), /GHS 500\.00/);
+
+  const stock = answer('what is running low', context);
+  assert.match(stock.text, /Cement/);
+});
+
+test('suggestedQuestions drops the summary prompt when financials are hidden', () => {
+  const questions = suggestedQuestions('retail', { canSeeFinancials: false });
+  assert.ok(!questions.some((question) => /business today/i.test(question)));
+  assert.ok(questions.includes("What's my stock looking like?"));
+
+  const full = suggestedQuestions('retail', { canSeeFinancials: true });
+  assert.ok(full.some((question) => /business today/i.test(question)));
 });

@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import {
   Inbox, MessageSquare, Bug, UserX, ChevronRight, Clock, RefreshCw, CheckCircle2,
 } from 'lucide-react';
-import { fetchOpenSupportRequests, fetchErrorLogs, fetchNeverSignedInUsers } from '../../services/api';
+import { fetchOpenSupportRequests, fetchErrorLogs, fetchNeverSignedInUsers, fetchStaffUserIds } from '../../services/api';
 import EmptyState from '../../components/ui/EmptyState';
 import SkeletonCards from '../../components/ui/SkeletonCards';
 import SkeletonScreen from '../../components/ui/SkeletonScreen';
@@ -209,6 +209,15 @@ const Chevron = styled(ChevronRight)`
 
 const shorten = (value) => (value ? new Date(value).toLocaleString() : '—');
 
+/**
+ * A cashier's login has its own profile, so without this the Inbox lists "users
+ * with errors" that are not businesses of their own (the owner's dashboard is
+ * where those belong). Support reports are deliberately NOT filtered: a person
+ * asking for help is a person, whether they own the shop or work in it.
+ */
+const withoutStaff = (rows, staffIds) =>
+  (rows || []).filter((row) => !staffIds.has(row.userId || row.id));
+
 const countAttention = (reports, errors, neverSignedIn) => {
   const errorUsers = new Set(errors.map(e => e.userId).filter(Boolean));
   return reports.length + errorUsers.size + neverSignedIn.length;
@@ -225,16 +234,19 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
     let active = true;
     const load = async () => {
       try {
-        const [r, e, n] = await Promise.all([
+        const [r, e, n, staffIds] = await Promise.all([
           fetchOpenSupportRequests(100),
           fetchErrorLogs(50),
           fetchNeverSignedInUsers(200),
+          fetchStaffUserIds(),
         ]);
         if (!active) return;
+        const errorsOnlyOwners = withoutStaff(e, staffIds);
+        const neverSignedInOwners = withoutStaff(n, staffIds);
         setReports(r);
-        setErrors(e);
-        setNeverSignedIn(n);
-        if (onAttentionCount) onAttentionCount(countAttention(r, e, n));
+        setErrors(errorsOnlyOwners);
+        setNeverSignedIn(neverSignedInOwners);
+        if (onAttentionCount) onAttentionCount(countAttention(r, errorsOnlyOwners, neverSignedInOwners));
       } catch (err) {
         console.error('Failed to load inbox', err);
       } finally {
@@ -248,15 +260,18 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const [r, e, n] = await Promise.all([
+      const [r, e, n, staffIds] = await Promise.all([
         fetchOpenSupportRequests(100),
         fetchErrorLogs(50),
         fetchNeverSignedInUsers(200),
+        fetchStaffUserIds(),
       ]);
+      const errorsOnlyOwners = withoutStaff(e, staffIds);
+      const neverSignedInOwners = withoutStaff(n, staffIds);
       setReports(r);
-      setErrors(e);
-      setNeverSignedIn(n);
-      if (onAttentionCount) onAttentionCount(countAttention(r, e, n));
+      setErrors(errorsOnlyOwners);
+      setNeverSignedIn(neverSignedInOwners);
+      if (onAttentionCount) onAttentionCount(countAttention(r, errorsOnlyOwners, neverSignedInOwners));
     } catch (err) {
       console.error('Failed to refresh inbox', err);
     } finally {

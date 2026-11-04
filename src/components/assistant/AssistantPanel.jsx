@@ -273,7 +273,16 @@ const AssistantPanel = () => {
   const endRef = useRef(null);
 
   const insights = useMemo(
-    () => (context ? buildInsights({ mode: context.mode, currency: context.currency, statsByScope: context.statsByScope }) : []),
+    () =>
+      context
+        ? buildInsights({
+            mode: context.mode,
+            currency: context.currency,
+            role: context.role,
+            modules: context.modules,
+            statsByScope: context.statsByScope,
+          })
+        : [],
     [context]
   );
 
@@ -346,7 +355,9 @@ const AssistantPanel = () => {
     );
   }
 
-  const suggestions = suggestedQuestions(context?.mode || 'retail');
+  const suggestions = suggestedQuestions(context?.mode || 'retail', {
+    canSeeFinancials: context ? context.canSeeFinancials !== false : true,
+  });
   const showLanding = messages.length === 0;
 
   return (

@@ -6,7 +6,7 @@ import Modal from '../../components/ui/Modal';
 import IconAction from '../../components/ui/IconAction';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import AssistantDoorway from '../../components/assistant/AssistantDoorway';
-import { fetchInventory, createInventoryItem, updateInventoryItem, deleteInventoryItem, fetchCategories, createCategory } from '../../services/api';
+import { fetchInventory, createInventoryItem, updateInventoryItem, deleteInventoryItem, restockProduct, fetchCategories, createCategory } from '../../services/api';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
@@ -14,7 +14,7 @@ import { supabase } from '../../services/supabase';
 import { checkCreateLimit } from '../../utils/subscriptionLimits';
 import { formatCurrency, getCurrencySymbol, parseAmount } from '../../utils/currency';
 import { sanitizeInput, sanitizeNumber } from '../../utils/sanitize';
-import { applyStockDelta, resolveMinStock, resolveStock, resolveStockStatus, stockValueAtCost, stockRetailValue, countUnitsInStock, countItemsMissingCost, countItemsWithCost, grossMarginPercent } from '../../utils/inventory';
+import { resolveStockStatus, stockValueAtCost, stockRetailValue, countUnitsInStock, countItemsMissingCost, countItemsWithCost, grossMarginPercent } from '../../utils/inventory';
 import Skeleton from '../../components/ui/Skeleton';
 import SkeletonTable from '../../components/ui/SkeletonTable';
 import SkeletonScreen from '../../components/ui/SkeletonScreen';
@@ -430,7 +430,7 @@ const ModalActions = styled.div`
 `;
 
 const InventoryManagement = () => {
-  const { currency, subscriptionPlan } = useSettingsStore();
+  const { currency, subscriptionPlan, businessRole } = useSettingsStore();
   const navigate = useNavigate();
   const user = useAuthStore(s => s.user);
   const [inventory, setInventory] = useState([]);
@@ -440,6 +440,7 @@ const InventoryManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [editProductId, setEditProductId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [saving, setSaving] = useState(false);
   const [limitError, setLimitError] = useState(null);
@@ -447,6 +448,9 @@ const InventoryManagement = () => {
   const [deleting, setDeleting] = useState(false);
   // Cleared by the first fetch only — loadData also runs after save/delete, where a skeleton flash would be wrong.
   const [loading, setLoading] = useState(true);
+
+  // Deleting a product removes it from every branch, so it stays owner-only.
+  const canDelete = businessRole === 'owner';
 
   const [formData, setFormData] = useState({
     name: '', category: '', stock: '', price: '', costPrice: '', minStock: 5, newCategory: ''
@@ -497,8 +501,9 @@ const InventoryManagement = () => {
     }
 
     const stockNum = sanitizeNumber(formData.stock);
-    const minStock = resolveMinStock({ minStock: sanitizeNumber(formData.minStock) });
+    const minStock = sanitizeNumber(formData.minStock) || 5;
     const itemPayload = {
+      productId: editProductId,
       name: sanitizeInput(formData.name, 100),
       category: sanitizeInput(selectedCategory, 50),
       stock: stockNum,
@@ -518,7 +523,7 @@ const InventoryManagement = () => {
       closeModal();
     } catch (error) {
       console.error('Failed to save inventory item', error);
-      alert('Failed to save inventory item. Please try again.');
+      alert(error?.message || 'Failed to save inventory item. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -537,17 +542,22 @@ const InventoryManagement = () => {
       newCategory: ''
     });
     setEditId(item.id);
+    setEditProductId(item.productId);
     setIsEditing(true);
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id) => {
+    if (!canDelete) return;
     setDeleting(true);
     try {
-      await deleteInventoryItem(id);
+      // Stock rows cascade with the product; the id passed is the branch_inventory
+      // row, so the product id travels with the target.
+      await deleteInventoryItem(id, deleteTarget?.productId);
       await loadData();
     } catch (error) {
       console.error('Failed to delete inventory item', error);
+      alert(error?.message || 'Failed to delete inventory item. Please try again.');
     } finally {
       setDeleteTarget(null);
       setDeleting(false);
@@ -558,23 +568,21 @@ const InventoryManagement = () => {
     setIsModalOpen(false);
     setIsEditing(false);
     setEditId(null);
+    setEditProductId(null);
     setFormData({ name: '', category: '', stock: '', price: '', costPrice: '', minStock: 5, newCategory: '' });
   };
 
   const adjustStock = async (item, delta) => {
+    if (!item.productId) return;
     setAdjustingId(item.id);
     try {
-      const applied = applyStockDelta(resolveStock(item), -delta, resolveMinStock(item));
-      await updateInventoryItem(item.id, {
-        stock: applied.stock,
-        status: applied.status
-      });
-      if (applied.shortfall > 0) {
-        alert(`${item.name} only has ${resolveStock(item)} units in stock. Stock has been set to 0, removing ${applied.shortfall} more than were available.`);
-      }
+      // `set_branch_stock` is the single writer for per-branch stock, so two
+      // cashiers restocking at once cannot overwrite each other's counts.
+      await restockProduct(item.productId, delta);
       await loadData();
     } catch (error) {
       console.error('Failed to adjust stock', error);
+      alert(error?.message || 'Failed to adjust stock. Please try again.');
     } finally {
       setAdjustingId(null);
     }
@@ -843,9 +851,11 @@ const InventoryManagement = () => {
                   <IconAction label={`Edit ${item.name}`} onClick={() => handleEdit(item)}>
                     <Edit2 size={16} color="#89726C" />
                   </IconAction>
-                  <IconAction label={`Delete ${item.name}`} onClick={() => setDeleteTarget(item)}>
-                    <Trash2 size={16} color="#BA1A1A" />
-                  </IconAction>
+                  {canDelete && (
+                    <IconAction label={`Delete ${item.name}`} onClick={() => setDeleteTarget(item)}>
+                      <Trash2 size={16} color="#BA1A1A" />
+                    </IconAction>
+                  )}
                 </div>
               </Td>
             </tr>
@@ -893,9 +903,11 @@ const InventoryManagement = () => {
                 <InvActionBtn onClick={() => handleEdit(item)} $color="#6F240A">
                   <Edit2 size={13} /> Edit
                 </InvActionBtn>
-                <InvActionBtn onClick={() => setDeleteTarget(item)} $color="#BA1A1A">
-                  <Trash2 size={13} /> Delete
-                </InvActionBtn>
+                {canDelete && (
+                  <InvActionBtn onClick={() => setDeleteTarget(item)} $color="#BA1A1A">
+                    <Trash2 size={13} /> Delete
+                  </InvActionBtn>
+                )}
               </div>
             </InvCardFooter>
           </InvCard>

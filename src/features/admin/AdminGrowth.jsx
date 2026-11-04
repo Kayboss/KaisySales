@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { UserPlus, LogIn, FilePlus2, Repeat, Megaphone, Info } from 'lucide-react';
-import { fetchUsersWithStats, fetchAcquisition, fetchVisitDays } from '../../services/api';
+import { fetchUsersWithStats, fetchAcquisition, fetchVisitDays, fetchStaffUserIds } from '../../services/api';
 import { summariseFunnel, UNATTRIBUTED } from '../../utils/growth';
 import EmptyState from '../../components/ui/EmptyState';
 import SkeletonScreen from '../../components/ui/SkeletonScreen';
@@ -168,12 +168,17 @@ const AdminGrowth = () => {
         // One pass, three sources, all of them what the other admin tabs read:
         // profiles + per-user record counts, the write-once attribution rows,
         // and 90 days of visits for the "came back" stage.
-        const [people, acquisition, visits] = await Promise.all([
+        const [people, acquisition, visits, staffIds] = await Promise.all([
           fetchUsersWithStats(),
           fetchAcquisition(),
           fetchVisitDays(90),
+          fetchStaffUserIds(),
         ]);
-        setFunnel(summariseFunnel({ profiles: people, stats: people, acquisition, visits }));
+        // A cashier has a login and a profile but is not a business of their own:
+        // counting them here would inflate signups and depress activation for
+        // every owner who hires, which reads as a marketing failure.
+        const owners = people.filter((person) => !staffIds.has(person.id));
+        setFunnel(summariseFunnel({ profiles: owners, stats: owners, acquisition, visits }));
       } catch (err) {
         console.error('Failed to load growth funnel', err);
       } finally {

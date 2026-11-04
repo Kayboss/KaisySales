@@ -2,6 +2,7 @@ import { useState } from 'react';
 import styled from 'styled-components';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
+import { dbService } from '../../services/supabase';
 import { CURRENCY_OPTIONS } from '../../utils/currency';
 import { sanitizeInput } from '../../utils/sanitize';
 import { 
@@ -13,7 +14,9 @@ import {
   Phone, 
   MapPin, 
   Check, 
-  Briefcase
+  Briefcase,
+  KeyRound,
+  Store
 } from 'lucide-react';
 
 const Container = styled.div`
@@ -310,9 +313,17 @@ const NextButton = styled.button`
 const OnboardingWizard = () => {
   const { user, logout } = useAuthStore();
   const updateSettings = useSettingsStore(state => state.updateSettings);
-  
+  const loadSettings = useSettingsStore(state => state.loadSettings);
+  const businessId = useSettingsStore(state => state.businessId);
+
+  // No membership yet means this login cannot write a single row (tenant
+  // columns are NOT NULL), so it must either create a business or redeem an
+  // invite before the profile can be saved.
+  const needsBusiness = !businessId;
+  const [mode, setMode] = useState(needsBusiness ? 'choose' : 'profile');
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
   const [formData, setFormData] = useState({
     ownerName: '',
     businessName: '',
@@ -341,43 +352,93 @@ const OnboardingWizard = () => {
     if (step < 3) {
       setStep(step + 1);
     } else {
-      handleSubmit();
+      handleCreateSubmit();
     }
   };
 
   const handleBack = () => {
-    if (step > 1) {
-      setStep(step - 1);
-    }
+    if (step > 1) setStep(step - 1);
+    else if (needsBusiness) setMode('choose');
   };
 
-  const handleSubmit = async () => {
+  const profileFields = () => ({
+    ownerName: sanitizeInput(formData.ownerName, 100),
+    avatarColor: formData.avatarColor,
+    email: user?.email || '',
+    isOnboarded: true,
+  });
+
+  // A membership is the gate: load it first so updateSettings knows which
+  // business row to patch, then save the profile. The free plan is granted here
+  // (and only here) so an invited cashier never provisions a business.
+  const afterMembership = async () => {
+    await loadSettings(user.uid);
+    await updateSettings(user.uid, profileFields());
+    await dbService.ensureFreeTrial(user.uid);
+    await loadSettings(user.uid);
+  };
+
+  const handleCreateSubmit = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const finalProfile = {
-        ownerName: sanitizeInput(formData.ownerName, 100),
-        businessName: sanitizeInput(formData.businessName, 100),
+      await dbService.createBusiness({
+        name: sanitizeInput(formData.businessName, 100),
+        type: formData.category === 'Services' ? 'services' : 'retail',
+        currency: formData.currency,
+        category: sanitizeInput(formData.category, 50),
         phone: sanitizeInput(formData.phone, 20),
         location: sanitizeInput(formData.location, 200),
-        category: sanitizeInput(formData.category, 50),
-        businessType: formData.category === 'Services' ? 'services' : 'retail',
-        avatarColor: formData.avatarColor,
-        currency: formData.currency,
-        email: user.email,
-        isOnboarded: true
-      };
+      });
+      await afterMembership();
+    } catch (error) {
+      console.error('🔥 Onboarding submit failed:', error);
+      alert(error?.message || 'Could not create your business. Please try again.');
+      setLoading(false);
+    }
+  };
 
-        await updateSettings(user.uid, finalProfile);
-      } catch (error) {
-        console.error('🔥 Onboarding submit failed:', error);
-        alert('Could not save your profile details. Please try again.');
-      } finally {
-        setLoading(false);
+  const handleJoinSubmit = async (e) => {
+    e.preventDefault();
+    if (!user || !inviteCode.trim()) return;
+    setLoading(true);
+    try {
+      await dbService.redeemInvite(inviteCode);
+      await afterMembership();
+    } catch (error) {
+      console.error('🔥 Joining business failed:', error);
+      const message = error?.message || '';
+      if (message.includes('already belongs')) {
+        alert('This login already belongs to a business.');
+      } else if (message.toLowerCase().includes('expired')) {
+        alert('That invite code has expired. Ask the owner for a new one.');
+      } else if (message.toLowerCase().includes('used')) {
+        alert('That invite code has already been used.');
+      } else {
+        alert(message || 'Could not join with that code. Check the code and try again.');
       }
-    };
+      setLoading(false);
+    }
+  };
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    if (!user) return;
+    setLoading(true);
+    try {
+      await updateSettings(user.uid, profileFields());
+      await dbService.ensureFreeTrial(user.uid);
+      await loadSettings(user.uid);
+    } catch (error) {
+      console.error('🔥 Saving profile failed:', error);
+      alert(error?.message || 'Could not save your profile details. Please try again.');
+      setLoading(false);
+    }
+  };
 
   const isStepValid = () => {
+    if (mode === 'join') return inviteCode.trim().length >= 6 && formData.ownerName.trim().length > 2;
+    if (mode === 'profile') return formData.ownerName.trim().length > 2;
     if (step === 1) return formData.ownerName.trim().length > 2;
     if (step === 2) return formData.businessName.trim().length > 2;
     if (step === 3) return formData.phone.trim().length > 7;
@@ -407,13 +468,38 @@ const OnboardingWizard = () => {
           </button>
         </div>
         <TopProgressBar style={{ marginTop: '2.5rem' }}>
-          <ProgressSegment $active={step >= 1} />
-          <ProgressSegment $active={step >= 2} />
-          <ProgressSegment $active={step >= 3} />
+          <ProgressSegment $active={mode === 'create' ? step >= 1 : true} />
+          <ProgressSegment $active={mode === 'create' ? step >= 2 : mode === 'profile'} />
+          <ProgressSegment $active={mode === 'create' ? step >= 3 : false} />
         </TopProgressBar>
 
         <Content>
-          {step === 1 && (
+          {mode === 'choose' && (
+            <div>
+              <StepHeader>
+                <h2>Welcome to KaisySales</h2>
+                <p>Are you setting up a business, or joining one your team already runs?</p>
+              </StepHeader>
+              <CategoryGrid>
+                <CategoryOption type="button" onClick={() => { setMode('create'); setStep(1); }}>
+                  <Store size={20} />
+                  <OptionDescription>
+                    <span>Create your business</span>
+                    <span>You become the owner and can invite staff</span>
+                  </OptionDescription>
+                </CategoryOption>
+                <CategoryOption type="button" onClick={() => setMode('join')}>
+                  <KeyRound size={20} />
+                  <OptionDescription>
+                    <span>Join with a code</span>
+                    <span>Use the invite code your owner shared</span>
+                  </OptionDescription>
+                </CategoryOption>
+              </CategoryGrid>
+            </div>
+          )}
+
+          {mode === 'create' && step === 1 && (
             <div>
               <StepHeader>
                 <h2>Welcome to KaisySales</h2>
@@ -455,7 +541,7 @@ const OnboardingWizard = () => {
             </div>
           )}
 
-          {step === 2 && (
+          {mode === 'create' && step === 2 && (
             <div>
               <StepHeader>
                 <h2>Business Profile</h2>
@@ -502,7 +588,7 @@ const OnboardingWizard = () => {
             </div>
           )}
 
-          {step === 3 && (
+          {mode === 'create' && step === 3 && (
             <div>
               <StepHeader>
                 <h2>Contact & Currency</h2>
@@ -561,38 +647,152 @@ const OnboardingWizard = () => {
             </div>
           )}
 
+          {mode === 'join' && (
+            <div>
+              <StepHeader>
+                <h2>Join your team</h2>
+                <p>Enter the invite code from your business owner, and tell us your name.</p>
+              </StepHeader>
+              <Form onSubmit={handleJoinSubmit}>
+                <div>
+                  <Label>Invite Code</Label>
+                  <InputWrapper>
+                    <KeyRound size={18} />
+                    <Input
+                      type="text"
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. 8F3A1C2D"
+                      maxLength={12}
+                      required
+                      autoFocus
+                    />
+                  </InputWrapper>
+                </div>
+                <div>
+                  <Label>Your Full Name</Label>
+                  <InputWrapper>
+                    <User size={18} />
+                    <Input
+                      type="text"
+                      name="ownerName"
+                      value={formData.ownerName}
+                      onChange={handleChange}
+                      placeholder="e.g. Ama Mensah"
+                      required
+                    />
+                  </InputWrapper>
+                </div>
+                <div>
+                  <Label>Select Profile Aesthetic Color</Label>
+                  <ColorGrid>
+                    {avatarColors.map(color => (
+                      <ColorOption
+                        key={color}
+                        type="button"
+                        $color={color}
+                        $selected={formData.avatarColor === color}
+                        onClick={() => setColor(color)}
+                      >
+                        {formData.avatarColor === color && <Check size={18} />}
+                      </ColorOption>
+                    ))}
+                  </ColorGrid>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid #E6DFDA' }}>
+                  <BackButton type="button" onClick={() => setMode('choose')} disabled={loading}>
+                    <ArrowLeft size={16} />
+                    Back
+                  </BackButton>
+                  <NextButton type="submit" disabled={!isStepValid() || loading}>
+                    {loading ? 'Joining...' : (<>{'Join business'}<ArrowRight size={16} /></>)}
+                  </NextButton>
+                </div>
+              </Form>
+            </div>
+          )}
+
+          {mode === 'profile' && (
+            <div>
+              <StepHeader>
+                <h2>Finish your profile</h2>
+                <p>Your business is already set up. We just need your name for receipts and reports.</p>
+              </StepHeader>
+              <Form onSubmit={handleProfileSubmit}>
+                <div>
+                  <Label>Your Full Name</Label>
+                  <InputWrapper>
+                    <User size={18} />
+                    <Input
+                      type="text"
+                      name="ownerName"
+                      value={formData.ownerName}
+                      onChange={handleChange}
+                      placeholder="e.g. Ama Mensah"
+                      required
+                      autoFocus
+                    />
+                  </InputWrapper>
+                </div>
+                <div>
+                  <Label>Select Profile Aesthetic Color</Label>
+                  <ColorGrid>
+                    {avatarColors.map(color => (
+                      <ColorOption
+                        key={color}
+                        type="button"
+                        $color={color}
+                        $selected={formData.avatarColor === color}
+                        onClick={() => setColor(color)}
+                      >
+                        {formData.avatarColor === color && <Check size={18} />}
+                      </ColorOption>
+                    ))}
+                  </ColorGrid>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid #E6DFDA' }}>
+                  <NextButton type="submit" disabled={!isStepValid() || loading}>
+                    {loading ? 'Saving...' : (<>{'Open KaisySales'}<Sparkles size={16} /></>)}
+                  </NextButton>
+                </div>
+              </Form>
+            </div>
+          )}
+
         </Content>
 
-        <Footer>
-          <BackButton 
-            type="button"
-            onClick={handleBack} 
-            disabled={step === 1 || loading}
-          >
-            <ArrowLeft size={16} />
-            Back
-          </BackButton>
-          
-          <NextButton 
-            type="button" 
-            onClick={handleNext}
-            disabled={!isStepValid() || loading}
-          >
-            {loading ? (
-              'Setting up your workspace...'
-            ) : step === 3 ? (
-              <>
-                Open KaisySales
-                <Sparkles size={16} />
-              </>
-            ) : (
-              <>
-                Continue
-                <ArrowRight size={16} />
-              </>
-            )}
-          </NextButton>
-        </Footer>
+        {mode === 'create' && (
+          <Footer>
+            <BackButton 
+              type="button"
+              onClick={handleBack} 
+              disabled={step === 1 || loading}
+            >
+              <ArrowLeft size={16} />
+              Back
+            </BackButton>
+            
+            <NextButton 
+              type="button" 
+              onClick={handleNext}
+              disabled={!isStepValid() || loading}
+            >
+              {loading ? (
+                'Setting up your workspace...'
+              ) : step === 3 ? (
+                <>
+                  Open KaisySales
+                  <Sparkles size={16} />
+                </>
+              ) : (
+                <>
+                  Continue
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </NextButton>
+          </Footer>
+        )}
       </WizardCard>
     </Container>
   );

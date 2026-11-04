@@ -1,0 +1,233 @@
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #14110f;
+  font-family: 'Work Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#fit {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#stage {
+  position: relative;
+  overflow: hidden;
+  background: #fcf9f3;
+  transform-origin: center center;
+  flex: none;
+}
+
+#stage .art {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+}
+
+/* Every animated SVG group rotates around its own local origin (the joint) */
+#stage .art g {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+/* Only the near arm holds the phone; the far one is a ghost behind the torso */
+#stage .art .arm-b .hand-phone { display: none; }
+
+/* ---------- copy ---------- */
+
+.wordmark,
+.hook-line,
+.card-title,
+.end-name,
+.end-head,
+.end-cta {
+  font-family: 'Tango Sans', 'Manrope', sans-serif;
+  font-weight: 700;
+}
+
+.wordmark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  color: #6f240a;
+  text-align: center;
+}
+
+.hook {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.hook-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  color: #1c1c18;
+  line-height: 1.12;
+}
+
+.hook-line[data-i='1'] { color: #6f240a; }
+
+/* ---------- feature cards ---------- */
+
+.card {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 2px solid rgba(217, 199, 191, 0.7);
+  box-shadow: 0 24px 48px -18px rgba(111, 36, 10, 0.28), 0 4px 12px rgba(28, 28, 24, 0.05);
+}
+
+.card-accent {
+  border-radius: 999px;
+  background: var(--accent, #6f240a);
+  flex: none;
+}
+
+.card-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.card-icon svg { display: block; }
+
+.card-text { min-width: 0; }
+
+.card-title { color: #1c1c18; }
+.card-line { font-weight: 500; color: #55423d; }
+
+.card-step {
+  margin-left: auto;
+  font-family: 'Tango Sans', 'Manrope', sans-serif;
+  font-weight: 700;
+  color: #6f240a;
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
+.card-step span { font-size: 0.72em; }
+
+.dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dot {
+  display: block;
+  height: 16px;
+  width: 16px;
+  border-radius: 999px;
+  background: #6f240a;
+}
+
+/* ---------- end card ---------- */
+
+#end {
+  position: absolute;
+  text-align: center;
+}
+
+.end-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.end-logo img { display: block; width: 128px; height: auto; }
+
+.end-name { color: #6f240a; }
+
+.end-head {
+  color: #1c1c18;
+  white-space: pre-line;
+  margin: 0;
+}
+
+.end-cta {
+  display: inline-block;
+  color: #ffffff;
+  background: #6f240a;
+  border-radius: 999px;
+}
+
+.end-url {
+  color: #55423d;
+  font-weight: 600;
+}
+
+/* ---------- portrait 9:16 ---------- */
+
+[data-ratio='9x16'] .wordmark { top: 108px; font-size: 44px; }
+[data-ratio='9x16'] .hook { top: 236px; padding: 0 70px; }
+[data-ratio='9x16'] .hook-line { font-size: 74px; line-height: 1.12; }
+[data-ratio='9x16'] .card {
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: 900px;
+  height: 344px;
+  padding: 46px 52px;
+  border-radius: 32px;
+  gap: 34px;
+}
+[data-ratio='9x16'] .card-accent { width: 10px; height: 168px; }
+[data-ratio='9x16'] .card-icon { width: 104px; height: 104px; }
+[data-ratio='9x16'] .card-icon svg { width: 54px; height: 54px; }
+[data-ratio='9x16'] .card-title { font-size: 58px; line-height: 1.12; }
+[data-ratio='9x16'] .card-line { font-size: 34px; line-height: 1.3; margin-top: 12px; }
+[data-ratio='9x16'] .card-step { font-size: 34px; }
+[data-ratio='9x16'] .dots { top: 1168px; gap: 16px; }
+[data-ratio='9x16'] #end { left: 0; right: 0; top: 520px; }
+[data-ratio='9x16'] .end-logo { gap: 26px; }
+[data-ratio='9x16'] .end-name { font-size: 62px; }
+[data-ratio='9x16'] .end-head { font-size: 62px; line-height: 1.18; margin-top: 44px; }
+[data-ratio='9x16'] .end-cta { font-size: 42px; padding: 26px 62px; margin-top: 54px; }
+[data-ratio='9x16'] .end-url { font-size: 34px; margin-top: 30px; }
+
+/* ---------- landscape 16:9 ---------- */
+
+[data-ratio='16x9'] .wordmark { top: 76px; right: 120px; left: auto; font-size: 34px; }
+[data-ratio='16x9'] .hook { top: 168px; left: 128px; right: auto; width: 760px; }
+[data-ratio='16x9'] .hook-line { font-size: 56px; line-height: 1.14; text-align: left; }
+[data-ratio='16x9'] .card {
+  left: 1056px;
+  width: 792px;
+  height: 118px;
+  padding: 18px 26px;
+  border-radius: 22px;
+  gap: 20px;
+}
+[data-ratio='16x9'] .card-accent { width: 7px; height: 62px; }
+[data-ratio='16x9'] .card-icon { width: 64px; height: 64px; }
+[data-ratio='16x9'] .card-icon svg { width: 34px; height: 34px; }
+[data-ratio='16x9'] .card-title { font-size: 34px; line-height: 1.1; }
+[data-ratio='16x9'] .card-line { font-size: 22px; line-height: 1.25; margin-top: 6px; }
+[data-ratio='16x9'] .card-step { font-size: 22px; }
+[data-ratio='16x9'] #end { left: 1034px; width: 836px; top: 300px; }
+[data-ratio='16x9'] .end-logo { gap: 20px; }
+[data-ratio='16x9'] .end-logo img { width: 108px; }
+[data-ratio='16x9'] .end-name { font-size: 52px; }
+[data-ratio='16x9'] .end-head { font-size: 54px; line-height: 1.16; margin-top: 34px; }
+[data-ratio='16x9'] .end-cta { font-size: 36px; padding: 22px 54px; margin-top: 42px; }
+[data-ratio='16x9'] .end-url { font-size: 28px; margin-top: 24px; }

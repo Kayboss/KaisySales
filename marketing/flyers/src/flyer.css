@@ -1,0 +1,331 @@
+/* Print layout for the KaisySales flyers.
+ *
+ * Everything is in millimetres, because the output of this project is paper:
+ * a PDF whose page box is the trim size plus 3 mm of bleed on every edge. The
+ * trim area carries its own padding, so nothing that must survive the guillotine
+ * sits inside the outer 8 mm. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --accent: #6f240a;
+  --accent-soft: #8e3a1f;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #ebe7df;
+  font-family: 'Work Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The sheet is trim + bleed. Print shops ask for that; the PNG preview is the
+ * trim area only, which is why the bleed is a separate element rather than a
+ * bigger #page. */
+#sheet {
+  position: relative;
+  background: #fcf9f3;
+  overflow: hidden;
+}
+
+#page {
+  position: absolute;
+  inset: 3mm;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* On screen (--serve) the sheet is shown as a soft proof on a grey desk. This
+ * is screen-only: a print stylesheet that pads the body would push the whole
+ * flyer 10 mm down the PDF and put the PNG crop out of register. */
+@media screen {
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 10mm;
+  }
+
+  body #sheet {
+    box-shadow: 0 12mm 30mm -8mm rgba(28, 28, 24, 0.4);
+  }
+}
+
+@media print {
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    background: #fcf9f3;
+  }
+}
+
+/* --------------------------------------------------------------- brand row */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--brand-gap);
+  flex: none;
+}
+
+.brand .mark {
+  display: block;
+  height: var(--mark-h);
+  width: auto;
+}
+
+.wordmark {
+  font-family: 'Tango Sans', 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: var(--wordmark);
+  line-height: 1;
+  color: #1c1c18;
+  white-space: nowrap;
+}
+
+.chip {
+  margin-left: auto;
+  font-size: var(--chip);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  background: var(--accent);
+  border-radius: 999px;
+  padding: var(--chip-pad);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------- hook */
+
+.hook {
+  margin: var(--hook-top) 0 0;
+  font-family: 'Tango Sans', 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: var(--hook);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: #1c1c18;
+}
+
+.hook span {
+  display: block;
+}
+
+.hook span + span {
+  color: var(--accent);
+  margin-top: var(--hook-gap);
+}
+
+.sub {
+  margin: var(--sub-top) 0 0;
+  font-size: var(--sub);
+  line-height: 1.35;
+  font-weight: 500;
+  color: #55423d;
+  max-width: var(--sub-width);
+}
+
+/* ---------------------------------------------------------------- features */
+
+.features {
+  list-style: none;
+  margin: var(--features-top) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--row-gap);
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: var(--row-gap-icon);
+  border-bottom: 0.25mm solid #e2d9ce;
+  padding-bottom: var(--row-pad);
+}
+
+.feature:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.feature .ico {
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, #fcf9f3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.feature .ico svg {
+  width: var(--icon-glyph);
+  height: var(--icon-glyph);
+  display: block;
+}
+
+.feature .txt {
+  min-width: 0;
+}
+
+.feature .name {
+  font-family: 'Tango Sans', 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: var(--feat-name);
+  line-height: 1.15;
+  color: #1c1c18;
+}
+
+.feature .line {
+  font-size: var(--feat-line);
+  line-height: 1.3;
+  color: #55423d;
+  margin-top: var(--feat-line-gap);
+}
+
+/* --------------------------------------------------------------------- CTA */
+
+.cta {
+  margin-top: auto;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--cta-gap);
+  background: var(--accent);
+  border-radius: var(--cta-radius);
+  padding: var(--cta-pad);
+}
+
+.qr {
+  flex: none;
+  display: block;
+  width: var(--qr);
+  height: var(--qr);
+  background: #ffffff;
+  border-radius: var(--qr-radius);
+  padding: var(--qr-pad);
+}
+
+.cta-text {
+  min-width: 0;
+}
+
+.cta-title {
+  font-family: 'Tango Sans', 'Manrope', sans-serif;
+  font-weight: 700;
+  font-size: var(--cta-title);
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+.cta-line {
+  margin-top: var(--cta-line-gap);
+  font-size: var(--cta-line);
+  line-height: 1.35;
+  font-weight: 500;
+  color: #f7e9dd;
+}
+
+/* ------------------------------------------------------------------ footer */
+
+.foot {
+  flex: none;
+  margin-top: var(--foot-top);
+  display: flex;
+  align-items: baseline;
+  gap: var(--foot-gap);
+  font-size: var(--foot);
+  font-weight: 600;
+  color: #55423d;
+}
+
+.foot .url {
+  color: var(--accent);
+}
+
+.foot .sep {
+  color: #b6a49d;
+}
+
+/* ------------------------------------------------------------------- sizes */
+
+[data-format='a5'] {
+  --mark-h: 8.5mm;
+  --brand-gap: 2.4mm;
+  --wordmark: 6.6mm;
+  --chip: 3.3mm;
+  --chip-pad: 1.7mm 3.2mm;
+  --hook-top: 9mm;
+  --hook: 10.4mm;
+  --hook-gap: 0.8mm;
+  --sub-top: 4.4mm;
+  --sub: 4.05mm;
+  --sub-width: 112mm;
+  --features-top: 7.5mm;
+  --row-gap: 4.2mm;
+  --row-pad: 3.6mm;
+  --row-gap-icon: 4mm;
+  --icon: 9.2mm;
+  --icon-glyph: 5mm;
+  --feat-name: 5.2mm;
+  --feat-line: 3.7mm;
+  --feat-line-gap: 1mm;
+  --cta-gap: 4.6mm;
+  --cta-radius: 4mm;
+  --cta-pad: 4.6mm;
+  --qr: 27mm;
+  --qr-pad: 1.8mm;
+  --qr-radius: 2mm;
+  --cta-title: 6mm;
+  --cta-line: 3.6mm;
+  --cta-line-gap: 1.6mm;
+  --foot-top: 6mm;
+  --foot-gap: 2.2mm;
+  --foot: 3.4mm;
+}
+
+[data-format='a4'] {
+  --mark-h: 11.5mm;
+  --brand-gap: 3.2mm;
+  --wordmark: 9mm;
+  --chip: 4.4mm;
+  --chip-pad: 2.3mm 4.4mm;
+  --hook-top: 13mm;
+  --hook: 15mm;
+  --hook-gap: 1.2mm;
+  --sub-top: 6mm;
+  --sub: 5.4mm;
+  --sub-width: 158mm;
+  --features-top: 11mm;
+  --row-gap: 6.2mm;
+  --row-pad: 5.2mm;
+  --row-gap-icon: 5.5mm;
+  --icon: 13mm;
+  --icon-glyph: 7mm;
+  --feat-name: 7mm;
+  --feat-line: 5mm;
+  --feat-line-gap: 1.4mm;
+  --cta-gap: 6.5mm;
+  --cta-radius: 5.5mm;
+  --cta-pad: 6.5mm;
+  --qr: 38mm;
+  --qr-pad: 2.4mm;
+  --qr-radius: 2.8mm;
+  --cta-title: 8.4mm;
+  --cta-line: 4.9mm;
+  --cta-line-gap: 2.2mm;
+  --foot-top: 8mm;
+  --foot-gap: 3mm;
+  --foot: 4.5mm;
+}

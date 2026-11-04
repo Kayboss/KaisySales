@@ -1,0 +1,15 @@
+{
+  "name": "kaisysales-flyers",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Print flyers for KaisySales (A5/A4, retail + services) rendered to PDF by render.mjs",
+  "type": "module",
+  "scripts": {
+    "render": "node render.mjs",
+    "serve": "node render.mjs --serve",
+    "preview": "node render.mjs --format a5"
+  },
+  "devDependencies": {
+    "qrcode": "^1.5.4"
+  }
+}

@@ -1,4 +1,5 @@
 import { formatCurrency } from '../currency.js';
+import { canSeeReports } from '../tenancy.js';
 
 /**
  * Assistant insights builder.
@@ -20,6 +21,22 @@ import { formatCurrency } from '../currency.js';
  */
 
 const SEVERITY_RANK = { high: 0, medium: 1, low: 2, info: 3 };
+
+/**
+ * Every insight that states a money figure the `reporting` module gates:
+ * expenses, profit, margins and unpaid balances. A cashier without that module
+ * must not be told the shop is running at a loss, and must not be sent to a
+ * screen they cannot open. Operational insights (stock) stay, because restocking
+ * their own branch is part of the job.
+ */
+const FINANCIAL_INSIGHTS = new Set([
+  'in-the-red',
+  'unpriced',
+  'quiet-month',
+  'outstanding',
+  'overdue',
+  'recurring-due',
+]);
 
 const pad = (n) => String(n).padStart(2, '0');
 const isoOf = (date) => `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
@@ -46,12 +63,18 @@ const homeRoute = (mode) => (mode === 'services' ? SERVICES_HOME : RETAIL_HOME);
 
 const reportingRoute = (mode) => (mode === 'services' ? '/service-reporting' : '/reporting');
 
+const hasFinancials = (context) =>
+  context.role !== 'staff' ||
+  canSeeReports({ role: context.role, modules: context.modules });
+
 /**
  * Turns the stats the engine already has into a ranked "needs attention" list.
  *
  * @param {{
  *   mode?: 'retail'|'services',
  *   currency?: string,
+ *   role?: 'owner'|'staff',
+ *   modules?: string[],
  *   statsByScope?: Object,
  *   todayIso?: string,
  * }} context
@@ -71,6 +94,9 @@ export const buildInsights = (context = {}) => {
   const byScope = context.statsByScope || {};
   const allTime = byScope['all time'] || {};
   const month = byScope['this month'] || {};
+  // An absent role means a login from before tenancy existed (or services mode,
+  // which has no staff), so treat it as full access.
+  const financials = hasFinancials(context);
 
   const moneyText = (value) => money(value, currency);
   const insights = [];
@@ -87,7 +113,9 @@ export const buildInsights = (context = {}) => {
         title: 'No records yet',
         body: services
           ? 'Add your first payment or expense and this panel will start flagging what needs your attention.'
-          : 'Add your first sale or expense and this panel will start flagging what needs your attention.',
+          : financials
+            ? 'Add your first sale or expense and this panel will start flagging what needs your attention.'
+            : 'Add your first sale and this panel will start flagging what needs your attention.',
         route: homeRoute(mode),
         action: services ? 'Add income' : 'Record a sale',
       },
@@ -200,7 +228,9 @@ export const buildInsights = (context = {}) => {
     });
   }
 
-  return insights.sort((a, b) => (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9));
+  return insights
+    .filter((insight) => financials || !FINANCIAL_INSIGHTS.has(insight.id))
+    .sort((a, b) => (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9));
 };
 
 /**

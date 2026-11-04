@@ -116,20 +116,26 @@ const guidanceAnswer = (meta) => {
   return topic ? topic.text : fallbackHowto(meta.mode);
 };
 
-const unknownSuggestionsFor = (mode) =>
-  mode === 'services'
-    ? [
-        'Who owes me money?',
-        'How much did I make this month?',
-        'How do I add a client?',
-        'How do I track income?',
-      ]
-    : [
-        'How much did I make this month?',
-        "What's my stock looking like?",
-        'How do I record my first sale?',
-        'What should I know about my business today?',
-      ];
+const unknownSuggestionsFor = (mode, canSeeFinancials = true) => {
+  const list =
+    mode === 'services'
+      ? [
+          'Who owes me money?',
+          'How much did I make this month?',
+          'How do I add a client?',
+          'How do I track income?',
+        ]
+      : [
+          'How much did I make this month?',
+          "What's my stock looking like?",
+          'How do I record my first sale?',
+          'What should I know about my business today?',
+        ];
+  // A staff login without `reporting` cannot see expenses or profit, so offering
+  // "what should I know about my business today" (a summary of both) would invite
+  // a question the panel then has to refuse.
+  return canSeeFinancials ? list : list.filter((item) => !/business today|spending on/i.test(item));
+};
 
 const money = (value, currency) => formatCurrency(parseAmount(value), currency);
 const countText = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
@@ -197,8 +203,10 @@ const intentAnswerers = {
 
   thanks: () => 'You\u2019re welcome. Ask me about your sales, expenses, stock or who owes you.',
 
-  help: () =>
-    `I can look at your records and answer questions like:\n\u2022 How much did I make this month?\n\u2022 What am I spending on?\n\u2022 Is anything running low?\n\u2022 Who owes me money?\nAsk away, or tap one of the suggestions.`,
+  help: (meta) => {
+    const items = unknownSuggestionsFor(meta.mode, meta.canSeeFinancials !== false);
+    return `I can look at your records and answer questions like:\n\u2022 ${items.join('\n\u2022 ')}\nAsk away, or tap one of the suggestions.`;
+  },
 
   overview: (meta) => {
     const { scope, scopeStats, currency, mode } = meta;
@@ -499,6 +507,19 @@ export const classifyIntent = (raw) => {
 };
 
 /**
+ * Intents whose answer states expenses or profit. A staff login without the
+ * `reporting` module gets an explanation rather than a real-looking zero: RLS
+ * returns no expense rows for them, so answering normally would say "you spent
+ * GHS 0.00" and be believed.
+ */
+const FINANCIAL_INTENTS = new Set(['overview', 'expenses', 'profit', 'expenseTop']);
+
+const NO_FINANCIALS_TEXT =
+  'Reports and expenses aren\u2019t switched on for your login, so I can\u2019t show you that. ' +
+  'Ask the business owner to enable reports if you need the numbers.\n' +
+  '\u2022 I can still help with sales, stock and how to record something.';
+
+/**
  * Turns a question into an answer using ONLY the stats it was handed.
  *
  * @param {string} question
@@ -506,6 +527,7 @@ export const classifyIntent = (raw) => {
  *   mode: 'retail'|'services',
  *   currency?: string,
  *   businessName?: string,
+ *   canSeeFinancials?: boolean,
  *   statsByScope: Record<string, object>,
  * }} context
  * @returns {{ intent: string, scope: string, text: string }}
@@ -521,8 +543,12 @@ export const answer = (question, context = {}) => {
     return {
       intent,
       scope,
-      text: `I couldn\u2019t quite work that one out. I can answer from your own records \u2014 try:\n\u2022 ${unknownSuggestionsFor(mode).join('\n\u2022 ')}`,
+      text: `I couldn\u2019t quite work that one out. I can answer from your own records \u2014 try:\n\u2022 ${unknownSuggestionsFor(mode, contextSet.canSeeFinancials !== false).join('\n\u2022 ')}`,
     };
+  }
+
+  if (contextSet.canSeeFinancials === false && FINANCIAL_INTENTS.has(intent)) {
+    return { intent, scope, text: NO_FINANCIALS_TEXT };
   }
 
   const scopeStats = scopeStatsOf(contextSet, scope);
@@ -533,6 +559,7 @@ export const answer = (question, context = {}) => {
     currency,
     mode,
     context: contextSet,
+    canSeeFinancials: contextSet.canSeeFinancials !== false,
     matchedText: question,
   };
 
@@ -542,4 +569,8 @@ export const answer = (question, context = {}) => {
   return { intent, scope, text };
 };
 
-export const suggestedQuestions = (mode) => unknownSuggestionsFor(mode === 'services' ? 'services' : 'retail');
+export const suggestedQuestions = (mode, { canSeeFinancials = true } = {}) =>
+  unknownSuggestionsFor(
+    mode === 'services' ? 'services' : 'retail',
+    canSeeFinancials !== false
+  );

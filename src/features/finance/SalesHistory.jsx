@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import styled from 'styled-components';
 import {
+  Ban,
   Calendar,
   ChevronDown,
   ChevronRight,
@@ -8,10 +9,13 @@ import {
   Search,
   TrendingUp,
 } from 'lucide-react';
-import { fetchSales, fetchInventory } from '../../services/api';
+import { fetchSales, fetchInventory, fetchMemberDirectory, voidSale } from '../../services/api';
 import AssistantDoorway from '../../components/assistant/AssistantDoorway';
+import Modal from '../../components/ui/Modal';
+import IconAction from '../../components/ui/IconAction';
 import { convertToCSV, downloadCSV } from '../../utils/exportUtils';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useAuthStore } from '../../store/authStore';
 import { formatCurrency, formatCurrencyShort, parseAmount } from '../../utils/currency';
 import Skeleton from '../../components/ui/Skeleton';
 import SkeletonCards from '../../components/ui/SkeletonCards';
@@ -145,6 +149,16 @@ const ActionButton = styled.button`
   cursor: pointer;
   font-weight: 700;
   font-size: 0.85rem;
+`;
+
+const SoldBySelect = styled.select`
+  padding: 0.45rem 0.6rem;
+  border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: white;
+  color: ${({ theme }) => theme.colors.text.main};
+  font-weight: 600;
 `;
 
 const StatsGrid = styled.div`
@@ -386,6 +400,60 @@ const Badge = styled.span`
   font-weight: 700;
 `;
 
+const FormGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+
+  label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: ${({ theme }) => theme.colors.text.main};
+  }
+
+  input {
+    padding: 0.65rem 0.75rem;
+    border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: ${({ theme }) => theme.colors.text.main};
+    background: white;
+    outline: none;
+    font-family: inherit;
+
+    &:focus { border-color: ${({ theme }) => theme.colors.primary}; }
+  }
+`;
+
+const ModalActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+
+  button {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .cancel {
+    background: white;
+    border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
+    color: ${({ theme }) => theme.colors.text.main};
+  }
+
+  .save {
+    background: ${({ theme }) => theme.colors.primary};
+    border: none;
+    color: white;
+  }
+
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+`;
+
 const Pager = styled.div`
   display: flex;
   align-items: center;
@@ -407,31 +475,80 @@ const PRESETS = [
 ];
 
 const SalesHistory = () => {
-  const { currency } = useSettingsStore();
+  const { currency, businessRole } = useSettingsStore();
+  const currentUserId = useAuthStore(s => s.user?.uid);
   const [sales, setSales] = useState([]);
   const [inventory, setInventory] = useState([]);
+  const [directory, setDirectory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [preset, setPreset] = useState('7');
   const [startDate, setStartDate] = useState(shiftDays(todayISO(), -6));
   const [endDate, setEndDate] = useState(todayISO());
   const [searchTerm, setSearchTerm] = useState('');
+  // A cashier opening this page is usually checking their own day, so their rows
+  // are the default. This is a convenience filter only — RLS still lets them
+  // read the whole branch.
+  const [soldBy, setSoldBy] = useState('all');
   const [collapsedDays, setCollapsedDays] = useState(() => new Set());
   const [page, setPage] = useState(1);
+  const [voidTarget, setVoidTarget] = useState(null);
+  const [voidReason, setVoidReason] = useState('');
+  const [voiding, setVoiding] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [saleRows, inventoryRows, members] = await Promise.all([
+        fetchSales(),
+        fetchInventory(),
+        fetchMemberDirectory(),
+      ]);
+      setSales(Array.isArray(saleRows) ? saleRows : []);
+      setInventory(Array.isArray(inventoryRows) ? inventoryRows : []);
+      setDirectory(Array.isArray(members) ? members : []);
+    } catch (error) {
+      console.error('Failed to load sales history', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [saleRows, inventoryRows] = await Promise.all([fetchSales(), fetchInventory()]);
-        setSales(Array.isArray(saleRows) ? saleRows : []);
-        setInventory(Array.isArray(inventoryRows) ? inventoryRows : []);
-      } catch (error) {
-        console.error('Failed to load sales history', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
+    // Owners start on the whole business; staff start on their own rows.
+    if (businessRole === 'staff' && currentUserId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSoldBy(currentUserId);
+    }
+  }, [businessRole, currentUserId]);
+
+  const nameOf = (userId) => {
+    if (userId && userId === currentUserId) return 'You';
+    const match = directory.find((member) => member.userId === userId);
+    return match?.displayName || match?.email || 'Unknown';
+  };
+
+  const canVoid = (sale) =>
+    Boolean(sale?.userId && sale.userId === currentUserId) || businessRole === 'owner';
+
+  const handleVoid = async () => {
+    if (!voidTarget) return;
+    setVoiding(true);
+    try {
+      // Voiding is audited and returns the units to the branch's stock. The row
+      // is kept so history, exports and revenue all still reconcile.
+      await voidSale(Number(voidTarget.id), voidReason.trim());
+      setVoidTarget(null);
+      setVoidReason('');
+      await load();
+    } catch (error) {
+      console.error('Failed to void sale', error);
+      alert(error?.message || 'Could not void this sale. Please try again.');
+    } finally {
+      setVoiding(false);
+    }
+  };
 
   const applyPreset = (key) => {
     setPreset(key);
@@ -491,16 +608,23 @@ const SalesHistory = () => {
     };
   }, [costByItem]);
 
+  // Voided rows stay in the table for the audit trail, but they are not takings:
+  // they are out of every list, total and export on this page.
+  const liveSales = useMemo(() => sales.filter((sale) => !sale.voidedAt), [sales]);
+
   const inRange = useMemo(() => {
-    if (!startDate && !endDate) return sales;
-    return sales.filter(sale => {
+    const scoped = soldBy === 'all'
+      ? liveSales
+      : liveSales.filter((sale) => sale.userId === soldBy);
+    if (!startDate && !endDate) return scoped;
+    return scoped.filter(sale => {
       const date = sale.date;
       if (!date) return false;
       if (startDate && date < startDate) return false;
       if (endDate && date > endDate) return false;
       return true;
     });
-  }, [sales, startDate, endDate]);
+  }, [liveSales, soldBy, startDate, endDate]);
 
   const searched = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -564,6 +688,7 @@ const SalesHistory = () => {
       amount: 'Amount',
       grossProfit: 'Gross Profit',
       paymentMethod: 'Payment Method',
+      soldBy: 'Sold By',
       id: 'Sale ID',
     };
     const rows = days.flatMap(day =>
@@ -577,6 +702,7 @@ const SalesHistory = () => {
         amount: sale.amount || sale.totalAmount,
         grossProfit: profitOf(sale).toFixed(2),
         paymentMethod: sale.paymentMethod,
+        soldBy: nameOf(sale.userId),
         id: sale.id,
       }))
     );
@@ -653,6 +779,18 @@ const SalesHistory = () => {
             onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
           />
         </SearchBox>
+        <SoldBySelect
+          aria-label="Filter by who sold"
+          value={soldBy}
+          onChange={e => { setSoldBy(e.target.value); setPage(1); }}
+        >
+          <option value="all">All teammates</option>
+          {directory.map(member => (
+            <option key={member.userId} value={member.userId}>
+              {member.userId === currentUserId ? 'Me' : (member.displayName || member.email)}
+            </option>
+          ))}
+        </SoldBySelect>
       </Toolbar>
 
       <StatsGrid>
@@ -727,6 +865,8 @@ const SalesHistory = () => {
                           <Th>Amount</Th>
                           <Th>Profit</Th>
                           <Th>Payment</Th>
+                          <Th>Sold By</Th>
+                          <Th aria-label="Actions"></Th>
                         </tr>
                       </thead>
                       <tbody>
@@ -748,6 +888,17 @@ const SalesHistory = () => {
                                 {formatCurrency(profit, currency)}
                               </Td>
                               <Td>{sale.paymentMethod || '—'}</Td>
+                              <Td style={{ color: '#55423D' }}>{nameOf(sale.userId)}</Td>
+                              <Td style={{ textAlign: 'right' }}>
+                                {canVoid(sale) && (
+                                  <IconAction
+                                    label={`Void sale of ${sale.item}`}
+                                    onClick={() => { setVoidReason(''); setVoidTarget(sale); }}
+                                  >
+                                    <Ban size={16} color="#BA1A1A" />
+                                  </IconAction>
+                                )}
+                              </Td>
                             </tr>
                           );
                         })}
@@ -765,6 +916,7 @@ const SalesHistory = () => {
                           sale.time,
                           unitPrice > 0 ? `${quantity} × ${formatCurrency(unitPrice, currency)}` : `Qty ${quantity}`,
                           sale.paymentMethod,
+                          `Sold by ${nameOf(sale.userId)}`,
                         ].filter(Boolean).join(' · ');
                         return (
                           <MobileSale key={sale.id}>
@@ -781,6 +933,16 @@ const SalesHistory = () => {
                                 {formatCurrency(profit, currency)} profit
                               </MobileSaleProfit>
                             </MobileSaleFoot>
+                            {canVoid(sale) && (
+                              <div style={{ marginTop: '0.35rem' }}>
+                                <IconAction
+                                  label={`Void sale of ${sale.item}`}
+                                  onClick={() => { setVoidReason(''); setVoidTarget(sale); }}
+                                >
+                                  <Ban size={14} color="#BA1A1A" />
+                                </IconAction>
+                              </div>
+                            )}
                           </MobileSale>
                         );
                       })}
@@ -810,6 +972,40 @@ const SalesHistory = () => {
           )}
         </>
       )}
+
+      <Modal
+        isOpen={!!voidTarget}
+        onClose={() => { if (!voiding) { setVoidTarget(null); setVoidReason(''); } }}
+        title="Void Sale"
+      >
+        <p style={{ color: '#55423D', marginTop: 0 }}>
+          Voiding returns the units to stock and keeps the row in history for the audit trail.
+          {voidTarget ? ` This void will be recorded against “${voidTarget.item}”.` : ''}
+        </p>
+        <FormGroup>
+          <label htmlFor="void-reason">Reason</label>
+          <input
+            id="void-reason"
+            type="text"
+            value={voidReason}
+            onChange={(e) => setVoidReason(e.target.value)}
+            placeholder="e.g. customer returned the item"
+          />
+        </FormGroup>
+        <ModalActions>
+          <button
+            type="button"
+            className="cancel"
+            onClick={() => { setVoidTarget(null); setVoidReason(''); }}
+            disabled={voiding}
+          >
+            Cancel
+          </button>
+          <button type="button" className="save" onClick={handleVoid} disabled={voiding}>
+            {voiding ? 'Voiding...' : 'Void sale'}
+          </button>
+        </ModalActions>
+      </Modal>
     </div>
   );
 };

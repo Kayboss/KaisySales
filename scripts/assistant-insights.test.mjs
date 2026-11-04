@@ -180,3 +180,49 @@ test('amounts are rendered as the ISO code', () => {
   const insights = buildInsights(context('services', { incomeCount: 1, outstandingTotal: 1500 }));
   assert.match(flat(insights[0].body), /GHS 1,500\.00/);
 });
+test('a staff login without reporting gets stock warnings but no money figures', () => {
+  const staff = {
+    role: 'staff',
+    modules: ['sales'],
+  };
+  const month = {
+    incomeCount: 2,
+    incomeTotal: 100,
+    expenseTotal: 400,
+    profit: -300,
+    lowStock: [
+      { name: 'Cement', stock: 0, minStock: 5 },
+      { name: 'Sugar', stock: 2, minStock: 5 },
+    ],
+  };
+
+  const owner = buildInsights(context('retail', month));
+  const cashier = buildInsights(context('retail', month, {}, staff));
+
+  // The owner sees the loss; the cashier must not, because Expenses is not a
+  // screen they can open and RLS returns no expense rows to them anyway.
+  assert.ok(ids(owner).includes('in-the-red'));
+  assert.ok(!ids(cashier).includes('in-the-red'));
+  assert.ok(!ids(cashier).includes('unpriced'));
+
+  // Restocking their own branch is part of the job, so stock stays visible.
+  assert.deepEqual(ids(cashier), ['stock-out', 'low-stock']);
+  for (const insight of cashier) {
+    assert.doesNotMatch(flat(insight.body), /GHS/);
+  }
+});
+
+test('a staff login WITH reporting sees exactly what the owner sees', () => {
+  const month = { incomeCount: 2, incomeTotal: 100, expenseTotal: 400, profit: -300, lowStock: [] };
+  const owner = buildInsights(context('retail', month));
+  const trustedStaff = buildInsights(
+    context('retail', month, {}, { role: 'staff', modules: ['sales', 'reporting'] })
+  );
+
+  assert.deepEqual(ids(trustedStaff), ids(owner));
+});
+
+test('a quiet month is not waved at a cashier who cannot see expenses', () => {
+  const quiet = buildInsights(context('retail', {}, { incomeCount: 4 }, { role: 'staff', modules: ['sales'] }));
+  assert.deepEqual(ids(quiet), []);
+});

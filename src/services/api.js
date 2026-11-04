@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { getEntity, CATEGORY_TYPE_BY_ENTITY } from '../utils/import/schema';
 import { findDuplicates, applyImportValues } from '../utils/import/duplicates';
+import { branchForWrites } from '../utils/tenancy';
 import { cached, invalidateAdminCache } from './adminCache';
 
 
@@ -18,13 +19,34 @@ const getUid = () => {
   return user.uid;
 };
 
+/**
+ * The branch the owner has selected, or null for "All branches". Staff never
+ * have a null here: their membership pins them to one branch and RLS does the
+ * rest, so this filter is mostly for the owner's branch switcher.
+ */
+const getBranchScope = () => useSettingsStore.getState().activeBranchId ?? null;
+
+/**
+ * Inventory is per branch. An owner looking at "All branches" still needs one
+ * shelf to add stock to, so writes/shelf reads fall back to the default branch.
+ */
+export const getInventoryBranchId = () => {
+  const { activeBranchId, branchId, branches, businessRole } =
+    useSettingsStore.getState();
+  return branchForWrites({
+    role: businessRole,
+    branchId,
+    activeBranchId,
+    branches,
+  });
+};
+
 // ====================================================
 // 1. SALES
 // ====================================================
 export const fetchSales = async () => {
   try {
-    const uid = getUid();
-    return await dbService.fetchUserRecords(uid, 'sales');
+    return await dbService.fetchTenantRecords('sales', { branchId: getBranchScope() });
   } catch (error) {
     console.error('🔥 Error fetching sales:', error);
     return [];
@@ -32,18 +54,15 @@ export const fetchSales = async () => {
 };
 
 export const createSale = async (sale) => {
-  const uid = getUid();
-  return await dbService.createUserRecord(uid, 'sales', sale);
+  return await dbService.createTenantRecord('sales', sale);
 };
 
 export const updateSale = async (id, sale) => {
-  const uid = getUid();
-  return await dbService.updateUserRecord(uid, 'sales', id, sale);
+  return await dbService.updateTenantRecord('sales', id, sale);
 };
 
 export const deleteSale = async (id) => {
-  const uid = getUid();
-  await dbService.deleteUserRecord(uid, 'sales', id);
+  await dbService.deleteTenantRecord('sales', id);
 };
 
 // ====================================================
@@ -51,8 +70,7 @@ export const deleteSale = async (id) => {
 // ====================================================
 export const fetchInvoices = async () => {
   try {
-    const uid = getUid();
-    return await dbService.fetchUserRecords(uid, 'invoices');
+    return await dbService.fetchTenantRecords('invoices', { branchId: getBranchScope() });
   } catch (error) {
     console.error('🔥 Error fetching invoices:', error);
     return [];
@@ -60,18 +78,15 @@ export const fetchInvoices = async () => {
 };
 
 export const createInvoice = async (invoice) => {
-  const uid = getUid();
-  return await dbService.createUserRecord(uid, 'invoices', invoice);
+  return await dbService.createTenantRecord('invoices', invoice);
 };
 
 export const updateInvoice = async (id, invoice) => {
-  const uid = getUid();
-  return await dbService.updateUserRecord(uid, 'invoices', id, invoice);
+  return await dbService.updateTenantRecord('invoices', id, invoice);
 };
 
 export const deleteInvoice = async (id) => {
-  const uid = getUid();
-  await dbService.deleteUserRecord(uid, 'invoices', id);
+  await dbService.deleteTenantRecord('invoices', id);
 };
 
 // ====================================================
@@ -79,8 +94,7 @@ export const deleteInvoice = async (id) => {
 // ====================================================
 export const fetchExpenses = async () => {
   try {
-    const uid = getUid();
-    return await dbService.fetchUserRecords(uid, 'expenses');
+    return await dbService.fetchTenantRecords('expenses', { branchId: getBranchScope() });
   } catch (error) {
     console.error('🔥 Error fetching expenses:', error);
     return [];
@@ -88,28 +102,23 @@ export const fetchExpenses = async () => {
 };
 
 export const createExpense = async (expense) => {
-  const uid = getUid();
-  return await dbService.createUserRecord(uid, 'expenses', expense);
+  return await dbService.createTenantRecord('expenses', expense);
 };
 
 export const updateExpense = async (id, expense) => {
-  const uid = getUid();
-  return await dbService.updateUserRecord(uid, 'expenses', id, expense);
+  return await dbService.updateTenantRecord('expenses', id, expense);
 };
 
 export const deleteExpense = async (id) => {
-  const uid = getUid();
-  await dbService.deleteUserRecord(uid, 'expenses', id);
+  await dbService.deleteTenantRecord('expenses', id);
 };
 
 export const fetchLargestExpenseCategory = async () => {
   try {
-    const uid = getUid();
     if (!supabase) return 'N/A';
     const { data, error } = await supabase
       .from('expenses')
-      .select('category')
-      .eq('user_id', uid);
+      .select('category');
     if (error) throw error;
     const counts = {};
     (data || []).forEach(r => { counts[r.category] = (counts[r.category] || 0) + 1; });
@@ -122,31 +131,177 @@ export const fetchLargestExpenseCategory = async () => {
 };
 
 // ====================================================
-// 4. INVENTORY
+// 4. INVENTORY (products + per-branch stock)
 // ====================================================
 export const fetchInventory = async () => {
   try {
-    const uid = getUid();
-    return await dbService.fetchUserRecords(uid, 'inventory');
+    return await dbService.fetchBranchInventory(getInventoryBranchId());
   } catch (error) {
     console.error('🔥 Error fetching inventory:', error);
     return [];
   }
 };
 
+// Kept for the import adapter and any caller that only has a name.
+export const fetchProducts = async () => {
+  try {
+    return await dbService.fetchProducts();
+  } catch (error) {
+    console.error('🔥 Error fetching products:', error);
+    return [];
+  }
+};
+
+export const fetchBranchInventory = async (branchId = getInventoryBranchId()) => {
+  try {
+    return await dbService.fetchBranchInventory(branchId);
+  } catch (error) {
+    console.error('🔥 Error fetching branch inventory:', error);
+    return [];
+  }
+};
+
 export const createInventoryItem = async (item) => {
-  const uid = getUid();
-  return await dbService.createUserRecord(uid, 'inventory', item);
+  return await dbService.createProduct({
+    name: item.name,
+    category: item.category,
+    unit: item.unit,
+    price: item.price,
+    cost: item.costPrice,
+    minStock: item.minStock,
+    branchId: getInventoryBranchId(),
+    stock: Number(item.stock) || 0,
+  });
 };
 
 export const updateInventoryItem = async (id, item) => {
-  const uid = getUid();
-  return await dbService.updateUserRecord(uid, 'inventory', id, item);
+  const productId = item.productId || item.product_id;
+  if (productId) {
+    await dbService.updateProduct(productId, {
+      name: item.name,
+      category: item.category,
+      unit: item.unit,
+    });
+  }
+  await dbService.updateBranchStock(id, {
+    stock: Number(item.stock) || 0,
+    price: item.price,
+    cost_price: item.costPrice,
+    min_stock: item.minStock,
+    status: item.status,
+  });
+  return { ...item, id: String(id) };
 };
 
-export const deleteInventoryItem = async (id) => {
-  const uid = getUid();
-  await dbService.deleteUserRecord(uid, 'inventory', id);
+// Product identity is business-wide, stock is per branch: deleting the product
+// cascades every branch's stock row by design.
+export const deleteInventoryItem = async (id, productId = null) => {
+  const target = productId || id;
+  await dbService.deleteProduct(target);
+};
+
+export const restockProduct = async (productId, quantityDelta, branchId = getInventoryBranchId()) => {
+  const rows = await dbService.fetchBranchInventory(branchId);
+  const row = rows.find((item) => String(item.productId) === String(productId));
+  if (!row) throw new Error('This product is not stocked at the selected branch.');
+  const next = Math.max(0, (Number(row.stock) || 0) + quantityDelta);
+  await dbService.setBranchStock({
+    productId,
+    branchId,
+    stock: next,
+    price: row.price,
+    cost: row.costPrice,
+    minStock: row.minStock,
+  });
+  return next;
+};
+
+// ====================================================
+// 4b. BRANCHES / TEAM
+// ====================================================
+export const fetchBranches = async () => {
+  try {
+    return await dbService.fetchBranches();
+  } catch (error) {
+    console.error('Failed to fetch branches', error);
+    return [];
+  }
+};
+
+export const createBranch = async (branch) => {
+  const { businessId } = useSettingsStore.getState();
+  return dbService.createBranch({ businessId, ...branch });
+};
+
+export const updateBranch = async (branchId, fields) => {
+  return dbService.updateBranch(branchId, fields);
+};
+
+export const archiveBranch = async (branchId) => {
+  return dbService.archiveBranch(branchId);
+};
+
+export const listMembers = async () => {
+  return dbService.listMembers();
+};
+
+export const fetchMemberDirectory = async () => {
+  try {
+    return await dbService.memberDirectory();
+  } catch (error) {
+    console.error('Failed to load teammate names', error);
+    return [];
+  }
+};
+
+export const createInvite = async (branchId) => {
+  return dbService.createInvite(branchId);
+};
+
+export const listInvites = async () => {
+  return dbService.listInvites();
+};
+
+export const revokeInvite = async (inviteId) => {
+  return dbService.revokeInvite(inviteId);
+};
+
+export const setMemberModules = async (userId, modules) => {
+  return dbService.setMemberModules(userId, modules);
+};
+
+export const setMemberBranch = async (userId, branchId) => {
+  return dbService.setMemberBranch(userId, branchId);
+};
+
+export const removeMember = async (userId) => {
+  return dbService.removeMember(userId);
+};
+
+export const transferOwnership = async (userId) => {
+  return dbService.transferOwnership(userId);
+};
+
+export const redeemInvite = async (code) => {
+  return dbService.redeemInvite(code);
+};
+
+// ====================================================
+// 4c. SALES / INVOICE RPCs
+// ====================================================
+export const recordSale = async (sale) => {
+  return dbService.recordSale({
+    ...sale,
+    branchId: sale.branchId ?? getInventoryBranchId(),
+  });
+};
+
+export const recordInvoiceSale = async (invoiceId) => {
+  return dbService.recordInvoiceSale(invoiceId);
+};
+
+export const voidSale = async (saleId, reason = '') => {
+  return dbService.voidSale(saleId, reason);
 };
 
 // ====================================================
@@ -277,6 +432,25 @@ export const fetchNeverSignedInUsers = async (limit = 200) => {
   } catch (error) {
     console.error('Failed to fetch never-signed-in users', error);
     return [];
+  }
+};
+
+/**
+ * Staff logins (see `dbService.fetchStaffUserIds`). A Set because every caller
+ * only ever asks "is this account a cashier?" — and the alternative, a `find`
+ * per row, is how a funnel with 500 accounts gets slow for no reason.
+ */
+export const fetchStaffUserIds = async () => {
+  try {
+    await requireAdmin();
+    const ids = await cached('admin:staffUserIds', () => dbService.fetchStaffUserIds());
+    return new Set(Array.isArray(ids) ? ids : []);
+  } catch (error) {
+    console.error('Failed to fetch staff accounts', error);
+    // An empty set means the exclusion cannot be applied, so the funnel would
+    // over-count staff as businesses until the next load. That is visible in the
+    // numbers; throwing would blank the whole screen for one failed lookup.
+    return new Set();
   }
 };
 
@@ -662,9 +836,58 @@ const stripMeta = (record) => {
 
 const importError = (message) => ({ message });
 
+// Inventory moved from a per-user `inventory` row to a business `products` row
+// plus a per-branch `branch_inventory` row. Import has to write through the same
+// RPCs as the UI, otherwise imported stock lands in the legacy table where the
+// sales screen can no longer see it.
+const importInventoryRow = async (row) => {
+  const branchId = getInventoryBranchId();
+  const name = String(row.name || '').trim();
+  const rows = await dbService.fetchBranchInventory(branchId);
+  const match = rows.find((item) => item.name.trim().toLowerCase() === name.toLowerCase());
+  const stock = Number(row.stock) || 0;
+  const price = row.price ?? '';
+  const cost = row.costPrice ?? '';
+  const minStock = Number(row.minStock) || 5;
+
+  if (match) {
+    await dbService.setBranchStock({
+      productId: match.productId,
+      branchId,
+      stock,
+      price,
+      cost,
+      minStock,
+    });
+    return { ...match, stock, price, costPrice: cost, minStock };
+  }
+
+  const productId = await dbService.createProduct({
+    name,
+    category: row.category,
+    unit: row.unit,
+    price,
+    cost,
+    minStock,
+    branchId,
+    stock,
+  });
+  const created = (await dbService.fetchBranchInventory(branchId))
+    .find((item) => String(item.productId) === String(productId));
+  return created || { id: String(productId), productId: String(productId), ...row, stock };
+};
+
+const deleteInventoryRowById = async (id) => {
+  const rows = await dbService.fetchBranchInventory(getInventoryBranchId());
+  const row = rows.find((item) => String(item.id) === String(id));
+  if (!row?.productId) return;
+  await dbService.deleteProduct(row.productId);
+};
+
 export const fetchExistingRows = async (entityKey) => {
   const entity = getEntity(entityKey);
   if (!entity) throw new Error(`Unknown import target "${entityKey}".`);
+  if (entityKey === 'inventory') return await fetchInventory();
   const uid = getUid();
   return await dbService.fetchUserRecords(uid, entity.table);
 };
@@ -725,12 +948,22 @@ export const importRows = async (entityKey, records, options = {}) => {
   };
 
   if (toInsert.length > 0) {
-    try {
-      outcome.inserted = await dbService.createUserRecords(uid, entity.table, toInsert);
-    } catch (error) {
-      outcome.inserted = error.inserted || [];
-      outcome.errors.push(error.message || 'Some rows could not be saved.');
-      outcome.failedFrom = error.failedFrom;
+    if (entityKey === 'inventory') {
+      for (const row of toInsert) {
+        try {
+          outcome.inserted.push(await importInventoryRow(row));
+        } catch (error) {
+          outcome.errors.push(error.message || 'Some items could not be saved.');
+        }
+      }
+    } else {
+      try {
+        outcome.inserted = await dbService.createUserRecords(uid, entity.table, toInsert);
+      } catch (error) {
+        outcome.inserted = error.inserted || [];
+        outcome.errors.push(error.message || 'Some rows could not be saved.');
+        outcome.failedFrom = error.failedFrom;
+      }
     }
   }
 
@@ -751,7 +984,9 @@ export const importRows = async (entityKey, records, options = {}) => {
     }
 
     try {
-      const applied = await dbService.updateUserRecord(uid, entity.table, operation.id, stripMeta(next));
+      const applied = entityKey === 'inventory'
+        ? await updateInventoryItem(operation.id, stripMeta(next))
+        : await dbService.updateUserRecord(uid, entity.table, operation.id, stripMeta(next));
       outcome[operation.mode === 'replace' ? 'replaced' : 'merged'].push({
         id: operation.id,
         previous,
@@ -783,7 +1018,8 @@ export const undoImport = async (entityKey, { insertedIds = [], previous = [] })
 
   for (const id of insertedIds) {
     try {
-      await dbService.deleteUserRecord(uid, entity.table, id);
+      if (entityKey === 'inventory') await deleteInventoryRowById(id);
+      else await dbService.deleteUserRecord(uid, entity.table, id);
     } catch (error) {
       problems.push(error.message || `Could not remove row ${id}.`);
     }
@@ -791,7 +1027,8 @@ export const undoImport = async (entityKey, { insertedIds = [], previous = [] })
 
   for (const row of [...previous].reverse()) {
     try {
-      await dbService.updateUserRecord(uid, entity.table, row.id, stripMeta(row));
+      if (entityKey === 'inventory') await updateInventoryItem(row.id, stripMeta(row));
+      else await dbService.updateUserRecord(uid, entity.table, row.id, stripMeta(row));
     } catch (error) {
       problems.push(error.message || `Could not restore row ${row.id}.`);
     }
@@ -810,7 +1047,8 @@ export const deleteImportedRows = async (entityKey, ids) => {
   const uid = getUid();
   try {
     for (const id of ids) {
-      await dbService.deleteUserRecord(uid, entity.table, id);
+      if (entityKey === 'inventory') await deleteInventoryRowById(id);
+      else await dbService.deleteUserRecord(uid, entity.table, id);
     }
     return { success: true };
   } catch (error) {

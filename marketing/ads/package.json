@@ -1,0 +1,15 @@
+{
+  "name": "kaisysales-ads",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Self-contained 2D animated ads for KaisySales, rendered to MP4 by capture.mjs",
+  "type": "module",
+  "scripts": {
+    "serve": "node capture.mjs --serve",
+    "stills": "node capture.mjs --stills 0,2.9,4.2,5.2,7.9,13.1,16.9,19",
+    "render": "node capture.mjs"
+  },
+  "devDependencies": {
+    "ffmpeg-static": "^5.2.0"
+  }
+}
