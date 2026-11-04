@@ -862,6 +862,28 @@ export const dbService = {
     return JSON.parse(localStorage.getItem('kaisysales_mock_all_profiles') || '[]');
   },
 
+  // Resolves each user's business name (via business_members → businesses)
+  // and email (from profiles). Admin screens used to read profiles.business_name
+  // before that column was dropped in M4.
+  async fetchUserBusinessEmailMap(userIds) {
+    const ids = [...new Set(userIds.filter(Boolean))];
+    if (ids.length === 0) return {};
+    const [membersResult, businessesResult, profilesResult] = await Promise.all([
+      supabase.from('business_members').select('user_id, business_id').in('user_id', ids),
+      supabase.from('businesses').select('id, name'),
+      supabase.from('profiles').select('id, email'),
+    ]);
+    const businessMap = Object.fromEntries((businessesResult.data || []).map(b => [b.id, b.name]));
+    const userBusinessMap = {};
+    (membersResult.data || []).forEach(m => {
+      if (m.business_id && businessMap[m.business_id]) {
+        userBusinessMap[m.user_id] = businessMap[m.business_id];
+      }
+    });
+    const emailMap = Object.fromEntries((profilesResult.data || []).map(p => [p.id, p.email]));
+    return Object.fromEntries(ids.map(id => [id, { email: emailMap[id] || null, businessName: userBusinessMap[id] || null }]));
+  },
+
   // Just the accounts that have never signed in. The admin inbox only needs
   // these for the "never signed in" list, so it asks the database for exactly
   // them instead of pulling every profile and filtering in the browser.
@@ -870,7 +892,7 @@ export const dbService = {
     if (supabase) {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, business_name, owner_name, avatar_color, created_at, last_sign_in_at')
+        .select('id, email, owner_name, avatar_color, created_at, last_sign_in_at')
         .is('last_sign_in_at', null)
         .order('created_at', { ascending: false })
         .limit(limit);
@@ -916,11 +938,11 @@ export const dbService = {
     if (!supabase) return [];
     const profiles = await this.fetchAllProfiles();
 
-    const [allSales, allInvoices, allExpenses, allInventory, allCustomers, allServiceIncome, allRecurringIncome] = await Promise.all([
+    const [allSales, allInvoices, allExpenses, allBranchInventory, allCustomers, allServiceIncome, allRecurringIncome] = await Promise.all([
       supabase.from('sales').select('user_id, amount'),
       supabase.from('invoices').select('user_id, total'),
       supabase.from('expenses').select('user_id, amount'),
-      supabase.from('inventory').select('user_id'),
+      supabase.from('branch_inventory').select('business_id'),
       supabase.from('customers').select('user_id'),
       supabase.from('service_income').select('user_id, amount'),
       supabase.from('recurring_income').select('user_id, amount'),
@@ -939,10 +961,28 @@ export const dbService = {
     const salesMap = groupByUser(allSales.data, 'amount');
     const invoicesMap = groupByUser(allInvoices.data, 'total');
     const expensesMap = groupByUser(allExpenses.data, 'amount');
-    const inventoryMap = groupByUser(allInventory.data, null);
     const customersMap = groupByUser(allCustomers.data, null);
     const serviceIncomeMap = groupByUser(allServiceIncome.data, 'amount');
     const recurringIncomeMap = groupByUser(allRecurringIncome.data, 'amount');
+
+    // Inventory is per-branch (business_id), not per-user. Count per business,
+    // then attribute to every member of that business.
+    const inventoryByBusiness = {};
+    (allBranchInventory.data || []).forEach(r => {
+      inventoryByBusiness[r.business_id] = (inventoryByBusiness[r.business_id] || 0) + 1;
+    });
+    const inventoryByUser = {};
+    if (Object.keys(inventoryByBusiness).length > 0) {
+      const { data: allMembers } = await supabase
+        .from('business_members')
+        .select('user_id, business_id');
+      (allMembers || []).forEach(m => {
+        const count = inventoryByBusiness[m.business_id];
+        if (count) {
+          inventoryByUser[m.user_id] = (inventoryByUser[m.user_id] || 0) + count;
+        }
+      });
+    }
 
     return profiles.map(p => ({
       ...p,
@@ -952,7 +992,7 @@ export const dbService = {
       invoiceTotal: invoicesMap[p.id]?.total || 0,
       expenseCount: expensesMap[p.id]?.count || 0,
       expenseTotal: expensesMap[p.id]?.total || 0,
-      inventoryCount: inventoryMap[p.id]?.count || 0,
+      inventoryCount: inventoryByUser[p.id] || 0,
       customerCount: customersMap[p.id]?.count || 0,
       serviceIncomeCount: serviceIncomeMap[p.id]?.count || 0,
       serviceIncomeTotal: serviceIncomeMap[p.id]?.total || 0,
@@ -996,22 +1036,13 @@ export const dbService = {
     }
     const userIds = [...new Set(results.map(r => r.userId).filter(Boolean))];
     if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, business_name, email')
-        .in('id', userIds);
-      if (profiles) {
-        const profileMap = {};
-        profiles.forEach(p => {
-          profileMap[p.id] = { businessName: p.business_name, email: p.email };
-        });
-        results.forEach(r => {
-          if (profileMap[r.userId]) {
-            r.businessName = profileMap[r.userId].businessName;
-            r.userEmail = profileMap[r.userId].email;
-          }
-        });
-      }
+      const profileMap = await this.fetchUserBusinessEmailMap(userIds);
+      results.forEach(r => {
+        if (profileMap[r.userId]) {
+          r.businessName = profileMap[r.userId].businessName;
+          r.userEmail = profileMap[r.userId].email;
+        }
+      });
     }
     results.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     return results.slice(0, limit);
@@ -1057,14 +1088,7 @@ export const dbService = {
     const notes = (data || []).map(r => toCamelCase(r));
     const userIds = [...new Set(notes.map(n => n.userId).filter(Boolean))];
     if (userIds.length === 0) return notes;
-    const { data: profiles, error: pErr } = await supabase
-      .from('profiles')
-      .select('id, email, business_name')
-      .in('id', userIds);
-    if (pErr || !profiles) return notes;
-    const profileMap = Object.fromEntries(
-      profiles.map(p => [p.id, { email: p.email, businessName: p.business_name }])
-    );
+    const profileMap = await this.fetchUserBusinessEmailMap(userIds);
     return notes.map(n => ({
       ...n,
       userEmail: profileMap[n.userId]?.email || null,
@@ -1208,20 +1232,12 @@ export const dbService = {
       const logs = (data || []).map(r => toCamelCase(r));
       const userIds = [...new Set(logs.map(l => l.userId).filter(Boolean))];
       if (userIds.length > 0) {
-        const { data: profiles, error: pErr } = await supabase
-          .from('profiles')
-          .select('id, email, business_name')
-          .in('id', userIds);
-        if (!pErr && profiles) {
-          const profileMap = Object.fromEntries(
-            profiles.map(p => [p.id, { email: p.email, businessName: p.business_name }])
-          );
-          return logs.map(l => ({
-            ...l,
-            userEmail: profileMap[l.userId]?.email || null,
-            userBusinessName: profileMap[l.userId]?.businessName || null,
-          }));
-        }
+        const profileMap = await this.fetchUserBusinessEmailMap(userIds);
+        return logs.map(l => ({
+          ...l,
+          userEmail: profileMap[l.userId]?.email || null,
+          userBusinessName: profileMap[l.userId]?.businessName || null,
+        }));
       }
       return logs;
     }
@@ -1241,14 +1257,7 @@ export const dbService = {
     const actions = (data || []).map(r => toCamelCase(r));
     const userIds = [...new Set(actions.map(a => a.userId).filter(Boolean))];
     if (userIds.length === 0) return actions;
-    const { data: profiles, error: pErr } = await supabase
-      .from('profiles')
-      .select('id, email, business_name')
-      .in('id', userIds);
-    if (pErr || !profiles) return actions;
-    const profileMap = Object.fromEntries(
-      profiles.map(p => [p.id, { email: p.email, businessName: p.business_name }])
-    );
+    const profileMap = await this.fetchUserBusinessEmailMap(userIds);
     return actions.map(a => ({
       ...a,
       userEmail: profileMap[a.userId]?.email || null,
