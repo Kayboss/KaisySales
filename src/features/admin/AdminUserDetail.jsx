@@ -524,6 +524,7 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
   const [confirmSuspend, setConfirmSuspend] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [expanded, setExpanded] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -622,11 +623,12 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
 
   const handleToggleStatus = async () => {
     setBusy(true);
+    setActionError(null);
     try {
       await updateUserStatus(id, isSuspended ? 'active' : 'suspended');
       setProfile(prev => ({ ...prev, status: isSuspended ? 'active' : 'suspended' }));
     } catch (err) {
-      console.error('Failed to update user status', err);
+      setActionError(err.message || 'Failed to update user status. Please try again.');
     } finally {
       setBusy(false);
       setConfirmSuspend(false);
@@ -635,11 +637,12 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
 
   const handleDeleteUser = async () => {
     setBusy(true);
+    setActionError(null);
     try {
       await deleteUser(id);
       onClose();
     } catch (err) {
-      console.error('Failed to delete user account', err);
+      setActionError(err.message || 'Failed to delete user account. Please try again.');
     } finally {
       setBusy(false);
       setConfirmDelete(false);
@@ -709,6 +712,16 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
               </Stat>
             </StatsRow>
           )}
+
+        {actionError && (
+          <div style={{
+            padding: '0.75rem 1rem', marginBottom: '1rem', background: '#FFE8E8',
+            border: '1px solid #FFC7C7', borderRadius: '8px', color: '#BA1A1A',
+            fontSize: '0.85rem', fontWeight: 600,
+          }}>
+            {actionError}
+          </div>
+        )}
 
           <ActionsRow>
             <ActionBtn href={`mailto:${profile.email}`} target="_blank" rel="noreferrer">

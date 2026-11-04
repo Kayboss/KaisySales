@@ -1075,6 +1075,8 @@ export const dbService = {
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (error) throw error;
+      // Mark any unread notes as read now that the admin is viewing them.
+      await supabase.rpc('mark_support_notes_read', { p_user_id: userId }).catch(() => {});
       return (data || []).map(r => toCamelCase(r));
     }
     return [];
@@ -1087,6 +1089,7 @@ export const dbService = {
       .select('*')
       .eq('is_from_admin', false)
       .eq('status', 'open')
+      .is('read_at', null)
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw error;

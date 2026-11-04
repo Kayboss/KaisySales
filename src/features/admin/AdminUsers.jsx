@@ -288,6 +288,7 @@ const AdminUsers = ({ onOpenUser }) => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [btTogglingId, setBtTogglingId] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
   const loadData = async () => {
     try {
@@ -309,12 +310,13 @@ const AdminUsers = ({ onOpenUser }) => {
 
   const handleToggleStatus = async (u) => {
     setTogglingId(u.id);
+    setActionError(null);
     const newStatus = u.status === 'suspended' ? 'active' : 'suspended';
     try {
       await updateUserStatus(u.id, newStatus);
       await loadData();
     } catch (err) {
-      console.error('Failed to update user status', err);
+      setActionError(err.message || 'Failed to update user status. Please try again.');
     }
     setTogglingId(null);
     setSuspendTarget(null);
@@ -322,11 +324,12 @@ const AdminUsers = ({ onOpenUser }) => {
 
   const handleDeleteUser = async (u) => {
     setTogglingId(u.id);
+    setActionError(null);
     try {
       await deleteUser(u.id);
       await loadData();
     } catch (err) {
-      console.error('Failed to delete user account', err);
+      setActionError(err.message || 'Failed to delete user account. Please try again.');
     }
     setTogglingId(null);
     setDeleteTarget(null);
@@ -398,6 +401,16 @@ const AdminUsers = ({ onOpenUser }) => {
           return <SumPill key={s}>{s}: {count}</SumPill>;
         })}
       </SumRow>
+
+      {actionError && (
+        <div style={{
+          padding: '0.75rem 1rem', marginBottom: '1rem', background: '#FFE8E8',
+          border: '1px solid #FFC7C7', borderRadius: '8px', color: '#BA1A1A',
+          fontSize: '0.85rem', fontWeight: 600,
+        }}>
+          {actionError}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <EmptyState>{search ? 'No users match your search.' : 'No users found.'}</EmptyState>
