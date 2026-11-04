@@ -241,7 +241,7 @@ const App = () => {
       if (acquisitionFlushedFor !== user.uid) {
         acquisitionFlushedFor = user.uid;
         const touch = readTouch(window.sessionStorage);
-        if (touch) dbService.recordAcquisition(user.uid, touch);
+        if (touch) dbService.recordAcquisition(user.uid, touch).catch(() => {});
       }
     }
   }, [user, location.pathname]);

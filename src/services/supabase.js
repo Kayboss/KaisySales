@@ -1506,7 +1506,10 @@ export const dbService = {
       });
       if (!error) return true;
       // 23505 = unique violation: this account was already attributed.
-      if (error.code === '23505') return true;
+      const isDuplicate = error.code === '23505'
+        || error.status === 409
+        || (typeof error.message === 'string' && /23505|already exists|duplicate key/i.test(error.message));
+      if (isDuplicate) return true;
       console.warn('recordAcquisition insert failed:', error.message);
       return false;
     } catch (err) {
