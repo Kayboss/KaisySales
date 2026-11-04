@@ -108,6 +108,7 @@ export const useSettingsStore = create((set, get) => ({
         subscriptionPlan: profile?.subscriptionPlan || 'none',
         subscriptionStatus: profile?.subscriptionStatus || 'none',
         subscriptionExpiresAt: profile?.subscriptionExpiresAt || null,
+        deletedAt: profile?.deletedAt || profile?.deleted_at || null,
         // A completed profile is enough for services mode (no membership
         // required). Retail needs a membership to write.
         isOnboarded: profile?.isOnboarded === true && (businessId || profileBusinessType === 'services'),

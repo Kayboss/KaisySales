@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Search, Mail, Calendar, ShoppingCart, CreditCard, ToggleLeft, ToggleRight, Briefcase, Store, Users, Package, DollarSign, LayoutGrid, List } from 'lucide-react';
-import { fetchUsersWithStats, updateUserStatus, updateUserBusinessType } from '../../services/api';
+import { Search, Mail, Calendar, ShoppingCart, CreditCard, ToggleLeft, ToggleRight, Briefcase, Store, Users, Package, DollarSign, LayoutGrid, List, Trash2 } from 'lucide-react';
+import { fetchUsersWithStats, updateUserStatus, updateUserBusinessType, deleteUser } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import EmptyState from '../../components/ui/EmptyState';
 import SkeletonCards from '../../components/ui/SkeletonCards';
@@ -285,6 +285,7 @@ const AdminUsers = ({ onOpenUser }) => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [suspendTarget, setSuspendTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [btTogglingId, setBtTogglingId] = useState(null);
 
@@ -317,6 +318,18 @@ const AdminUsers = ({ onOpenUser }) => {
     }
     setTogglingId(null);
     setSuspendTarget(null);
+  };
+
+  const handleDeleteUser = async (u) => {
+    setTogglingId(u.id);
+    try {
+      await deleteUser(u.id);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to delete user account', err);
+    }
+    setTogglingId(null);
+    setDeleteTarget(null);
   };
 
   const handleToggleBusinessType = async (u) => {
@@ -438,6 +451,18 @@ const AdminUsers = ({ onOpenUser }) => {
                           {togglingId === u.id ? '...' : isSuspended ? <ToggleLeft size={13} /> : <ToggleRight size={13} />}
                           {togglingId === u.id ? 'Processing' : isSuspended ? 'Activate' : 'Suspend'}
                         </ToggleBtn>
+                        <button
+                          disabled={togglingId === u.id}
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(u); }}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                            padding: '0.25rem 0.5rem', borderRadius: '6px', border: 'none',
+                            cursor: 'pointer', fontSize: '0.65rem', fontWeight: 600,
+                            color: '#BA1A1A', background: '#FFE8E8',
+                          }}
+                        >
+                          <Trash2 size={11} /> Delete
+                        </button>
                       </div>
                     </Td>
                   </tr>
@@ -458,7 +483,7 @@ const AdminUsers = ({ onOpenUser }) => {
                     <CardName>{u.ownerName || '—'}</CardName>
                     <CardEmail><Mail size={11} /> {u.email || '—'}</CardEmail>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                     <StatusBadge $status={statusInfo.status}>{statusInfo.label}</StatusBadge>
                     <ToggleBtn
                       $suspended={isSuspended}
@@ -469,6 +494,18 @@ const AdminUsers = ({ onOpenUser }) => {
                       {togglingId === u.id ? '...' : isSuspended ? <ToggleLeft size={13} /> : <ToggleRight size={13} />}
                       {togglingId === u.id ? 'Processing' : isSuspended ? 'Activate' : 'Suspend'}
                     </ToggleBtn>
+                    <button
+                      disabled={togglingId === u.id}
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(u); }}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                        padding: '0.25rem 0.5rem', borderRadius: '6px', border: 'none',
+                        cursor: 'pointer', fontSize: '0.65rem', fontWeight: 600,
+                        color: '#BA1A1A', background: '#FFE8E8',
+                      }}
+                    >
+                      <Trash2 size={11} /> Delete
+                    </button>
                   </div>
                 </CardHeader>
 
@@ -532,6 +569,15 @@ const AdminUsers = ({ onOpenUser }) => {
           confirmLabel={suspendTarget.status === 'suspended' ? 'Activate' : 'Suspend'}
           onConfirm={() => handleToggleStatus(suspendTarget)}
           onCancel={() => setSuspendTarget(null)}
+        />
+      )}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete Account"
+          message={`Permanently delete ${deleteTarget.ownerName || deleteTarget.businessName || 'this user'}'s account? This cannot be undone.`}
+          confirmLabel="Delete"
+          onConfirm={() => handleDeleteUser(deleteTarget)}
+          onCancel={() => setDeleteTarget(null)}
         />
       )}
     </div>

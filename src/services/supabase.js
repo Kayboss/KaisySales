@@ -207,10 +207,14 @@ export const authService = {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       if (data.user) {
-        const { data: profile } = await supabase.from('profiles').select('status').eq('id', data.user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('status, deleted_at').eq('id', data.user.id).single();
         if (profile?.status === 'suspended') {
           await supabase.auth.signOut();
           throw new Error('Your account has been suspended. Please contact support.');
+        }
+        if (profile?.deleted_at) {
+          await supabase.auth.signOut();
+          throw new Error('This account has been deleted. Please contact support.');
         }
         migrateLocalData(data.user.id);
         supabase.from('profiles').update({ last_sign_in_at: new Date().toISOString() }).eq('id', data.user.id).then().catch((err) => {
@@ -1268,10 +1272,16 @@ export const dbService = {
 
   async updateUserStatus(userId, status) {
     if (supabase) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', userId);
+      const { error } = await supabase.rpc('set_user_status', { p_user_id: userId, p_status: status });
+      if (error) throw error;
+      return true;
+    }
+    return false;
+  },
+
+  async deleteUserAccount(userId) {
+    if (supabase) {
+      const { error } = await supabase.rpc('delete_user_account', { p_user_id: userId });
       if (error) throw error;
       return true;
     }

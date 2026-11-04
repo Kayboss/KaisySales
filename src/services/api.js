@@ -539,12 +539,22 @@ export const fetchErrorLogs = async (limit = 20, userId = null) => {
 
 export const updateUserStatus = async (userId, status) => {
   try {
-    await requireAdmin();
     const result = await dbService.updateUserStatus(userId, status);
     invalidateAdminCache();
     return result;
   } catch (error) {
     console.error('Failed to update user status', error);
+    throw error;
+  }
+};
+
+export const deleteUser = async (userId) => {
+  try {
+    const result = await dbService.deleteUserAccount(userId);
+    invalidateAdminCache();
+    return result;
+  } catch (error) {
+    console.error('Failed to delete user account', error);
     throw error;
   }
 };

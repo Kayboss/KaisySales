@@ -9,6 +9,7 @@ import {
 import {
   fetchUsersWithStats, fetchSupportNotes, createSupportNote, updateSupportNoteStatus,
   updateUserStatus, updateUserBusinessType, fetchUserActions, fetchErrorLogs, fetchRecentActivity,
+  deleteUser,
 } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -521,6 +522,7 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmSuspend, setConfirmSuspend] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
@@ -631,6 +633,19 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
     }
   };
 
+  const handleDeleteUser = async () => {
+    setBusy(true);
+    try {
+      await deleteUser(id);
+      onClose();
+    } catch (err) {
+      console.error('Failed to delete user account', err);
+    } finally {
+      setBusy(false);
+      setConfirmDelete(false);
+    }
+  };
+
   const handleToggleType = async () => {
     setBusy(true);
     const next = profile.businessType === 'services' ? 'retail' : 'services';
@@ -707,6 +722,18 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
               {profile.businessType === 'services' ? <Briefcase size={14} /> : <Store size={14} />}
               Switch to {profile.businessType === 'services' ? 'retail' : 'services'}
             </TypeBtn>
+            <button
+              disabled={busy}
+              onClick={() => setConfirmDelete(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                padding: '0.45rem 0.8rem', borderRadius: '8px', border: 'none',
+                cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700,
+                color: '#BA1A1A', background: '#FFE8E8',
+              }}
+            >
+              <Trash2 size={14} /> Delete Account
+            </button>
           </ActionsRow>
         </PanelHeader>
 
@@ -909,6 +936,16 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
           confirmLabel={isSuspended ? 'Activate' : 'Suspend'}
           onConfirm={handleToggleStatus}
           onCancel={() => setConfirmSuspend(false)}
+          confirmLoading={busy}
+        />
+      )}
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete Account"
+          message={`Permanently delete ${displayName}'s account? This cannot be undone.`}
+          confirmLabel="Delete"
+          onConfirm={handleDeleteUser}
+          onCancel={() => setConfirmDelete(false)}
           confirmLoading={busy}
         />
       )}

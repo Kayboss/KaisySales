@@ -71,7 +71,7 @@ const SuspendedContainer = styled.div`
 
 const CheckAuth = () => {
   const { isAuthenticated, isInitialized, user } = useAuthStore();
-  const { isOnboarded, loadSettings, isLoading, clearSettings, status, role, businessRole, subscriptionPlan, subscriptionStatus, subscriptionExpiresAt } = useSettingsStore();
+  const { isOnboarded, loadSettings, isLoading, clearSettings, status, role, businessRole, subscriptionPlan, subscriptionStatus, subscriptionExpiresAt, deletedAt } = useSettingsStore();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -132,6 +132,19 @@ const CheckAuth = () => {
         </p>
         <p style={{ fontSize: '0.85rem', color: '#55423D' }}>
           <a href="mailto:support@kaisysales.com" style={{ color: '#6F240A' }}>support@kaisysales.com</a>
+        </p>
+      </SuspendedContainer>
+    );
+  }
+
+  // Block deleted accounts (soft-deleted by an admin)
+  if (deletedAt) {
+    return (
+      <SuspendedContainer>
+        <Ban size={48} />
+        <h2 style={{ color: '#1C1B1F', margin: 0 }}>Account Deleted</h2>
+        <p style={{ color: '#55423D', maxWidth: 400 }}>
+          This account has been deleted by an administrator. Please contact support if you believe this was in error.
         </p>
       </SuspendedContainer>
     );
