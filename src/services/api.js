@@ -46,7 +46,7 @@ export const getInventoryBranchId = () => {
 // ====================================================
 export const fetchSales = async () => {
   try {
-    return await dbService.fetchTenantRecords('sales', { branchId: getBranchScope() });
+    return await dbService.fetchTenantRecords('sales', { branchId: getBranchScope(), userId: getUid() });
   } catch (error) {
     console.error('🔥 Error fetching sales:', error);
     return [];
@@ -70,7 +70,7 @@ export const deleteSale = async (id) => {
 // ====================================================
 export const fetchInvoices = async () => {
   try {
-    return await dbService.fetchTenantRecords('invoices', { branchId: getBranchScope() });
+    return await dbService.fetchTenantRecords('invoices', { branchId: getBranchScope(), userId: getUid() });
   } catch (error) {
     console.error('🔥 Error fetching invoices:', error);
     return [];
@@ -94,7 +94,7 @@ export const deleteInvoice = async (id) => {
 // ====================================================
 export const fetchExpenses = async () => {
   try {
-    return await dbService.fetchTenantRecords('expenses', { branchId: getBranchScope() });
+    return await dbService.fetchTenantRecords('expenses', { branchId: getBranchScope(), userId: getUid() });
   } catch (error) {
     console.error('🔥 Error fetching expenses:', error);
     return [];
@@ -118,7 +118,8 @@ export const fetchLargestExpenseCategory = async () => {
     if (!supabase) return 'N/A';
     const { data, error } = await supabase
       .from('expenses')
-      .select('category');
+      .select('category')
+      .eq('user_id', getUid());
     if (error) throw error;
     const counts = {};
     (data || []).forEach(r => { counts[r.category] = (counts[r.category] || 0) + 1; });

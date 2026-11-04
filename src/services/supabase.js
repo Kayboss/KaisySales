@@ -639,7 +639,7 @@ export const dbService = {
   // stocked, and an owner has to see the whole business.
   // ---------------------------------------------------
 
-  async fetchTenantRecords(collection, { branchId } = {}) {
+  async fetchTenantRecords(collection, { branchId, userId } = {}) {
     assertBackendAvailable();
     if (supabase) {
       let query = supabase
@@ -647,6 +647,7 @@ export const dbService = {
         .select('*')
         .order('created_at', { ascending: false });
       if (branchId != null) query = query.eq('branch_id', branchId);
+      if (userId != null) query = query.eq('user_id', userId);
       const { data, error } = await query;
       if (error) throw error;
       return (data || []).map((r) => ({ ...toCamelCase(r), id: String(r.id) }));
