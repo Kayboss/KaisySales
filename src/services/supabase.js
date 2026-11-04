@@ -1076,7 +1076,11 @@ export const dbService = {
         .order('created_at', { ascending: false });
       if (error) throw error;
       // Mark any unread notes as read now that the admin is viewing them.
-      await supabase.rpc('mark_support_notes_read', { p_user_id: userId }).catch(() => {});
+      try {
+        await supabase.rpc('mark_support_notes_read', { p_user_id: userId });
+      } catch {
+        // best-effort; marking read should never break reading the thread
+      }
       return (data || []).map(r => toCamelCase(r));
     }
     return [];
