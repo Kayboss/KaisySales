@@ -77,6 +77,14 @@ export const useSettingsStore = create((set, get) => ({
         tenant?.branchId
       );
 
+      // Services mode has no businesses/branches/staff: when there is no
+      // membership, fall back to profile fields so a services login keeps its
+      // business type, currency, name and logo instead of retail defaults.
+      const profileBusinessType = profile?.businessType || profile?.business_type || 'retail';
+      const profileCurrency = profile?.currency || 'GHS';
+      const profileLogoUrl = profile?.logoUrl || profile?.logo_url || '';
+      const profileBusinessName = profile?.businessName || profile?.business_name || '';
+
       set({
         businessId,
         businessRole: tenant?.role || null,
@@ -84,13 +92,13 @@ export const useSettingsStore = create((set, get) => ({
         modules: Array.isArray(tenant?.modules) ? tenant.modules : [],
         branches,
         activeBranchId,
-        businessName: business?.name || '',
-        phone: business?.phone || '',
-        location: business?.location || '',
-        category: business?.category || '',
-        businessType: business?.businessType || business?.business_type || 'retail',
-        currency: business?.currency || 'GHS',
-        logoUrl: business?.logoUrl || business?.logo_url || '',
+        businessName: business?.name || profileBusinessName || '',
+        phone: business?.phone || profile?.phone || '',
+        location: business?.location || profile?.location || '',
+        category: business?.category || profile?.category || '',
+        businessType: business?.businessType || business?.business_type || profileBusinessType,
+        currency: business?.currency || profileCurrency || 'GHS',
+        logoUrl: business?.logoUrl || business?.logo_url || profileLogoUrl || '',
         ownerName: profile?.ownerName || '',
         email: profile?.email || '',
         avatarColor: profile?.avatarColor || '#6F240A',
@@ -100,9 +108,9 @@ export const useSettingsStore = create((set, get) => ({
         subscriptionPlan: profile?.subscriptionPlan || 'none',
         subscriptionStatus: profile?.subscriptionStatus || 'none',
         subscriptionExpiresAt: profile?.subscriptionExpiresAt || null,
-        // A completed profile is not enough: without a membership the login
-        // cannot write a single row, so onboarding must run again.
-        isOnboarded: profile?.isOnboarded === true && Boolean(businessId),
+        // A completed profile is enough for services mode (no membership
+        // required). Retail needs a membership to write.
+        isOnboarded: profile?.isOnboarded === true && (businessId || profileBusinessType === 'services'),
         isLoading: false,
       });
     } catch (error) {
@@ -143,7 +151,21 @@ export const useSettingsStore = create((set, get) => ({
         await dbService.updateBusiness(businessId, businessPatch);
       }
 
-      const updated = await dbService.saveUserProfile(uid, profileFields);
+      // Services mode has no business row: persist business fields to the
+      // profile so they survive a reload (profiles.business_* columns were
+      // restored by migration 20261104170000).
+      const profileFieldsForServices = { ...profileFields };
+      if (!businessId) {
+        if (businessName !== undefined) profileFieldsForServices.business_name = businessName;
+        if (businessType !== undefined) profileFieldsForServices.business_type = businessType;
+        if (currency !== undefined) profileFieldsForServices.currency = currency;
+        if (logoUrl !== undefined) profileFieldsForServices.logo_url = logoUrl;
+        if (phone !== undefined) profileFieldsForServices.phone = phone;
+        if (location !== undefined) profileFieldsForServices.location = location;
+        if (category !== undefined) profileFieldsForServices.category = category;
+      }
+
+      const updated = await dbService.saveUserProfile(uid, profileFieldsForServices);
 
       set((state) => ({
         ...state,
