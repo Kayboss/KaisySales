@@ -283,6 +283,10 @@ export const transferOwnership = async (userId) => {
   return dbService.transferOwnership(userId);
 };
 
+export const createStaffLogin = async (payload) => {
+  return dbService.createStaffLogin(payload);
+};
+
 export const redeemInvite = async (code) => {
   return dbService.redeemInvite(code);
 };
@@ -548,13 +552,44 @@ export const updateUserStatus = async (userId, status) => {
   }
 };
 
-export const deleteUser = async (userId) => {
+/**
+ * Deactivates an account: it is signed out and blocked from signing in, but
+ * every record it wrote is kept and the account can be restored. This is what
+ * "Deactivate" does; it is not a deletion.
+ */
+export const deactivateUser = async (userId) => {
   try {
     const result = await dbService.deleteUserAccount(userId);
     invalidateAdminCache();
     return result;
   } catch (error) {
-    console.error('Failed to delete user account', error);
+    console.error('Failed to deactivate user account', error);
+    throw error;
+  }
+};
+
+export const restoreUser = async (userId) => {
+  try {
+    const result = await dbService.restoreUserAccount(userId);
+    invalidateAdminCache();
+    return result;
+  } catch (error) {
+    console.error('Failed to restore user account', error);
+    throw error;
+  }
+};
+
+/**
+ * Irreversible. Frees the email address and drops the records with the account;
+ * the database refuses an owner who still has active staff.
+ */
+export const purgeUser = async (userId) => {
+  try {
+    const result = await dbService.purgeUserAccount(userId);
+    invalidateAdminCache();
+    return result;
+  } catch (error) {
+    console.error('Failed to permanently delete user account', error);
     throw error;
   }
 };

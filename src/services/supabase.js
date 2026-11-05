@@ -68,6 +68,11 @@ function mapUser(sbUser) {
     uid: sbUser.id,
     email: sbUser.email || '',
     ...sbUser.user_metadata,
+    // The staff-login function stores this in metadata rather than in a new
+    // `profiles` column: it is set when the owner creates the login and cleared
+    // by the same `updateUser` call that sets the new password, so no extra
+    // write (and no RLS bypass) is involved.
+    mustChangePassword: sbUser.user_metadata?.must_change_password === true,
   };
 }
 
@@ -291,6 +296,28 @@ export const authService = {
       });
       if (error) throw error;
     }
+  },
+
+  /**
+   * Sets a new password for the signed-in login and clears the
+   * `must_change_password` flag in the same call, so the CheckAuth gate stops
+   * asking without a second write. A staff login created by an owner has a
+   * temporary password they were given in person; this is where they replace it.
+   */
+  async updatePassword(password) {
+    if (!supabase) throw new Error('Setting a password requires a configured backend.');
+    const { data, error } = await supabase.auth.updateUser({
+      password,
+      data: { must_change_password: false },
+    });
+    if (error) throw error;
+    const updated = mapUser(data?.user);
+    // GoTrue also emits USER_UPDATED, which reaches the store through
+    // onAuthStateChanged. This is the same notification made explicit: if that
+    // event were ever missed, the person would land back on the "choose your
+    // password" screen with the new password already saved and no way past it.
+    if (updated) notifyListeners(updated);
+    return updated;
   },
 };
 
@@ -631,6 +658,34 @@ export const dbService = {
     if (!supabase) return null;
     const { data, error } = await supabase.rpc('transfer_ownership', { p_user_id: userId });
     if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Creates a staff login for the signed-in owner (edge function `create-staff`,
+   * because only a service-role key can create an auth user). The owner hands
+   * over the temporary password, and the new login must change it on first
+   * sign-in.
+   */
+  async createStaffLogin({ email, password, fullName, branchId, modules }) {
+    assertBackendAvailable();
+    if (!supabase) throw new Error('Creating a login requires a configured backend.');
+    const { data, error } = await supabase.functions.invoke('create-staff', {
+      body: { email, password, fullName, branchId, modules },
+    });
+    if (error) {
+      // FunctionsHttpError hides the function's own body, and that body is the
+      // only useful message ("An account already exists for that email
+      // address."). Fall back to the transport message if it cannot be read.
+      let message = error.message;
+      try {
+        const body = await error.context?.json?.();
+        if (body?.error) message = body.error;
+      } catch {
+        // Keep the transport message.
+      }
+      throw new Error(message || 'Could not create that login.');
+    }
     return data;
   },
 
@@ -1289,6 +1344,33 @@ export const dbService = {
   async deleteUserAccount(userId) {
     if (supabase) {
       const { error } = await supabase.rpc('delete_user_account', { p_user_id: userId });
+      if (error) throw error;
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Brings a deactivated account back. The login was never removed, so this is
+   * just the `profiles.deleted_at` flag that CheckAuth gates on.
+   */
+  async restoreUserAccount(userId) {
+    if (supabase) {
+      const { error } = await supabase.rpc('restore_user_account', { p_user_id: userId });
+      if (error) throw error;
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Irreversible. Deletes the login (and, for an owner, the business with it),
+   * which there is no client-side way to undo. The database refuses an owner
+   * who still has active staff and refuses the caller's own account.
+   */
+  async purgeUserAccount(userId) {
+    if (supabase) {
+      const { error } = await supabase.rpc('purge_user_account', { p_user_id: userId });
       if (error) throw error;
       return true;
     }

@@ -10,6 +10,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  Wand2,
 } from 'lucide-react';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Skeleton from '../../components/ui/Skeleton';
@@ -19,6 +20,7 @@ import {
   archiveBranch,
   createBranch,
   createInvite,
+  createStaffLogin,
   fetchBranches,
   listInvites,
   listMembers,
@@ -28,6 +30,12 @@ import {
   setMemberModules,
   transferOwnership,
 } from '../../services/api';
+import {
+  PASSWORD_HINT,
+  generateTemporaryPassword,
+  isEmail,
+  passwordProblem,
+} from '../../utils/staffLogin';
 
 const Section = styled.section`
   background: white;
@@ -262,6 +270,20 @@ const TeamSettings = () => {
   const [copiedCode, setCopiedCode] = useState('');
   const [creatingInvite, setCreatingInvite] = useState(false);
 
+  // Owner-created staff logins. The password only ever lives in this component's
+  // state: it is shown once to hand over, and nothing writes it anywhere.
+  const [loginForm, setLoginForm] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    branchId: '',
+    reporting: false,
+  });
+  const [creatingLogin, setCreatingLogin] = useState(false);
+  const [loginError, setLoginError] = useState(null);
+  const [createdLogin, setCreatedLogin] = useState(null);
+  const [copiedLogin, setCopiedLogin] = useState(false);
+
   const [newBranchName, setNewBranchName] = useState('');
   const [creatingBranch, setCreatingBranch] = useState(false);
 
@@ -324,6 +346,70 @@ const TeamSettings = () => {
     withBusy(`${member.userId}-modules`, () =>
       setMemberModules(member.userId, checked ? ['sales', 'reporting'] : ['sales'])
     );
+
+  const handleCreateLogin = async (event) => {
+    event.preventDefault();
+    setLoginError(null);
+
+    const email = loginForm.email.trim();
+    const branchId = loginForm.branchId || inviteBranchId;
+
+    if (!loginForm.fullName.trim()) {
+      setLoginError("Enter the teammate's name.");
+      return;
+    }
+    if (!isEmail(email)) {
+      setLoginError('Enter a valid email address.');
+      return;
+    }
+    const problem = passwordProblem(loginForm.password);
+    if (problem) {
+      setLoginError(problem);
+      return;
+    }
+    if (!branchId) {
+      setLoginError('Choose the branch this teammate works in.');
+      return;
+    }
+
+    setCreatingLogin(true);
+    try {
+      const result = await createStaffLogin({
+        email,
+        password: loginForm.password,
+        fullName: loginForm.fullName.trim(),
+        branchId: Number(branchId),
+        modules: loginForm.reporting ? ['sales', 'reporting'] : ['sales'],
+      });
+      // Keep the password only long enough to show it once. It is not stored.
+      setCreatedLogin({ ...result, password: loginForm.password });
+      setLoginForm({ fullName: '', email: '', password: '', branchId: '', reporting: false });
+      setCopiedLogin(false);
+      await load();
+    } catch (error) {
+      console.error('Failed to create staff login', error);
+      setLoginError(error?.message || 'Could not create that login.');
+    } finally {
+      setCreatingLogin(false);
+    }
+  };
+
+  const copyLogin = async () => {
+    if (!createdLogin) return;
+    const text = [
+      'KaisySales login',
+      `Email: ${createdLogin.email}`,
+      `Temporary password: ${createdLogin.password}`,
+      'You will be asked to choose a new password when you first sign in.',
+    ].join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedLogin(true);
+      setTimeout(() => setCopiedLogin(false), 2000);
+    } catch {
+      // Clipboard permissions vary by browser; the details are on screen.
+    }
+  };
 
   const handleCreateInvite = async (event) => {
     event.preventDefault();
@@ -625,7 +711,126 @@ const TeamSettings = () => {
       <Section>
         <SectionHead>
           <div>
-            <h2><UserPlus size={18} /> Invite a teammate</h2>
+            <h2><UserPlus size={18} /> Create a login for a teammate</h2>
+            <p>
+              Choose their branch and access, then give them the temporary password.
+              They pick a new one the first time they sign in.
+            </p>
+          </div>
+        </SectionHead>
+
+        {loginError && (
+          <div
+            role="alert"
+            style={{
+              marginBottom: '0.9rem',
+              padding: '0.65rem 0.85rem',
+              borderRadius: '8px',
+              border: '1px solid #FFC7C7',
+              background: '#FFE8E8',
+              color: '#BA1A1A',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+            }}
+          >
+            {loginError}
+          </div>
+        )}
+
+        <InlineForm onSubmit={handleCreateLogin}>
+          <TextInput
+            value={loginForm.fullName}
+            onChange={(event) => setLoginForm((form) => ({ ...form, fullName: event.target.value }))}
+            placeholder="Full name"
+            aria-label="Teammate's full name"
+            autoComplete="off"
+            required
+          />
+          <TextInput
+            type="email"
+            value={loginForm.email}
+            onChange={(event) => setLoginForm((form) => ({ ...form, email: event.target.value }))}
+            placeholder="Email address"
+            aria-label="Teammate's email address"
+            autoComplete="off"
+            required
+          />
+          <div style={{ display: 'flex', gap: '0.4rem', flex: '1 1 240px' }}>
+            <TextInput
+              value={loginForm.password}
+              onChange={(event) => setLoginForm((form) => ({ ...form, password: event.target.value }))}
+              placeholder="Temporary password"
+              aria-label="Temporary password"
+              autoComplete="new-password"
+              required
+            />
+            <Button
+              type="button"
+              onClick={() => setLoginForm((form) => ({ ...form, password: generateTemporaryPassword() }))}
+            >
+              <Wand2 size={14} /> Generate
+            </Button>
+          </div>
+          <Select
+            aria-label="Branch for the new login"
+            value={loginForm.branchId || inviteBranchId}
+            onChange={(event) => setLoginForm((form) => ({ ...form, branchId: event.target.value }))}
+            style={{ flex: '1 1 200px' }}
+          >
+            {liveBranches.map((branch) => (
+              <option key={branch.id} value={String(branch.id)}>
+                {branch.name}{branch.isDefault ? ' (default)' : ''}
+              </option>
+            ))}
+          </Select>
+          <ToggleLabel>
+            <input
+              type="checkbox"
+              checked={loginForm.reporting}
+              onChange={(event) => setLoginForm((form) => ({ ...form, reporting: event.target.checked }))}
+            />
+            Reports &amp; expenses
+          </ToggleLabel>
+          <PrimaryButton type="submit" disabled={creatingLogin || liveBranches.length === 0}>
+            <UserPlus size={14} /> {creatingLogin ? 'Creating...' : 'Create login'}
+          </PrimaryButton>
+        </InlineForm>
+
+        <Note style={{ marginBottom: '0.9rem' }}>
+          {PASSWORD_HINT} No email is sent, so hand these details over yourself.
+        </Note>
+
+        {createdLogin && (
+          <InviteRow>
+            <div>
+              <strong style={{ color: '#1C1C18' }}>{createdLogin.fullName}</strong>
+              <div style={{ color: '#89726C', fontSize: '0.78rem', marginTop: '0.2rem' }}>
+                {createdLogin.branchName || 'Their branch'} · {createdLogin.modules?.includes('reporting')
+                  ? 'reports and expenses'
+                  : 'sales only'}
+              </div>
+              <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#55423D' }}>
+                Email <Code style={{ fontSize: '0.85rem', letterSpacing: 0 }}>{createdLogin.email}</Code>
+              </div>
+              <div style={{ marginTop: '0.15rem', fontSize: '0.8rem', color: '#55423D' }}>
+                Temporary password <Code style={{ fontSize: '0.9rem' }}>{createdLogin.password}</Code>
+              </div>
+              <div style={{ color: '#89726C', fontSize: '0.75rem', marginTop: '0.35rem' }}>
+                This is shown once. They must choose a new password on first sign-in.
+              </div>
+            </div>
+            <Button type="button" onClick={copyLogin}>
+              {copiedLogin ? <Check size={14} /> : <Copy size={14} />}
+              {copiedLogin ? 'Copied' : 'Copy details'}
+            </Button>
+          </InviteRow>
+        )}
+      </Section>
+
+      <Section>
+        <SectionHead>
+          <div>
+            <h2><KeyRound size={18} /> Or share an invite code</h2>
             <p>Generate a single-use code. They enter it when they sign up or join.</p>
           </div>
         </SectionHead>

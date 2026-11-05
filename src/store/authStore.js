@@ -11,7 +11,13 @@ export const useAuthStore = create((set) => {
   const unsubscribe = authService.onAuthStateChanged((user) => {
     if (user) {
       set({ 
-        user: { uid: user.uid, email: user.email }, 
+        user: {
+          uid: user.uid,
+          email: user.email,
+          // Set by the `create-staff` function; CheckAuth blocks the app until
+          // the password has been replaced.
+          mustChangePassword: user.mustChangePassword === true,
+        }, 
         isAuthenticated: true, 
         isInitialized: true 
       });

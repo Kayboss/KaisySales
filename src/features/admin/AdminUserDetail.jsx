@@ -4,12 +4,12 @@ import {
   X, Mail, Briefcase, Store, Calendar, Clock, ToggleLeft, ToggleRight,
   Send, CheckCircle2, RotateCcw, PlusCircle, Pencil, Trash2, Bug, ShoppingCart,
   Receipt, CreditCard, Users, ChevronDown, ChevronUp, History, Activity as ActivityIcon,
-  MessageSquare, DollarSign, Package, AlertCircle,
+  MessageSquare, DollarSign, Package, AlertCircle, UserX,
 } from 'lucide-react';
 import {
   fetchUsersWithStats, fetchSupportNotes, createSupportNote, updateSupportNoteStatus,
   updateUserStatus, updateUserBusinessType, fetchUserActions, fetchErrorLogs, fetchRecentActivity,
-  deleteUser,
+  deactivateUser, restoreUser, purgeUser,
 } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -224,6 +224,27 @@ const TypeBtn = styled.button`
   font-weight: 700;
   color: ${props => props.$services ? '#25432F' : '#6F240A'};
   background: ${props => props.$services ? '#E8F0EC' : '#F5EFEB'};
+
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+`;
+
+/**
+ * Deactivate is reversible; delete permanently is not. They never share a
+ * colour, and an account already deleted is only offered Restore / Delete
+ * permanently so a second "delete" cannot be mistaken for the first.
+ */
+const DangerBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #BA1A1A;
+  background: #FFE8E8;
 
   &:disabled { opacity: 0.6; cursor: not-allowed; }
 `;
@@ -506,7 +527,7 @@ const summarise = (details) => {
 
 const shortenDate = (value) => (value ? new Date(value).toLocaleString() : '—');
 
-const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
+const AdminUserDetail = ({ user, initialSection = 'support', onClose, onChanged }) => {
   const { id, salesCount } = user;
   const { currency } = useSettingsStore();
   const { user: admin } = useAuthStore();
@@ -522,7 +543,9 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmSuspend, setConfirmSuspend] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [confirmRestore, setConfirmRestore] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [actionError, setActionError] = useState(null);
 
@@ -579,6 +602,7 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
   const displayName = profile.ownerName || profile.businessName || profile.userBusinessName || profile.email || 'User';
   const initial = displayName.trim().charAt(0).toUpperCase() || 'U';
   const isSuspended = profile.status === 'suspended';
+  const isDeleted = !!profile.deletedAt;
 
   const handleSend = async () => {
     if (!message.trim() || !admin) return;
@@ -627,6 +651,7 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
     try {
       await updateUserStatus(id, isSuspended ? 'active' : 'suspended');
       setProfile(prev => ({ ...prev, status: isSuspended ? 'active' : 'suspended' }));
+      onChanged?.();
     } catch (err) {
       setActionError(err.message || 'Failed to update user status. Please try again.');
     } finally {
@@ -635,17 +660,48 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
     }
   };
 
-  const handleDeleteUser = async () => {
+  const handleDeactivateUser = async () => {
     setBusy(true);
     setActionError(null);
     try {
-      await deleteUser(id);
-      onClose();
+      await deactivateUser(id);
+      setProfile(prev => ({ ...prev, deletedAt: new Date().toISOString() }));
+      onChanged?.();
     } catch (err) {
-      setActionError(err.message || 'Failed to delete user account. Please try again.');
+      setActionError(err.message || 'Failed to deactivate the account. Please try again.');
     } finally {
       setBusy(false);
-      setConfirmDelete(false);
+      setConfirmDeactivate(false);
+    }
+  };
+
+  const handleRestoreUser = async () => {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await restoreUser(id);
+      setProfile(prev => ({ ...prev, deletedAt: null }));
+      onChanged?.();
+    } catch (err) {
+      setActionError(err.message || 'Failed to restore the account. Please try again.');
+    } finally {
+      setBusy(false);
+      setConfirmRestore(false);
+    }
+  };
+
+  const handlePurgeUser = async () => {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await purgeUser(id);
+      onChanged?.();
+      onClose();
+    } catch (err) {
+      setActionError(err.message || 'Failed to delete the account. Please try again.');
+    } finally {
+      setBusy(false);
+      setConfirmPurge(false);
     }
   };
 
@@ -682,11 +738,12 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
                 {profile.businessType}
               </Badge>
             )}
-            {profile.status && (
+            {!isDeleted && profile.status && (
               <Badge $tone={profile.status === 'suspended' ? 'suspended' : 'active'}>
                 {profile.status}
               </Badge>
             )}
+            {isDeleted && <Badge $tone="suspended">deleted</Badge>}
             {profile.createdAt && (
               <Badge><Calendar size={11} /> joined {new Date(profile.createdAt).toLocaleDateString()}</Badge>
             )}
@@ -727,26 +784,30 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
             <ActionBtn href={`mailto:${profile.email}`} target="_blank" rel="noreferrer">
               <Mail size={14} /> Email
             </ActionBtn>
-            <ToggleBtn $active={isSuspended} disabled={busy} onClick={() => setConfirmSuspend(true)}>
-              {isSuspended ? <ToggleLeft size={14} /> : <ToggleRight size={14} />}
-              {isSuspended ? 'Activate' : 'Suspend'}
-            </ToggleBtn>
-            <TypeBtn $services={profile.businessType === 'services'} disabled={busy} onClick={handleToggleType}>
-              {profile.businessType === 'services' ? <Briefcase size={14} /> : <Store size={14} />}
-              Switch to {profile.businessType === 'services' ? 'retail' : 'services'}
-            </TypeBtn>
-            <button
-              disabled={busy}
-              onClick={() => setConfirmDelete(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                padding: '0.45rem 0.8rem', borderRadius: '8px', border: 'none',
-                cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700,
-                color: '#BA1A1A', background: '#FFE8E8',
-              }}
-            >
-              <Trash2 size={14} /> Delete Account
-            </button>
+            {isDeleted ? (
+              <>
+                <ToggleBtn $active disabled={busy} onClick={() => setConfirmRestore(true)}>
+                  <RotateCcw size={14} /> Restore account
+                </ToggleBtn>
+                <DangerBtn disabled={busy} onClick={() => setConfirmPurge(true)}>
+                  <Trash2 size={14} /> Delete permanently
+                </DangerBtn>
+              </>
+            ) : (
+              <>
+                <ToggleBtn $active={isSuspended} disabled={busy} onClick={() => setConfirmSuspend(true)}>
+                  {isSuspended ? <ToggleLeft size={14} /> : <ToggleRight size={14} />}
+                  {isSuspended ? 'Activate' : 'Suspend'}
+                </ToggleBtn>
+                <TypeBtn $services={profile.businessType === 'services'} disabled={busy} onClick={handleToggleType}>
+                  {profile.businessType === 'services' ? <Briefcase size={14} /> : <Store size={14} />}
+                  Switch to {profile.businessType === 'services' ? 'retail' : 'services'}
+                </TypeBtn>
+                <DangerBtn disabled={busy} onClick={() => setConfirmDeactivate(true)}>
+                  <UserX size={14} /> Deactivate
+                </DangerBtn>
+              </>
+            )}
           </ActionsRow>
         </PanelHeader>
 
@@ -940,6 +1001,7 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
 
       {confirmSuspend && (
         <ConfirmDialog
+          isOpen
           title={isSuspended ? 'Activate Account' : 'Suspend Account'}
           message={
             isSuspended
@@ -952,13 +1014,36 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose }) => {
           confirmLoading={busy}
         />
       )}
-      {confirmDelete && (
+      {confirmDeactivate && (
         <ConfirmDialog
-          title="Delete Account"
-          message={`Permanently delete ${displayName}'s account? This cannot be undone.`}
-          confirmLabel="Delete"
-          onConfirm={handleDeleteUser}
-          onCancel={() => setConfirmDelete(false)}
+          isOpen
+          title="Deactivate Account"
+          message={`Deactivate ${displayName}'s account? They are signed out and blocked from signing in, but every record is kept and you can restore the account from the Deleted filter.`}
+          confirmLabel="Deactivate"
+          onConfirm={handleDeactivateUser}
+          onCancel={() => setConfirmDeactivate(false)}
+          confirmLoading={busy}
+        />
+      )}
+      {confirmRestore && (
+        <ConfirmDialog
+          isOpen
+          title="Restore Account"
+          message={`Restore ${displayName}'s account? They will be able to sign in again with the same email and password.`}
+          confirmLabel="Restore"
+          onConfirm={handleRestoreUser}
+          onCancel={() => setConfirmRestore(false)}
+          confirmLoading={busy}
+        />
+      )}
+      {confirmPurge && (
+        <ConfirmDialog
+          isOpen
+          title="Delete Permanently"
+          message={`Permanently delete ${displayName}? This removes the login, frees the email address and deletes their business records. It cannot be undone. If they own a business that still has active team members, remove or transfer those people first.`}
+          confirmLabel="Delete permanently"
+          onConfirm={handlePurgeUser}
+          onCancel={() => setConfirmPurge(false)}
           confirmLoading={busy}
         />
       )}

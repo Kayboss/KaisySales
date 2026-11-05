@@ -3,6 +3,7 @@ import { Navigate, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import OnboardingWizard from '../features/auth/OnboardingWizard';
+import SetPasswordScreen from '../features/auth/SetPasswordScreen';
 import styled from 'styled-components';
 import { Ban, Crown } from 'lucide-react';
 import { isSubscriptionExpired } from '../utils/subscriptionLimits';
@@ -148,6 +149,14 @@ const CheckAuth = () => {
         </p>
       </SuspendedContainer>
     );
+  }
+
+  // A login the owner created in Team settings carries a temporary password
+  // handed over in person. Nothing in the app is reachable until it has been
+  // replaced, so the password the owner knows stops working at first sign-in.
+  // `updatePassword` clears the flag and the auth listener re-renders this gate.
+  if (user?.mustChangePassword) {
+    return <SetPasswordScreen />;
   }
 
   // Subscription is paid by the owner of the business. A staff login has its own

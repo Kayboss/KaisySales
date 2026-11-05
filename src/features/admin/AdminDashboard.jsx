@@ -301,6 +301,7 @@ const AdminDashboard = () => {
           user={activeUser.user}
           initialSection={activeUser.section}
           onClose={() => setActiveUser(null)}
+          onChanged={() => setReloadKey(k => k + 1)}
         />
       )}
     </PageWrapper>

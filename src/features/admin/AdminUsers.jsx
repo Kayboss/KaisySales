@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Search, Mail, Calendar, ShoppingCart, CreditCard, ToggleLeft, ToggleRight, Briefcase, Store, Users, Package, DollarSign, LayoutGrid, List, Trash2 } from 'lucide-react';
-import { fetchUsersWithStats, updateUserStatus, updateUserBusinessType, deleteUser } from '../../services/api';
+import { Search, Mail, Calendar, ShoppingCart, CreditCard, ToggleLeft, ToggleRight, Briefcase, Store, Users, Package, DollarSign, LayoutGrid, List, Trash2, RotateCcw, UserX } from 'lucide-react';
+import { fetchUsersWithStats, updateUserStatus, updateUserBusinessType, deactivateUser, restoreUser, purgeUser } from '../../services/api';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import EmptyState from '../../components/ui/EmptyState';
 import SkeletonCards from '../../components/ui/SkeletonCards';
@@ -96,6 +96,29 @@ const ToggleBtn = styled.button`
   font-weight: 700;
   color: ${props => props.$suspended ? '#25432F' : '#BA1A1A'};
   background: ${props => props.$suspended ? '#E8F0EC' : '#FFE8E8'};
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) { opacity: 0.8; }
+
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+`;
+
+/**
+ * Restore and "delete permanently" are different actions with different
+ * colours on purpose: one is safe, the other throws records away.
+ */
+const DangerBtn = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: ${props => props.$restore ? '#25432F' : '#BA1A1A'};
+  background: ${props => props.$restore ? '#E8F0EC' : '#FFE8E8'};
   transition: all 0.15s ease;
 
   &:hover:not(:disabled) { opacity: 0.8; }
@@ -276,6 +299,50 @@ const getUserStatus = (lastSignInAt) => {
   return { label: 'Churned', status: 'churned' };
 };
 
+// The badge used to be derived from `last_sign_in_at` alone, so a suspended
+// account still read "Active" and the admin had no way to tell that the action
+// had landed. An admin-set state wins over the sign-in recency.
+const getAccountStatus = (u) => {
+  if (u.deletedAt) return { label: 'Deleted', status: 'deleted' };
+  if (u.status === 'suspended') return { label: 'Suspended', status: 'suspended' };
+  return getUserStatus(u.lastSignInAt);
+};
+
+/**
+ * One set of account actions for both views. A deactivated account offers
+ * Restore / Delete permanently; a live one offers Suspend / Deactivate.
+ * Clicks stop here so they never open the detail drawer underneath.
+ */
+const AccountActions = ({ user, busy, onSuspend, onDeactivate, onRestore, onPurge }) => {
+  const stop = (event) => event.stopPropagation();
+
+  if (user.deletedAt) {
+    return (
+      <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }} onClick={stop}>
+        <DangerBtn $restore disabled={busy} onClick={() => onRestore(user)}>
+          <RotateCcw size={12} /> {busy ? 'Working...' : 'Restore'}
+        </DangerBtn>
+        <DangerBtn disabled={busy} onClick={() => onPurge(user)}>
+          <Trash2 size={12} /> Delete permanently
+        </DangerBtn>
+      </div>
+    );
+  }
+
+  const isSuspended = user.status === 'suspended';
+  return (
+    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }} onClick={stop}>
+      <ToggleBtn $suspended={isSuspended} disabled={busy} onClick={() => onSuspend(user)}>
+        {isSuspended ? <ToggleLeft size={13} /> : <ToggleRight size={13} />}
+        {busy ? 'Working...' : isSuspended ? 'Activate' : 'Suspend'}
+      </ToggleBtn>
+      <DangerBtn disabled={busy} onClick={() => onDeactivate(user)}>
+        <UserX size={12} /> Deactivate
+      </DangerBtn>
+    </div>
+  );
+};
+
 const AdminUsers = ({ onOpenUser }) => {
   const { currency } = useSettingsStore();
   const [users, setUsers] = useState([]);
@@ -285,7 +352,9 @@ const AdminUsers = ({ onOpenUser }) => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [suspendTarget, setSuspendTarget] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
+  const [purgeTarget, setPurgeTarget] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [btTogglingId, setBtTogglingId] = useState(null);
   const [actionError, setActionError] = useState(null);
@@ -322,17 +391,46 @@ const AdminUsers = ({ onOpenUser }) => {
     setSuspendTarget(null);
   };
 
-  const handleDeleteUser = async (u) => {
+  const handleDeactivateUser = async (u) => {
     setTogglingId(u.id);
     setActionError(null);
     try {
-      await deleteUser(u.id);
+      await deactivateUser(u.id);
       await loadData();
     } catch (err) {
-      setActionError(err.message || 'Failed to delete user account. Please try again.');
+      setActionError(err.message || 'Failed to deactivate the account. Please try again.');
     }
     setTogglingId(null);
-    setDeleteTarget(null);
+    setDeactivateTarget(null);
+  };
+
+  const handleRestoreUser = async (u) => {
+    setTogglingId(u.id);
+    setActionError(null);
+    try {
+      await restoreUser(u.id);
+      await loadData();
+    } catch (err) {
+      setActionError(err.message || 'Failed to restore the account. Please try again.');
+    }
+    setTogglingId(null);
+    setRestoreTarget(null);
+  };
+
+  const handlePurgeUser = async (u) => {
+    setTogglingId(u.id);
+    setActionError(null);
+    try {
+      await purgeUser(u.id);
+      await loadData();
+    } catch (err) {
+      // The database refuses an owner who still has active staff, and that
+      // reason ("This owner still has 2 active team member(s)...") is the only
+      // thing that tells the admin what to do next, so it is shown verbatim.
+      setActionError(err.message || 'Failed to delete the account. Please try again.');
+    }
+    setTogglingId(null);
+    setPurgeTarget(null);
   };
 
   const handleToggleBusinessType = async (u) => {
@@ -348,9 +446,13 @@ const AdminUsers = ({ onOpenUser }) => {
   };
 
   const matchesStatus = (u) => {
-    if (statusFilter === 'all') return true;
-    if (statusFilter === 'suspended') return u.status === 'suspended';
-    return getUserStatus(u.lastSignInAt).label.toLowerCase() === statusFilter;
+    const account = getAccountStatus(u);
+    // Soft-deleted accounts are hidden from every view except their own filter:
+    // after "Delete" the account should disappear from the working list.
+    if (statusFilter === 'all') return !u.deletedAt;
+    if (statusFilter === 'deleted') return account.status === 'deleted';
+    if (statusFilter === 'suspended') return account.status === 'suspended';
+    return account.label.toLowerCase() === statusFilter;
   };
 
   const filtered = users.filter(u =>
@@ -387,6 +489,7 @@ const AdminUsers = ({ onOpenUser }) => {
           <FilterBtn $active={statusFilter === 'dormant'} onClick={() => setStatusFilter('dormant')}>Dormant</FilterBtn>
           <FilterBtn $active={statusFilter === 'churned'} onClick={() => setStatusFilter('churned')}>Churned</FilterBtn>
           <FilterBtn $active={statusFilter === 'suspended'} onClick={() => setStatusFilter('suspended')}>Suspended</FilterBtn>
+          <FilterBtn $active={statusFilter === 'deleted'} onClick={() => setStatusFilter('deleted')}>Deleted</FilterBtn>
         </FilterGroup>
 
         <ViewToggle>
@@ -397,7 +500,7 @@ const AdminUsers = ({ onOpenUser }) => {
 
       <SumRow>
         {['Active', 'Dormant', 'Churned', 'Never'].map(s => {
-          const count = filtered.filter(u => getUserStatus(u.lastSignInAt).label === s).length;
+          const count = filtered.filter(u => getAccountStatus(u).label === s).length;
           return <SumPill key={s}>{s}: {count}</SumPill>;
         })}
       </SumRow>
@@ -435,7 +538,7 @@ const AdminUsers = ({ onOpenUser }) => {
             <tbody>
               {filtered.map(u => {
                 const isSuspended = u.status === 'suspended';
-                const statusInfo = getUserStatus(u.lastSignInAt);
+                const statusInfo = getAccountStatus(u);
                 return (
                   <tr key={u.id} style={{ opacity: isSuspended ? 0.6 : 1, cursor: 'pointer' }} onClick={() => onOpenUser && onOpenUser(u)}>
                     <Td>
@@ -454,29 +557,14 @@ const AdminUsers = ({ onOpenUser }) => {
                       {u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleDateString() : '—'}
                     </Td>
                     <Td>
-                      <div style={{ display: 'flex', gap: '0.3rem' }}>
-                        <ToggleBtn
-                          $suspended={isSuspended}
-                          disabled={togglingId === u.id}
-                          onClick={(e) => { e.stopPropagation(); setSuspendTarget(u); }}
-                          style={{ fontSize: '0.65rem', padding: '0.25rem 0.5rem' }}
-                        >
-                          {togglingId === u.id ? '...' : isSuspended ? <ToggleLeft size={13} /> : <ToggleRight size={13} />}
-                          {togglingId === u.id ? 'Processing' : isSuspended ? 'Activate' : 'Suspend'}
-                        </ToggleBtn>
-                        <button
-                          disabled={togglingId === u.id}
-                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(u); }}
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                            padding: '0.25rem 0.5rem', borderRadius: '6px', border: 'none',
-                            cursor: 'pointer', fontSize: '0.65rem', fontWeight: 600,
-                            color: '#BA1A1A', background: '#FFE8E8',
-                          }}
-                        >
-                          <Trash2 size={11} /> Delete
-                        </button>
-                      </div>
+                      <AccountActions
+                        user={u}
+                        busy={togglingId === u.id}
+                        onSuspend={setSuspendTarget}
+                        onDeactivate={setDeactivateTarget}
+                        onRestore={setRestoreTarget}
+                        onPurge={setPurgeTarget}
+                      />
                     </Td>
                   </tr>
                 );
@@ -488,7 +576,7 @@ const AdminUsers = ({ onOpenUser }) => {
         <CardGrid>
           {filtered.map(u => {
             const isSuspended = u.status === 'suspended';
-            const statusInfo = getUserStatus(u.lastSignInAt);
+            const statusInfo = getAccountStatus(u);
             return (
               <UserCard key={u.id} $suspended={isSuspended} onClick={() => onOpenUser && onOpenUser(u)}>
                 <CardHeader>
@@ -496,29 +584,16 @@ const AdminUsers = ({ onOpenUser }) => {
                     <CardName>{u.ownerName || '—'}</CardName>
                     <CardEmail><Mail size={11} /> {u.email || '—'}</CardEmail>
                   </div>
-                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <StatusBadge $status={statusInfo.status}>{statusInfo.label}</StatusBadge>
-                    <ToggleBtn
-                      $suspended={isSuspended}
-                      disabled={togglingId === u.id}
-                      onClick={(e) => { e.stopPropagation(); setSuspendTarget(u); }}
-                      style={{ fontSize: '0.65rem', padding: '0.25rem 0.5rem' }}
-                    >
-                      {togglingId === u.id ? '...' : isSuspended ? <ToggleLeft size={13} /> : <ToggleRight size={13} />}
-                      {togglingId === u.id ? 'Processing' : isSuspended ? 'Activate' : 'Suspend'}
-                    </ToggleBtn>
-                    <button
-                      disabled={togglingId === u.id}
-                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(u); }}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                        padding: '0.25rem 0.5rem', borderRadius: '6px', border: 'none',
-                        cursor: 'pointer', fontSize: '0.65rem', fontWeight: 600,
-                        color: '#BA1A1A', background: '#FFE8E8',
-                      }}
-                    >
-                      <Trash2 size={11} /> Delete
-                    </button>
+                    <AccountActions
+                      user={u}
+                      busy={togglingId === u.id}
+                      onSuspend={setSuspendTarget}
+                      onDeactivate={setDeactivateTarget}
+                      onRestore={setRestoreTarget}
+                      onPurge={setPurgeTarget}
+                    />
                   </div>
                 </CardHeader>
 
@@ -573,6 +648,7 @@ const AdminUsers = ({ onOpenUser }) => {
 
       {suspendTarget && (
         <ConfirmDialog
+          isOpen
           title={suspendTarget.status === 'suspended' ? 'Activate Account' : 'Suspend Account'}
           message={
             suspendTarget.status === 'suspended'
@@ -584,13 +660,34 @@ const AdminUsers = ({ onOpenUser }) => {
           onCancel={() => setSuspendTarget(null)}
         />
       )}
-      {deleteTarget && (
+      {deactivateTarget && (
         <ConfirmDialog
-          title="Delete Account"
-          message={`Permanently delete ${deleteTarget.ownerName || deleteTarget.businessName || 'this user'}'s account? This cannot be undone.`}
-          confirmLabel="Delete"
-          onConfirm={() => handleDeleteUser(deleteTarget)}
-          onCancel={() => setDeleteTarget(null)}
+          isOpen
+          title="Deactivate Account"
+          message={`Deactivate ${deactivateTarget.ownerName || deactivateTarget.businessName || 'this user'}'s account? They are signed out and blocked from signing in, but every record is kept and you can restore the account from the Deleted filter.`}
+          confirmLabel="Deactivate"
+          onConfirm={() => handleDeactivateUser(deactivateTarget)}
+          onCancel={() => setDeactivateTarget(null)}
+        />
+      )}
+      {restoreTarget && (
+        <ConfirmDialog
+          isOpen
+          title="Restore Account"
+          message={`Restore ${restoreTarget.ownerName || restoreTarget.businessName || 'this user'}'s account? They will be able to sign in again with the same email and password.`}
+          confirmLabel="Restore"
+          onConfirm={() => handleRestoreUser(restoreTarget)}
+          onCancel={() => setRestoreTarget(null)}
+        />
+      )}
+      {purgeTarget && (
+        <ConfirmDialog
+          isOpen
+          title="Delete Permanently"
+          message={`Permanently delete ${purgeTarget.ownerName || purgeTarget.businessName || 'this user'}? This removes the login, frees the email address and deletes their business records. It cannot be undone. If they own a business that still has active team members, remove or transfer those people first.`}
+          confirmLabel="Delete permanently"
+          onConfirm={() => handlePurgeUser(purgeTarget)}
+          onCancel={() => setPurgeTarget(null)}
         />
       )}
     </div>

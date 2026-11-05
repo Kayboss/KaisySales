@@ -151,6 +151,24 @@ Retail only (services mode has no staff and keeps its own screens). Migrations `
 - **The assistant is mounted for every login**, but a staff login without `reporting` gets stock insights only and "aren't switched on" answers for money questions — RLS returns no expense rows, so answering normally would state `GHS 0.00` as fact.
 - Per-branch *reporting* breakdown is not built yet: the branch switcher gives per-branch views; a consolidated "all branches" report is the sum, not a comparison table.
 
+### Logins the owner creates (no email in the path)
+
+Migration `20261105120000`, edge function `supabase/functions/create-staff`, screen `TeamSettings`.
+
+- **The owner supplies email + temporary password**; nothing is sent (the project mailer can send two messages an hour). Only a service-role key can create an auth user, so it is an edge function, not an RPC: it verifies the caller's JWT with `getUser()` and requires an **active owner** membership, then creates the user with `email_confirm: true`, updates `owner_name`/`is_onboarded`, and inserts the `business_members` row (`role: staff`, branch, `modules`). Any failure after creation rolls the auth user back with `admin.auth.admin.deleteUser`, because a login with no membership would be shown the "create a business" wizard instead of their job.
+- **The password is never stored** — it is returned once into the form's state so the owner can hand it over, and after that only GoTrue holds it. `src/utils/staffLogin.js` (`isEmail`, `passwordProblem`, `generateTemporaryPassword`) is the client copy of the policy the function enforces; `scripts/staff-login.test.mjs` pins both copies, because a deployed function cannot import from `src/`.
+- **First sign-in must change it**, enforced by `user_metadata.must_change_password` (not a `profiles` column: it is set by the function and cleared by the same `auth.updateUser({ password, data: { must_change_password: false } })` call, so no extra write and no RLS exemption). `mapUser` exposes it, `CheckAuth` renders `SetPasswordScreen` until it is false. `authService.updatePassword` also notifies the listeners itself — if GoTrue's `USER_UPDATED` were ever missed the person would be stuck on a screen whose job they had already done.
+- `create-staff` must be **deployed separately** (dashboard or CLI) and needs the `SERVICE_ROLE_KEY` secret, the same name `verify-admin` already uses. It is not covered by any gate: a broken function surfaces as an inline form error in Team settings, not as a failed deploy.
+
+### Admin account lifecycle (suspend / deactivate / restore / purge)
+
+Migration `20261105120000`, screens `src/features/admin/AdminUsers.jsx` and `AdminUserDetail.jsx`.
+
+- **Two different "delete"s, deliberately.** *Suspend* (`set_user_status`) and *Deactivate* (`delete_user_account`, which sets `profiles.deleted_at`) are reversible and keep every record. *Delete permanently* (`purge_user_account`) removes the auth user, frees the email address and drops the business it owned. Deactivated accounts leave the working list and appear only under the **Deleted** filter, which is where Restore lives.
+- **`ConfirmDialog` returns `null` when `isOpen` is falsy.** Both admin screens rendered it without the prop, so no dialog appeared and Suspend/Delete silently did nothing. Any new dialog must pass `isOpen` (these pass a literal `isOpen` inside an `&&`).
+- **A hard delete was impossible until this migration:** `businesses.owner_id` is `ON DELETE RESTRICT`, and `log_user_action` inserted an audit row naming the actor during the cascade from `auth.users` → `23503`. Now `user_actions.user_id` is nullable with `ON DELETE SET NULL` (the history outlives the person; `actor` is NULL once the account is gone) and the trigger guards on `EXISTS (SELECT 1 FROM auth.users …)` rather than an exception block, to avoid a subtransaction on every write. `business_invites.used_by` is `ON DELETE CASCADE`, not SET NULL — a spent code must not look reusable.
+- `purge_user_account` refuses the caller's own account, refuses an owner whose business still has active staff (remove or transfer them first), deletes owned businesses before the auth user, and is revoked from `anon`. Every other FK to `auth.users` is already `SET NULL`/`CASCADE`, so no further ordering is needed.
+
 ## Architecture Map
 
 - `src/App.jsx` — routing, Layout (`height: 100vh` + `overflow: hidden`), Main (`overflow-y: auto`), sidebar (logo text only, no icon), mobile header. Renders retail vs services route trees based on `businessType`.
