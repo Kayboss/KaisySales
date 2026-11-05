@@ -150,6 +150,7 @@ Retail only (services mode has no staff and keeps its own screens). Migrations `
 - **Sales and inventory writes go through the RPCs** (`record_sale`, `create_product`, `set_branch_stock`, `void_sale`): module, branch and stock are checked in one transaction, so the client no longer computes stock itself.
 - **The assistant is mounted for every login**, but a staff login without `reporting` gets stock insights only and "aren't switched on" answers for money questions — RLS returns no expense rows, so answering normally would state `GHS 0.00` as fact.
 - Per-branch *reporting* breakdown is not built yet: the branch switcher gives per-branch views; a consolidated "all branches" report is the sum, not a comparison table.
+- **Deactivate, never delete.** `remove_member` never removed an `auth.users` row: it set `business_members.status = 'removed'`, so "Remove" promised a delete the database deliberately did not perform and left the person unreachable from Team settings. The button now says **Deactivate**, they are listed under **Deactivated** with a **Reactivate** action, and only an admin can delete a login permanently (`purge_user_account`). `reactivate_member(p_user_id, p_branch_id)` (migration `20261105160000`) is the owner-only inverse: it keeps their email, password and records, refuses an archived branch (a staff row must name a live branch), and reports a person who joined another business meanwhile as `This person is already active in another business` instead of a raw `23505` from `business_members_one_active`.
 
 ### Logins the owner creates (no email in the path)
 
@@ -184,7 +185,7 @@ Migration `20261105120000`, screens `src/features/admin/AdminUsers.jsx` and `Adm
 - `src/features/services/Customers.jsx` — customer management.
 - `src/features/services/ServiceInvoices.jsx` — invoices (edit handlers must filter out `_saleId`/`_incomeId` metadata).
 - `src/features/settings/SettingsPage.jsx` — Business Profile form + subscription tab + **Manage Categories** (income/expense tabs, add/delete inline, uses `createCategory({ name, type })`) + **Team** tab (owner only).
-- `src/features/settings/TeamSettings.jsx` — members list, invite code generator, per-member branch select, the one "Can see reports and expenses" toggle, remove member.
+- `src/features/settings/TeamSettings.jsx` — members list, invite code generator, per-member branch select, the one "Can see reports and expenses" toggle, deactivate/reactivate member.
 - `src/utils/tenancy.js` — pure tenancy rules (`MODULES`, `normaliseModules`, `canSeeReports`, `resolveActiveBranch`, `branchForWrites`); the single place the interface asks "what may this login see", unit-tested by `scripts/tenant.test.mjs`.
 - `src/features/settings/SubscriptionSettings.jsx` — subscription UI.
 - `src/components/invoice/InvoicePreview.jsx` — invoice render, business logo via `logo_url` with `<img src="/logo.svg">` fallback.

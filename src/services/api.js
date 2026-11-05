@@ -279,6 +279,10 @@ export const removeMember = async (userId) => {
   return dbService.removeMember(userId);
 };
 
+export const reactivateMember = async (userId, branchId = null) => {
+  return dbService.reactivateMember(userId, branchId);
+};
+
 export const transferOwnership = async (userId) => {
   return dbService.transferOwnership(userId);
 };

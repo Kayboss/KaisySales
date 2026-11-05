@@ -653,6 +653,17 @@ export const dbService = {
     return data === true;
   },
 
+  async reactivateMember(userId, branchId = null) {
+    assertBackendAvailable();
+    if (!supabase) return null;
+    const { data, error } = await supabase.rpc('reactivate_member', {
+      p_user_id: userId,
+      p_branch_id: branchId ?? null,
+    });
+    if (error) throw error;
+    return data;
+  },
+
   async transferOwnership(userId) {
     assertBackendAvailable();
     if (!supabase) return null;

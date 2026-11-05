@@ -584,17 +584,7 @@ const AdminUsers = ({ onOpenUser }) => {
                     <CardName>{u.ownerName || '—'}</CardName>
                     <CardEmail><Mail size={11} /> {u.email || '—'}</CardEmail>
                   </div>
-                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <StatusBadge $status={statusInfo.status}>{statusInfo.label}</StatusBadge>
-                    <AccountActions
-                      user={u}
-                      busy={togglingId === u.id}
-                      onSuspend={setSuspendTarget}
-                      onDeactivate={setDeactivateTarget}
-                      onRestore={setRestoreTarget}
-                      onPurge={setPurgeTarget}
-                    />
-                  </div>
+                  <StatusBadge $status={statusInfo.status}>{statusInfo.label}</StatusBadge>
                 </CardHeader>
 
                 <CardRow>
@@ -639,6 +629,20 @@ const AdminUsers = ({ onOpenUser }) => {
                     {btTogglingId === u.id ? '...' : u.businessType === 'services' ? <Briefcase size={14} /> : <Store size={14} />}
                     {btTogglingId === u.id ? 'Processing' : u.businessType === 'services' ? 'Services' : 'Retail'}
                   </TypeBtn>
+                </ActionRow>
+
+                {/* Account actions sit at the foot of the card so the header
+                    keeps just the name and status, and a long row of buttons
+                    cannot crowd the badge on a narrow card. */}
+                <ActionRow style={{ borderTop: 'none', marginTop: 0, paddingTop: '0.4rem' }}>
+                  <AccountActions
+                    user={u}
+                    busy={togglingId === u.id}
+                    onSuspend={setSuspendTarget}
+                    onDeactivate={setDeactivateTarget}
+                    onRestore={setRestoreTarget}
+                    onPurge={setPurgeTarget}
+                  />
                 </ActionRow>
               </UserCard>
             );

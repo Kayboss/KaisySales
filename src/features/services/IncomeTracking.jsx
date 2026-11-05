@@ -501,7 +501,7 @@ const IncomeTracking = () => {
         <StatCard>
           <h3>Monthly Recurring</h3>
           <div className="value">{formatCurrency(monthlyRecurring)}</div>
-          <div className="sub">From {activeRecurring.length} active item(s)</div>
+          <div className="sub">Monthly equivalent from {activeRecurring.length} active item(s)</div>
         </StatCard>
       </StatRow>
 

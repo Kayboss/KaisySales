@@ -147,7 +147,6 @@ const Logo = styled.div`
   font-family: ${themeTokens.fonts.display};
   color: ${({ theme }) => theme.colors.text.onPrimary};
   margin-bottom: 3rem;
-  letter-spacing: 2px;
 `;
 
 const CloseButton = styled.button`

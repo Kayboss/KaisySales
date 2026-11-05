@@ -29,11 +29,30 @@ const FormCard = styled.div`
   border-radius: ${({ theme }) => theme.borderRadius.lg};
   border: 1px solid ${({ theme }) => theme.colors.outlineVariant};
   box-shadow: ${({ theme }) => theme.shadows.soft};
-  max-width: 600px;
+  max-width: 980px;
 `;
 
 const FormGroup = styled.div`
   margin-bottom: 1.5rem;
+  min-width: 0;
+`;
+
+// Two columns on desktop, one on a phone. `min-width: 0` on the cells keeps a
+// long business name from stretching its grid track past the card.
+const FormGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 1.75rem;
+
+  @media (min-width: 900px) {
+    grid-template-columns: 1fr 1fr;
+  }
+`;
+
+const FormGroupFull = styled(FormGroup)`
+  @media (min-width: 900px) {
+    grid-column: 1 / -1;
+  }
 `;
 
 const Label = styled.label`
@@ -494,6 +513,7 @@ const SettingsPage = () => {
         )}
 
         <form onSubmit={handleSave}>
+          <FormGrid>
           <FormGroup>
             <Label>Business Name</Label>
             <InputWrapper>
@@ -608,7 +628,7 @@ const SettingsPage = () => {
 
           <FormGroup>
             <Label>Business Logo</Label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginLeft: '2.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               {formData.logoUrl ? (
                 <div style={{ position: 'relative' }}>
                   <img src={formData.logoUrl} alt="Business logo" style={{ height: 64, maxWidth: 180, objectFit: 'contain', border: '1px solid #D0C8C4', borderRadius: 8, padding: 4, background: '#FAFAFA' }} />
@@ -623,10 +643,10 @@ const SettingsPage = () => {
                 </label>
               )}
             </div>
-            <p style={{ marginLeft: '2.75rem', marginTop: '0.5rem', fontSize: '0.75rem', color: '#89726C' }}>Displayed on invoices. Recommended: 400×100px transparent PNG.</p>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#89726C' }}>Displayed on invoices. Recommended: 400×100px transparent PNG.</p>
           </FormGroup>
 
-          <FormGroup>
+          <FormGroupFull>
             <Label>Theme Color</Label>
             <InputWrapper>
               <Palette size={18} />
@@ -649,7 +669,8 @@ const SettingsPage = () => {
                 </ColorGrid>
               </div>
             </InputWrapper>
-          </FormGroup>
+          </FormGroupFull>
+          </FormGrid>
 
           <ActionButton type="submit" disabled={saving}>
             <Save size={18} />

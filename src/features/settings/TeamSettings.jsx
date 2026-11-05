@@ -8,7 +8,9 @@ import {
   KeyRound,
   Shield,
   Trash2,
+  UserCheck,
   UserPlus,
+  UserX,
   Users,
   Wand2,
 } from 'lucide-react';
@@ -24,6 +26,7 @@ import {
   fetchBranches,
   listInvites,
   listMembers,
+  reactivateMember,
   removeMember,
   revokeInvite,
   setMemberBranch,
@@ -288,6 +291,7 @@ const TeamSettings = () => {
   const [creatingBranch, setCreatingBranch] = useState(false);
 
   const [removeTarget, setRemoveTarget] = useState(null);
+  const [reactivateBranch, setReactivateBranch] = useState({});
   const [transferTarget, setTransferTarget] = useState(null);
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [confirming, setConfirming] = useState(false);
@@ -325,6 +329,22 @@ const TeamSettings = () => {
 
   const liveBranches = branches.filter((branch) => !branch.archivedAt);
   const activeMembers = members.filter((member) => member.status === 'active');
+  // `remove_member` never deleted the login: it sets status = 'removed'. Those
+  // rows were invisible here, so a deactivated teammate could not be brought
+  // back. They now have their own list below the active roster.
+  const deactivatedMembers = members.filter((member) => member.status !== 'active');
+
+  // Reactivating restores access at a branch. Keep the one they had when it is
+  // still live; otherwise fall back to a live branch rather than sending an
+  // archived id the database will refuse.
+  const branchForReactivate = (member) => {
+    const chosen = reactivateBranch[member.userId];
+    if (chosen) return String(chosen);
+    if (liveBranches.some((branch) => String(branch.id) === String(member.branchId))) {
+      return String(member.branchId);
+    }
+    return liveBranches[0] ? String(liveBranches[0].id) : '';
+  };
 
   const withBusy = async (id, action) => {
     setBusyId(id);
@@ -465,12 +485,20 @@ const TeamSettings = () => {
       await reloadTenant(currentUserId);
       await load();
     } catch (error) {
-      console.error('Failed to remove member', error);
-      alert(error?.message || 'Could not remove that member.');
+      console.error('Failed to deactivate member', error);
+      alert(error?.message || 'Could not deactivate that member.');
     } finally {
       setConfirming(false);
     }
   };
+
+  // The inverse of the above. The auth user was never deleted, so this only
+  // flips the membership back to active: their email, password and history are
+  // exactly as they left them.
+  const handleReactivateMember = (member, branchId) =>
+    withBusy(`${member.userId}-reactivate`, () =>
+      reactivateMember(member.userId, branchId ? Number(branchId) : null)
+    );
 
   const handleTransfer = async () => {
     if (!transferTarget) return;
@@ -631,7 +659,7 @@ const TeamSettings = () => {
                           <ArrowRightLeft size={13} /> Make owner
                         </Button>
                         <DangerButton type="button" onClick={() => setRemoveTarget(member.userId)}>
-                          <Trash2 size={13} /> Remove
+                          <UserX size={13} /> Deactivate
                         </DangerButton>
                       </div>
                     )}
@@ -690,7 +718,7 @@ const TeamSettings = () => {
                         <ArrowRightLeft size={13} /> Make owner
                       </Button>
                       <DangerButton type="button" onClick={() => setRemoveTarget(member.userId)}>
-                        <Trash2 size={13} /> Remove
+                        <UserX size={13} /> Deactivate
                       </DangerButton>
                     </div>
                   </>
@@ -706,6 +734,59 @@ const TeamSettings = () => {
           A staff member with inventory access can work out your margin from product cost prices.
           “Own sales only” on Sales History is a page filter, not a database restriction.
         </Note>
+      </Section>
+
+      <Section>
+        <SectionHead>
+          <div>
+            <h2><UserX size={18} /> Deactivated</h2>
+            <p>
+              Deactivating keeps the login and every record, and only blocks sign-in.
+              Reactivating gives the same person their access back.
+            </p>
+          </div>
+        </SectionHead>
+
+        {deactivatedMembers.length === 0 ? (
+          <Empty>No deactivated teammates. Deactivating someone moves them here instead of deleting them.</Empty>
+        ) : (
+          deactivatedMembers.map((member) => (
+            <InviteRow key={member.userId}>
+              <div style={{ flex: '1 1 220px' }}>
+                <NameCell>
+                  <strong>{member.fullName || member.email || 'Unknown'}</strong>
+                  {member.fullName && member.email ? <span>{member.email}</span> : null}
+                </NameCell>
+                <div style={{ color: '#89726C', fontSize: '0.78rem', marginTop: '0.2rem' }}>
+                  {member.branchName ? `Was at ${member.branchName}` : 'No branch assigned'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <Select
+                  aria-label={`Branch to reactivate ${member.fullName || member.email} into`}
+                  value={branchForReactivate(member)}
+                  onChange={(event) =>
+                    setReactivateBranch((prev) => ({ ...prev, [member.userId]: event.target.value }))
+                  }
+                >
+                  {liveBranches.map((branch) => (
+                    <option key={branch.id} value={String(branch.id)}>
+                      {branch.name}{branch.isDefault ? ' (default)' : ''}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  type="button"
+                  disabled={busyId === `${member.userId}-reactivate` || liveBranches.length === 0}
+                  onClick={() => handleReactivateMember(member, branchForReactivate(member))}
+                >
+                  <UserCheck size={14} />
+                  {busyId === `${member.userId}-reactivate` ? 'Reactivating...' : 'Reactivate'}
+                </Button>
+              </div>
+            </InviteRow>
+          ))
+        )}
       </Section>
 
       <Section>
@@ -948,9 +1029,9 @@ const TeamSettings = () => {
 
       <ConfirmDialog
         isOpen={!!removeTarget}
-        title="Remove this teammate?"
-        message="They lose access immediately. Their past sales stay in your history, and you can invite them again later."
-        confirmLabel="Remove"
+        title="Deactivate this teammate?"
+        message="They lose access immediately and cannot sign in, but nothing is deleted: their past sales stay in your history and you can reactivate them from the Deactivated list whenever you like."
+        confirmLabel="Deactivate"
         confirmLoading={confirming}
         onConfirm={handleRemoveMember}
         onCancel={() => setRemoveTarget(null)}
