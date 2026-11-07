@@ -13,7 +13,7 @@ import {
 } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
-import { formatCurrencyShort } from '../../utils/currency';
+import { formatCurrency, formatCurrencyShort } from '../../utils/currency';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Skeleton from '../../components/ui/Skeleton';
 import SkeletonText from '../../components/ui/SkeletonText';
@@ -919,7 +919,9 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose, onChanged 
                         <Clock size={11} />
                         {shortenDate(item.date)}
                         {item.amount != null && item.amount !== '' && (
-                          <span style={{ color: '#55423D', fontWeight: 700 }}>{String(item.amount)}</span>
+                          <span style={{ color: '#55423D', fontWeight: 700 }}>
+                            {formatCurrency(item.amount, currency)}
+                          </span>
                         )}
                       </FeedMeta>
                     </FeedBody>

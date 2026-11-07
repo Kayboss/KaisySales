@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Shield, Users, Activity, Crown, LogOut, ArrowLeft, History, Inbox, RefreshCw, TrendingUp } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { invalidateAdminCache } from '../../services/adminCache';
 import AdminOverview from './AdminOverview';
 import AdminInbox from './AdminInbox';
 import AdminGrowth from './AdminGrowth';
@@ -238,6 +239,13 @@ const AdminDashboard = () => {
 
   const openUser = (user, section = 'support') => setActiveUser({ user, section });
 
+  // Drop the 60 s admin cache first. Remounting the tabs alone would replay the
+  // same cached feeds and the button would look broken for a minute.
+  const handleRefresh = () => {
+    invalidateAdminCache();
+    setReloadKey(k => k + 1);
+  };
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
@@ -268,7 +276,7 @@ const AdminDashboard = () => {
             <Title>Admin Dashboard</Title>
             <Subtitle>Track down where users get stuck, then support them from one place.</Subtitle>
           </div>
-          <RefreshBtn onClick={() => setReloadKey(k => k + 1)}>
+          <RefreshBtn onClick={handleRefresh}>
             <RefreshCw size={14} /> Refresh
           </RefreshBtn>
         </Header>

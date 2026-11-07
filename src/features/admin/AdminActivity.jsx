@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { ShoppingCart, Receipt, CreditCard, Clock, User, Briefcase, Users } from 'lucide-react';
 import { fetchRecentActivity } from '../../services/api';
+import { useSettingsStore } from '../../store/settingsStore';
+import { formatCurrency } from '../../utils/currency';
 import EmptyState from '../../components/ui/EmptyState';
 import SkeletonScreen from '../../components/ui/SkeletonScreen';
 import SkeletonTable from '../../components/ui/SkeletonTable';
@@ -134,6 +136,7 @@ const Pagination = styled.div`
 `;
 
 const AdminActivity = ({ onOpenUser }) => {
+  const { currency } = useSettingsStore();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -200,7 +203,9 @@ const AdminActivity = ({ onOpenUser }) => {
               </ActivityMeta>
             </ActivityInfo>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
-              {a.amount && <ActivityAmount>{a.amount}</ActivityAmount>}
+              {a.amount != null && (
+                <ActivityAmount>{formatCurrency(a.amount, currency)}</ActivityAmount>
+              )}
               <TypeTag $type={a.type}>{a.type}</TypeTag>
             </div>
           </FeedItem>

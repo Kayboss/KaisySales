@@ -16,7 +16,6 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { parseAmount } from '../utils/currency';
 import { resolveBackend, createAssertBackendAvailable, CONFIG_ERROR_MESSAGE } from './backendConfig';
 
 // ----------------------------------------------------------------
@@ -339,6 +338,30 @@ const toCamelCase = (obj) => {
     result[key.replace(/_([a-z])/g, (_, c) => c.toUpperCase())] = value;
   }
   return result;
+};
+
+// PostgREST caps one response at the project's `max_rows` (1000 on this
+// project), so a select without `.limit()` truncates silently: 1,223 page
+// visits were being read as 1,000 and the 501st profile would have vanished
+// from the admin list. An admin read must walk every page instead.
+//
+// `buildQuery` must return a FRESH builder each call -- Supabase builders are
+// single-use. An explicit secondary key keeps the window stable when
+// `created_at` ties, or `.range()` can repeat/skip rows.
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 200;
+
+const fetchAllPages = async (buildQuery) => {
+  const rows = [];
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const from = page * PAGE_SIZE;
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const batch = data || [];
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return rows;
 };
 
 // `my_permissions()` returns a nested JSON object. toCamelCase is shallow, so
@@ -926,9 +949,12 @@ export const dbService = {
   async fetchAllProfiles() {
     assertBackendAvailable();
     if (supabase) {
-      const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data || []).map(r => toCamelCase(r));
+      const rows = await fetchAllPages(() => supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .order('id'));
+      return rows.map(r => toCamelCase(r));
     }
     return JSON.parse(localStorage.getItem('kaisysales_mock_all_profiles') || '[]');
   },
@@ -1005,106 +1031,68 @@ export const dbService = {
     return [];
   },
 
+  // Per-account counts and totals. The four tenant-scoped tables (customers,
+  // service income, recurring income, inventory) can no longer be read across
+  // businesses by the admin -- migrations 20261105180000/190000 dropped the
+  // admin read-all policies so those rows stop leaking into the admin's own
+  // app screens. `admin_user_stats()` is the aggregate that replaces them: one
+  // gated row per profile, computed in SQL, so it is also immune to the
+  // 1000-row response cap.
   async fetchUsersWithStats() {
     if (!supabase) return [];
-    const profiles = await this.fetchAllProfiles();
-
-    const [allSales, allInvoices, allExpenses, allBranchInventory, allCustomers, allServiceIncome, allRecurringIncome] = await Promise.all([
-      supabase.from('sales').select('user_id, amount'),
-      supabase.from('invoices').select('user_id, total'),
-      supabase.from('expenses').select('user_id, amount'),
-      supabase.from('branch_inventory').select('business_id'),
-      supabase.from('customers').select('user_id'),
-      supabase.from('service_income').select('user_id, amount'),
-      supabase.from('recurring_income').select('user_id, amount'),
+    const [profiles, { data: statsRows, error }] = await Promise.all([
+      this.fetchAllProfiles(),
+      supabase.rpc('admin_user_stats'),
     ]);
+    if (error) throw error;
 
-    const groupByUser = (records, valueKey) => {
-      const map = {};
-      (records || []).forEach(r => {
-        if (!map[r.user_id]) map[r.user_id] = { count: 0, total: 0 };
-        map[r.user_id].count++;
-        if (valueKey) map[r.user_id].total += parseAmount(r[valueKey]);
-      });
-      return map;
-    };
+    const stats = new Map((statsRows || []).map(row => [row.user_id, row]));
+    const num = (value) => Number(value) || 0;
 
-    const salesMap = groupByUser(allSales.data, 'amount');
-    const invoicesMap = groupByUser(allInvoices.data, 'total');
-    const expensesMap = groupByUser(allExpenses.data, 'amount');
-    const customersMap = groupByUser(allCustomers.data, null);
-    const serviceIncomeMap = groupByUser(allServiceIncome.data, 'amount');
-    const recurringIncomeMap = groupByUser(allRecurringIncome.data, 'amount');
-
-    // Inventory is per-branch (business_id), not per-user. Count per business,
-    // then attribute to every member of that business.
-    const inventoryByBusiness = {};
-    (allBranchInventory.data || []).forEach(r => {
-      inventoryByBusiness[r.business_id] = (inventoryByBusiness[r.business_id] || 0) + 1;
+    return profiles.map(p => {
+      const s = stats.get(p.id);
+      return {
+        ...p,
+        salesCount: num(s?.sales_count),
+        salesRevenue: num(s?.sales_total),
+        invoiceCount: num(s?.invoice_count),
+        invoiceTotal: num(s?.invoice_total),
+        expenseCount: num(s?.expense_count),
+        expenseTotal: num(s?.expense_total),
+        inventoryCount: num(s?.inventory_count),
+        customerCount: num(s?.customer_count),
+        serviceIncomeCount: num(s?.service_income_count),
+        serviceIncomeTotal: num(s?.service_income_total),
+        recurringIncomeCount: num(s?.recurring_income_count),
+        recurringIncomeTotal: num(s?.recurring_income_total),
+      };
     });
-    const inventoryByUser = {};
-    if (Object.keys(inventoryByBusiness).length > 0) {
-      const { data: allMembers } = await supabase
-        .from('business_members')
-        .select('user_id, business_id');
-      (allMembers || []).forEach(m => {
-        const count = inventoryByBusiness[m.business_id];
-        if (count) {
-          inventoryByUser[m.user_id] = (inventoryByUser[m.user_id] || 0) + count;
-        }
-      });
-    }
-
-    return profiles.map(p => ({
-      ...p,
-      salesCount: salesMap[p.id]?.count || 0,
-      salesRevenue: salesMap[p.id]?.total || 0,
-      invoiceCount: invoicesMap[p.id]?.count || 0,
-      invoiceTotal: invoicesMap[p.id]?.total || 0,
-      expenseCount: expensesMap[p.id]?.count || 0,
-      expenseTotal: expensesMap[p.id]?.total || 0,
-      inventoryCount: inventoryByUser[p.id] || 0,
-      customerCount: customersMap[p.id]?.count || 0,
-      serviceIncomeCount: serviceIncomeMap[p.id]?.count || 0,
-      serviceIncomeTotal: serviceIncomeMap[p.id]?.total || 0,
-      recurringIncomeCount: recurringIncomeMap[p.id]?.count || 0,
-      recurringIncomeTotal: recurringIncomeMap[p.id]?.total || 0,
-    }));
   },
 
+  // Recent records across every table the Activity feed and the user drawer
+  // show. Served by `admin_recent_activity()` because customers, service
+  // income and recurring income are no longer readable across businesses from
+  // the client -- and because a six-table loop can only ever be as fresh as
+  // its slowest select.
   async fetchRecentActivity(limit = 20, userId = null) {
     if (!supabase) return [];
-    const collections = ['sales', 'invoices', 'expenses', 'customers', 'service_income', 'recurring_income'];
-    const results = [];
-    for (const col of collections) {
-      let query = supabase
-        .from(col)
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      if (userId) query = query.eq('user_id', userId);
-      const { data, error } = await query;
-      if (error) continue;
-      for (const r of data || []) {
-        let label = '';
-        if (col === 'sales') label = r.item;
-        else if (col === 'invoices') label = `Invoice #${r.id}`;
-        else if (col === 'expenses') label = r.title;
-        else if (col === 'customers') label = r.name || r.company || 'New Customer';
-        else if (col === 'service_income') label = r.title || r.description || 'Service Income';
-        else if (col === 'recurring_income') label = r.title || r.description || 'Recurring Income';
-        results.push({
-          type: col,
-          id: String(r.id),
-          userId: r.user_id,
-          label,
-          amount: r.amount || r.total,
-          date: r.created_at || r.date,
-          userEmail: null,
-          businessName: null,
-        });
-      }
-    }
+    const { data, error } = await supabase.rpc('admin_recent_activity', {
+      p_limit: limit,
+      p_user_id: userId,
+    });
+    if (error) throw error;
+
+    const results = (data || []).map(r => ({
+      type: r.record_type,
+      id: String(r.record_id),
+      userId: r.user_id,
+      label: r.label,
+      amount: r.amount,
+      date: r.happened_at,
+      userEmail: null,
+      businessName: null,
+    }));
+
     const userIds = [...new Set(results.map(r => r.userId).filter(Boolean))];
     if (userIds.length > 0) {
       const profileMap = await this.fetchUserBusinessEmailMap(userIds);
@@ -1115,8 +1103,7 @@ export const dbService = {
         }
       });
     }
-    results.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-    return results.slice(0, limit);
+    return results;
   },
 
   async createSupportNote(note) {
@@ -1531,6 +1518,9 @@ export const dbService = {
     return null;
   },
 
+  // Recent payments, enriched with the payer's email/business the same way the
+  // support and error feeds are. Without it the Payments tab could only print
+  // "User 8c3f2a11" -- the rows carry user_id, never an address.
   async fetchAllPayments(limit = 50) {
     if (supabase) {
       const { data, error } = await supabase
@@ -1539,7 +1529,17 @@ export const dbService = {
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return (data || []).map(r => toCamelCase(r));
+
+      const payments = (data || []).map(r => toCamelCase(r));
+      const userIds = [...new Set(payments.map(p => p.userId).filter(Boolean))];
+      if (userIds.length === 0) return payments;
+
+      const profileMap = await this.fetchUserBusinessEmailMap(userIds);
+      return payments.map(p => ({
+        ...p,
+        userEmail: profileMap[p.userId]?.email || null,
+        userBusinessName: profileMap[p.userId]?.businessName || null,
+      }));
     }
     return [];
   },
@@ -1611,60 +1611,51 @@ export const dbService = {
     }
   },
 
-  // Admin-only by RLS. Reads every attribution row, newest first.
-  async fetchAcquisition(limit = 2000) {
+  // Admin-only by RLS. One row per attributed account, so it is read in full:
+  // truncating it would relabel real accounts as "Not attributed" in the
+  // Growth funnel.
+  async fetchAcquisition(limit = null) {
     assertBackendAvailable();
     if (!supabase) return [];
-    const { data, error } = await supabase
+    const rows = await fetchAllPages(() => supabase
       .from('acquisition')
       .select('user_id, source, medium, campaign, content, term, referrer, landing_page, created_at')
       .order('created_at', { ascending: false })
-      .limit(limit);
-    if (error) throw error;
-    return (data || []).map(r => toCamelCase(r));
+      .order('user_id'));
+    const capped = limit ? rows.slice(0, limit) : rows;
+    return capped.map(r => toCamelCase(r));
   },
 
   // Distinct days, not distinct page views: retention is measured from these,
-  // so only the two columns the funnel needs are fetched.
-  async fetchVisitDays(days = 90, limit = 5000) {
+  // and the database groups them so the 1000-row cap cannot hide an older
+  // visiting day. `createdAt` keeps the shape growth.js already reduces.
+  async fetchVisitDays(days = 90) {
     assertBackendAvailable();
     if (!supabase) return [];
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-    const { data, error } = await supabase
-      .from('page_visits')
-      .select('user_id, created_at')
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    const { data, error } = await supabase.rpc('admin_visit_days', { p_days: days });
     if (error) throw error;
-    return (data || []).map(r => toCamelCase(r));
+    return (data || []).map(r => ({ userId: r.user_id, createdAt: r.visit_day }));
   },
 
   async fetchVisitStats() {
     if (!supabase) return { deviceData: [], locationData: [], dailyVisits: [] };
     try {
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await supabase
-        .from('page_visits')
-        .select('device_type, location, created_at')
-        .gte('created_at', thirtyDaysAgo);
+      // Grouped in SQL: 30 days of visits already exceeded the 1000-row
+      // response cap, so the client used to chart a truncated sample.
+      const { data, error } = await supabase.rpc('admin_visit_stats', { p_days: 30 });
       if (error) throw error;
-      const visits = data || [];
 
       const deviceCounts = {};
       const locationCounts = {};
       const dayCounts = {};
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-      visits.forEach(v => {
-        const device = v.device_type || 'desktop';
-        deviceCounts[device] = (deviceCounts[device] || 0) + 1;
-
-        const loc = v.location || 'Unknown';
-        locationCounts[loc] = (locationCounts[loc] || 0) + 1;
-
-        const day = dayNames[new Date(v.created_at).getDay()];
-        dayCounts[day] = (dayCounts[day] || 0) + 1;
+      (data || []).forEach(v => {
+        const count = Number(v.visits) || 0;
+        deviceCounts[v.device_type] = (deviceCounts[v.device_type] || 0) + count;
+        locationCounts[v.location] = (locationCounts[v.location] || 0) + count;
+        const day = dayNames[v.day_index];
+        if (day) dayCounts[day] = (dayCounts[day] || 0) + count;
       });
 
       const deviceData = Object.entries(deviceCounts).map(([name, value]) => ({ name, value }));
