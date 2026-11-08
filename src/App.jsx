@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
+import { Analytics } from '@vercel/analytics/react';
 import { themeTokens } from './styles/themeTokens';
 import { getThemeForColor } from './styles/colorThemes';
 import { GlobalStyles } from './styles/GlobalStyles';
@@ -299,6 +300,7 @@ const App = () => {
     <ThemeProvider theme={theme}>
       <ErrorBoundary>
         <GlobalStyles />
+        <Analytics />
         <Routes>
           <Route path="/login" element={!user ? <WelcomePage /> : <Navigate to="/" />} />
           
