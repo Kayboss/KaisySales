@@ -29,7 +29,7 @@ const memory = () => {
   };
 };
 
-const OWN = 'kaisy-sales.vercel.app';
+const OWN = 'www.kaisysales.com';
 
 test('a campaign tag is read as the source', () => {
   const touch = parseAcquisition({
@@ -88,14 +88,14 @@ test('a host is normalised, and a non-URL referrer is not a host', () => {
 test('the first touch of a session wins, even if a later page has a campaign tag', () => {
   const storage = memory();
   const first = rememberTouch(storage, {
-    href: 'https://kaisy-sales.vercel.app/landing/index.html',
+    href: 'https://www.kaisysales.com/landing/index.html',
     referrer: 'https://www.facebook.com/groups/123',
     ownHost: OWN,
   });
   assert.equal(first.source, 'facebook.com');
 
   const second = rememberTouch(storage, {
-    href: 'https://kaisy-sales.vercel.app/login?utm_source=instagram',
+    href: 'https://www.kaisysales.com/login?utm_source=instagram',
     ownHost: OWN,
   });
   assert.equal(second.source, 'facebook.com');
@@ -104,7 +104,7 @@ test('the first touch of a session wins, even if a later page has a campaign tag
 
 test('the touch survives a navigation, which is the whole point of storing it', () => {
   const storage = memory();
-  rememberTouch(storage, { href: 'https://kaisy-sales.vercel.app/login?utm_source=tiktok', ownHost: OWN });
+  rememberTouch(storage, { href: 'https://www.kaisysales.com/login?utm_source=tiktok', ownHost: OWN });
   assert.equal(storage.size, 1);
   assert.equal(readTouch(storage).source, 'tiktok');
   assert.equal(readTouch(storage).landingPage, '/login');
@@ -117,7 +117,7 @@ test('a storage that refuses to write loses attribution, not the page', () => {
     removeItem() { throw new Error('denied'); },
   };
   assert.equal(readTouch(broken), null);
-  const touch = rememberTouch(broken, { href: 'https://kaisy-sales.vercel.app/login', ownHost: OWN });
+  const touch = rememberTouch(broken, { href: 'https://www.kaisysales.com/login', ownHost: OWN });
   assert.equal(touch.source, 'direct');
   assert.doesNotThrow(() => clearTouch(broken));
 });
@@ -134,7 +134,7 @@ test('a corrupt or empty stored value is ignored rather than trusted', () => {
 
 test('a touch can be cleared once it has been recorded', () => {
   const storage = memory();
-  rememberTouch(storage, { href: 'https://kaisy-sales.vercel.app/login?utm_source=whatsapp', ownHost: OWN });
+  rememberTouch(storage, { href: 'https://www.kaisysales.com/login?utm_source=whatsapp', ownHost: OWN });
   clearTouch(storage);
   assert.equal(readTouch(storage), null);
 });

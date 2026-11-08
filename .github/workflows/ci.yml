@@ -246,7 +246,7 @@ jobs:
     steps:
       - name: Assert hardened headers are still served
         env:
-          TARGET: ${{ vars.PRODUCTION_URL || 'https://kaisy-sales.vercel.app' }}
+          TARGET: ${{ vars.PRODUCTION_URL || 'https://www.kaisysales.com' }}
         run: |
           headers=$(curl -sSI "$TARGET/invoices")
           status=0

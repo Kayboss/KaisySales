@@ -15,7 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const ORIGIN = 'https://kaisy-sales.vercel.app';
+const ORIGIN = 'https://www.kaisysales.com';
 
 const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
 const exists = (rel) => existsSync(path.join(ROOT, rel));

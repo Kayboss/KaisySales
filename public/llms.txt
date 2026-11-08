@@ -5,11 +5,11 @@
 > invoices and reports real profit. It is free to use, with every feature
 > included and no credit card required.
 
-- Website: https://kaisy-sales.vercel.app/
-- Pricing: https://kaisy-sales.vercel.app/pricing (free)
-- Help: https://kaisy-sales.vercel.app/pages/help.html
-- Privacy: https://kaisy-sales.vercel.app/pages/privacy.html
-- Terms: https://kaisy-sales.vercel.app/pages/terms.html
+- Website: https://www.kaisysales.com/
+- Pricing: https://www.kaisysales.com/pricing (free)
+- Help: https://www.kaisysales.com/pages/help.html
+- Privacy: https://www.kaisysales.com/pages/privacy.html
+- Terms: https://www.kaisysales.com/pages/terms.html
 - Support: support@kaisysales.com
 
 ## What it does

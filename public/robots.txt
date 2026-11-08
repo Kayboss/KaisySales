@@ -1,4 +1,4 @@
-# KaisySales — https://kaisy-sales.vercel.app
+# KaisySales — https://www.kaisysales.com
 #
 # Only the marketing pages belong in an index. The React app is served from the
 # same host and answers every unknown path with the app shell and HTTP 200, so
@@ -18,7 +18,7 @@ Allow: /
 Disallow: /landing/index.html
 Disallow: /landing/pages/
 
-Sitemap: https://kaisy-sales.vercel.app/sitemap.xml
+Sitemap: https://www.kaisysales.com/sitemap.xml
 
 # Answer engines and AI assistants may read the marketing pages. Being citable
 # is the point: a recommendation has to be able to find out what this is, who

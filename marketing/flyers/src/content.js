@@ -14,7 +14,7 @@ import { P } from '../../ads/src/palette.js';
  * is printed on the video ads but does not resolve, and a dead URL cannot be
  * attributed. Change this one line once the domain is live.
  */
-export const SITE = 'https://kaisy-sales.vercel.app';
+export const SITE = 'https://www.kaisysales.com';
 
 /** utm_source / utm_medium per placement. One flyer pile must be one key. */
 export const MEDIUMS = {
