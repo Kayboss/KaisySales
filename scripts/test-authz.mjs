@@ -47,7 +47,8 @@
  */
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ------------------------------------------------------------------ config
 
@@ -121,9 +122,11 @@ const users = {
 
 // The tables M1 gave a business_id to. H asks each one directly rather than
 // trusting C's owner-column filter, because a row whose user_id happens to be
-// right while its business_id points elsewhere would still pass C.
+// right while its business_id points elsewhere would still pass C. `inventory` is
+// deliberately absent: 20261104160000 dropped it in favour of products /
+// branch_inventory, so naming it here only ever produced a SKIP.
 const TENANT_TABLES = [
-  'sales', 'invoices', 'expenses', 'inventory', 'stores',
+  'sales', 'invoices', 'expenses', 'stores',
   'categories', 'customers', 'services', 'service_income', 'recurring_income',
 ];
 
@@ -164,7 +167,73 @@ function walk(dir, out = []) {
   return out;
 }
 
-function discover() {
+/**
+ * SQL with comments removed and literals blanked, because discovery reads text
+ * and neither is DDL. The header of 20261017134834 says "The RLS SELECT policy
+ * filters on user_id", which the POLICY regex below read as `create policy
+ * filters on user_id` and answered by probing a table that has never existed.
+ * Dollar-quoted bodies are copied verbatim: they are code, and an apostrophe in
+ * one of their comments must not be mistaken for the start of a string literal.
+ */
+function stripSqlComments(sql) {
+  let out = '';
+  let i = 0;
+  while (i < sql.length) {
+    const two = sql.slice(i, i + 2);
+    if (two === '--') {
+      const nl = sql.indexOf('\n', i);
+      i = nl < 0 ? sql.length : nl; // leave the newline for the DDL patterns
+      continue;
+    }
+    if (two === '/*') {
+      const end = sql.indexOf('*/', i + 2);
+      i = end < 0 ? sql.length : end + 2;
+      continue;
+    }
+    const dollar = /^\$[A-Za-z_0-9]*\$/.exec(sql.slice(i, i + 40));
+    if (dollar) {
+      const end = sql.indexOf(dollar[0], i + dollar[0].length);
+      const stop = end < 0 ? sql.length : end + dollar[0].length;
+      out += sql.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    const ch = sql[i];
+    if (ch === "'" || ch === '"') {
+      let j = i + 1;
+      while (j < sql.length) {
+        if (sql[j] === ch && sql[j + 1] === ch) { j += 2; continue; } // '' escape
+        if (sql[j] === ch) { j += 1; break; }
+        j += 1;
+      }
+      out += ch === "'" ? "''" : '""'; // keep the shape, drop the contents
+      i = j;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+/**
+ * The column regex captures whatever follows the type (`uuid primary key default
+ * gen_random_uuid`), so not one anchored PROBE_VALUES rule matched and
+ * probePayload() returned null for every table whose columns all carry inline
+ * constraints. The anon insert then fell through to a bare `{ user_id }` body,
+ * and PostgREST answered PGRST204 ("no such column") — a schema complaint that
+ * proves nothing about permissions. Stop the type at the first constraint word.
+ * `timestamp with time zone` survives, because the trim only fires on a whole
+ * word and `\bnot\b` does not match inside `without`.
+ */
+function normalizeColumnType(raw) {
+  return raw
+    .replace(/\s+(primary|not|null|default|references|unique|check|constraint|generated|collate)\b[\s\S]*$/i, '')
+    .trim()
+    .toLowerCase();
+}
+
+function discover(root = '.') {
   const tables = new Map();
   const functions = new Map();
 
@@ -191,8 +260,13 @@ function discover() {
       .join(',');
   };
 
-  for (const file of walk('supabase/migrations').filter((f) => f.endsWith('.sql'))) {
-    const sql = readFileSync(file, 'utf8');
+  // Sorted, because migrations are applied in timestamp order and the scan below
+  // honours DROP TABLE: readdir order is not guaranteed on every filesystem, and
+  // an unordered scan could let a table survive the migration that dropped it.
+  const migrationFiles = walk(join(root, 'supabase/migrations')).filter((f) => f.endsWith('.sql')).sort();
+
+  for (const file of migrationFiles) {
+    const sql = stripSqlComments(readFileSync(file, 'utf8'));
 
     // CREATE TABLE name ( col type [constraints], ... ) — keep the columns so we
     // can build a payload that actually reaches the permission check.
@@ -202,13 +276,25 @@ function discover() {
         .map((part) => /^\s*"?([a-z_][a-z0-9_]*)"?\s+([a-z][a-z0-9_ ]*(\[\])?)/i.exec(part))
         .filter(Boolean)
         .filter((c) => !/^(primary|foreign|unique|check|constraint|key)$/i.test(c[1]) && !/serial/i.test(c[2]))
-        .map((c) => ({ name: c[1].toLowerCase(), type: c[2].trim() }));
+        .map((c) => ({ name: c[1].toLowerCase(), type: normalizeColumnType(c[2]) }));
       addTable(m[1], columns.map((c) => c.name));
       tables.get(m[1].toLowerCase()).columns = columns;
     }
 
     for (const m of sql.matchAll(/(?:ALTER\s+TABLE|POLICY\s+\w+\s+ON|CREATE\s+INDEX[^;]*?\s+ON)\s+(?:ONLY\s+)?(?:public\.)?([a-z_][a-z0-9_]*)/gi)) {
       addTable(m[1], []);
+    }
+
+    // A table the schema retired stops being a table worth probing.
+    // 20261104160000 drops `inventory` (products + branch_inventory replaced it),
+    // so every check written against it skipped with "table does not exist in the
+    // database" — a verdict that reads like coverage and is not. Applying DROP in
+    // file order also means a table dropped and re-created is probed again.
+    for (const m of sql.matchAll(/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^;]+);/gi)) {
+      for (const part of m[1].split(',')) {
+        const name = /^\s*(?:ONLY\s+)?(?:public\.)?([a-z_][a-z0-9_]*)\s*(?:CASCADE|RESTRICT)?\s*$/i.exec(part);
+        if (name) tables.delete(name[1].toLowerCase());
+      }
     }
 
     // Deliberately loose on the return type: requiring a full signature drops
@@ -221,7 +307,7 @@ function discover() {
     }
   }
 
-  for (const file of walk('src').filter((f) => /\.(js|jsx)$/.test(f))) {
+  for (const file of walk(join(root, 'src')).filter((f) => /\.(js|jsx)$/.test(f))) {
     const code = readFileSync(file, 'utf8');
     for (const m of code.matchAll(/\.from\(\s*'([a-z_][a-z0-9_]*)'\s*\)/gi)) addTable(m[1], []);
     for (const m of code.matchAll(/UserRecords\(\s*[^,()]+\s*,\s*'([a-z_][a-z0-9_]*)'/gi)) addTable(m[1], []);
@@ -931,16 +1017,29 @@ async function main() {
   console.log('[authz] PASS\n');
 }
 
-try {
-  await main();
-} catch (err) {
-  if (err instanceof ConfigError) {
-    console.error(`\n[authz] CANNOT RUN: ${err.message}\n`);
-    console.error('  SUPABASE_URL       e.g. https://<project-ref>.supabase.co');
-    console.error('  SUPABASE_ANON_KEY  the public anon key (it already ships in the browser');
-    console.error('                    bundle — this is not a privileged credential)\n');
-  } else {
-    console.error(`\n[authz] ERROR: ${err?.stack || err}\n`);
+const selfPath = resolve(fileURLToPath(import.meta.url));
+const invokedPath = process.argv[1] ? resolve(process.argv[1]) : '';
+const invokedDirectly = invokedPath !== ''
+  && (process.platform === 'win32'
+    ? invokedPath.toLowerCase() === selfPath.toLowerCase()
+    : invokedPath === selfPath);
+
+// scripts/authz-discovery.test.mjs imports discover() to pin what the scan sees,
+// which must not start the live suite — so only run when executed directly.
+if (invokedDirectly) {
+  try {
+    await main();
+  } catch (err) {
+    if (err instanceof ConfigError) {
+      console.error(`\n[authz] CANNOT RUN: ${err.message}\n`);
+      console.error('  SUPABASE_URL       e.g. https://<project-ref>.supabase.co');
+      console.error('  SUPABASE_ANON_KEY  the public anon key (it already ships in the browser');
+      console.error('                    bundle — this is not a privileged credential)\n');
+    } else {
+      console.error(`\n[authz] ERROR: ${err?.stack || err}\n`);
+    }
+    process.exitCode = 1;
   }
-  process.exitCode = 1;
 }
+
+export { discover, probePayload, stripSqlComments };
