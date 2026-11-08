@@ -433,7 +433,9 @@ const WelcomePage = () => {
 </div>
         <Title style={{ fontFamily: "'Tango Sans', sans-serif" }}>Know your Business</Title>
         <Subtitle>
-          Sales, inventory and invoicing software for small business
+          Record every sale, track what you spend, know what is left in stock and send a
+          professional invoice — all in one place. KaisySales shows you the profit you
+          actually made, not just the money that passed through your hands.
         </Subtitle>
       </HeroSection>
 
