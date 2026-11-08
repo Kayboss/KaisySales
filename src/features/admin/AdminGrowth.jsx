@@ -101,8 +101,17 @@ const CardSub = styled.p`
   margin-bottom: 1rem;
 `;
 
+// The header cells are nowrap, so the table has a min-content width no phone
+// screen can hold. Without this wrapper the table widens its card instead of
+// scrolling, pushing the whole section off the right edge of the page.
+const TableWrapper = styled.div`
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+`;
+
 const Table = styled.table`
   width: 100%;
+  min-width: 440px;
   border-collapse: collapse;
   font-size: 0.85rem;
 `;
@@ -252,43 +261,45 @@ const AdminGrowth = () => {
             No attribution recorded for these accounts yet.
           </EmptyState>
         ) : (
-          <Table>
-            <thead>
-              <tr>
-                <Th>Channel</Th>
-                <Th>Signups</Th>
-                <Th>First record</Th>
-                <Th>Activation</Th>
-                <Th>Came back</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {funnel.channels.map((row) => (
-                <tr key={row.source}>
-                  <Td>
-                    <SourceName>{row.source === UNATTRIBUTED ? 'Not attributed' : row.source}</SourceName>
-                    {row.source === UNATTRIBUTED && (
-                      <>
-                        <br />
-                        <Muted>Signed up before attribution was recorded</Muted>
-                      </>
-                    )}
-                  </Td>
-                  <Td className="data-tabular">{row.signups}</Td>
-                  <Td className="data-tabular">{row.activated}</Td>
-                  <Td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Bar><BarFill $pct={(row.activationRate || 0) * 100} /></Bar>
-                      <span className="data-tabular" style={{ minWidth: '2.5rem' }}>
-                        {pct(row.activationRate)}
-                      </span>
-                    </div>
-                  </Td>
-                  <Td className="data-tabular">{row.returned}</Td>
+          <TableWrapper>
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Channel</Th>
+                  <Th>Signups</Th>
+                  <Th>First record</Th>
+                  <Th>Activation</Th>
+                  <Th>Came back</Th>
                 </tr>
-              ))}
-            </tbody>
-          </Table>
+              </thead>
+              <tbody>
+                {funnel.channels.map((row) => (
+                  <tr key={row.source}>
+                    <Td>
+                      <SourceName>{row.source === UNATTRIBUTED ? 'Not attributed' : row.source}</SourceName>
+                      {row.source === UNATTRIBUTED && (
+                        <>
+                          <br />
+                          <Muted>Signed up before attribution was recorded</Muted>
+                        </>
+                      )}
+                    </Td>
+                    <Td className="data-tabular">{row.signups}</Td>
+                    <Td className="data-tabular">{row.activated}</Td>
+                    <Td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Bar><BarFill $pct={(row.activationRate || 0) * 100} /></Bar>
+                        <span className="data-tabular" style={{ minWidth: '2.5rem' }}>
+                          {pct(row.activationRate)}
+                        </span>
+                      </div>
+                    </Td>
+                    <Td className="data-tabular">{row.returned}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </TableWrapper>
         )}
       </Card>
 
