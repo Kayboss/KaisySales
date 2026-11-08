@@ -433,9 +433,7 @@ const WelcomePage = () => {
 </div>
         <Title style={{ fontFamily: "'Tango Sans', sans-serif" }}>Know your Business</Title>
         <Subtitle>
-          Every true business owner knows that keeping track of every Cedi is the secret 
-          to moving from a small shop to a big enterprise. KaisySales is the digital 
-          financial partner built for the modern African entrepreneur.
+          Sales, inventory and invoicing software for small business
         </Subtitle>
       </HeroSection>
 
