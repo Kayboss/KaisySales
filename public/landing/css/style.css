@@ -2198,3 +2198,140 @@ h3 { font-size: clamp(22px, 3vw, 28px); }
     text-align: center;
   }
 }
+
+/* ============================================
+   VALUE BAND / MODE CARDS / PRICE TEASER
+   Added with the SEO pass: the homepage now says which countries and
+   currencies it covers, so a visitor from Lagos or Nairobi can tell in one
+   screen that this is for them.
+   ============================================ */
+.band {
+  background: var(--color-primary);
+}
+
+.band h2,
+.band h3 {
+  color: var(--color-bg);
+}
+
+.band .section-label {
+  color: var(--color-accent-light);
+}
+
+.band .section-subtitle,
+.band p {
+  color: rgba(252, 249, 243, 0.84);
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.chip {
+  border: 1px solid rgba(252, 249, 243, 0.35);
+  border-radius: var(--radius-full);
+  padding: 7px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-bg);
+}
+
+.chip--muted {
+  border-color: rgba(252, 249, 243, 0.22);
+  color: rgba(252, 249, 243, 0.72);
+}
+
+.features__grid--two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.mode-card__list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.mode-card__list li {
+  position: relative;
+  padding-left: 22px;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--color-text-muted);
+}
+
+.mode-card__list li::before {
+  content: '\2713';
+  position: absolute;
+  left: 0;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.price-teaser {
+  max-width: 660px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.price-teaser__amount {
+  font-family: var(--font-display);
+  font-size: clamp(44px, 6vw, 64px);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--color-primary);
+}
+
+.price-teaser__note {
+  margin-top: 12px;
+  color: var(--color-text-muted);
+}
+
+.price-teaser__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+@media (max-width: 1024px) {
+  .features__grid--two {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
+   HERO SLOGAN / FACTS, MODES, FAQ, PRICING TEASER
+   ============================================ */
+
+/* The slogan is no longer the H1 — the H1 carries the search term — but it
+   still belongs on the page, in the brand's display face. */
+.hero__slogan {
+  font-family: 'Tango Sans', sans-serif;
+  font-size: clamp(17px, 1.6vw, 22px);
+  font-weight: 700;
+  color: var(--color-accent-light);
+  margin: -8px 0 18px;
+}
+
+.hero__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.modes {
+  background: var(--color-bg);
+}
+
+.faq-section {
+  background: var(--color-bg-alt);
+}
+
+.pricing-teaser {
+  background: var(--color-bg-card);
+}

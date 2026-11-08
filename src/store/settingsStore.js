@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { dbService } from '../services/supabase';
 import { resolveActiveBranch } from '../utils/tenancy';
-// import { detectCurrency } from '../utils/currency';
 
 const BRANCH_KEY = 'kaisysales_active_branch';
 

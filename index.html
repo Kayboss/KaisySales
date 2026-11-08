@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!--
+      This file is the React app shell. Vercel answers every unmatched path with
+      it and HTTP 200, so without this tag a crawler would index /login, /admin,
+      a mistyped URL and every app route as thin duplicate pages. The marketing
+      pages in /landing are the ones that should rank; they carry their own
+      indexable metadata.
+
+      Do not remove this tag by way of a Disallow rule in robots.txt — a crawler
+      that is never allowed to fetch a URL cannot read a noindex on it.
+    -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="description" content="KaisySales — sales, inventory and invoicing software for small businesses across Africa. Free to use." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Tango+Sans:wght@400;700&family=Manrope:wght@500;600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet" />

@@ -1,0 +1,72 @@
+# KaisySales
+
+> KaisySales is sales, inventory and invoicing software for small businesses
+> across Africa. It records daily sales and expenses, tracks stock, sends
+> invoices and reports real profit. It is free to use, with every feature
+> included and no credit card required.
+
+- Website: https://kaisy-sales.vercel.app/
+- Pricing: https://kaisy-sales.vercel.app/pricing (free)
+- Help: https://kaisy-sales.vercel.app/pages/help.html
+- Privacy: https://kaisy-sales.vercel.app/pages/privacy.html
+- Terms: https://kaisy-sales.vercel.app/pages/terms.html
+- Support: support@kaisysales.com
+
+## What it does
+
+KaisySales is a web app with two modes, chosen once when a business signs up.
+A business uses one mode or the other, never both.
+
+**Retail mode** — for shops and anyone selling physical goods:
+
+- Daily sales, with a running total for the day
+- Products and stock levels, with low-stock alerts
+- Expenses, including cost of goods
+- Invoices for products
+- Business overview and reporting
+- Staff logins limited to one branch and to the modules the owner grants
+- Multiple branches for one business
+
+**Services mode** — for freelancers, agencies and consultants:
+
+- One-time income per client
+- Recurring income (monthly, quarterly, yearly) with a next-due date
+- Customer records and outstanding balances
+- Service expenses, including platform fees taken by marketplaces
+- Invoices billed by milestone
+- Service reporting and profit totals
+
+## Pricing
+
+Free. There is one plan and it includes every feature. No credit card, no trial
+period that expires, no per-user fee, and no charge per branch. If a paid plan is
+ever introduced, existing users are told before anything changes.
+
+## Countries and currencies
+
+Built for small businesses across Africa: Ghana, Nigeria, Kenya, South Africa,
+Tanzania, Uganda, Cameroon, Sierra Leone, Liberia and The Gambia.
+
+Amounts display in the local currency using ISO codes — GHS, NGN, KES, ZAR, TZS,
+UGX, XAF, SLL, LRD and GMD — plus USD and GBP.
+
+## What it is not
+
+Stated plainly so no one signs up expecting it:
+
+- Not an accounting package. There is no general ledger, no double-entry
+  bookkeeping and no statutory chart of accounts.
+- No tax filing and no certified e-invoicing. Invoices are business documents,
+  not fiscal documents recognised by a tax authority.
+- No payment processing. A sale records how it was paid (cash, card, mobile
+  money) as a label; KaisySales never touches the money and holds no balance.
+- No mobile app to download. It runs in a web browser on a phone, tablet or
+  computer.
+- No offline mode. It needs a connection.
+
+## Data and security
+
+Records are stored in Supabase (PostgreSQL). Row-level security means a signed-in
+account can only read its own business's rows, and connections are encrypted in
+transit. Every business table is scoped by business, branch and module inside the
+database rather than by the screen.

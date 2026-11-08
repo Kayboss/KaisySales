@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { dbService } from '../../services/supabase';
-import { CURRENCY_OPTIONS } from '../../utils/currency';
+import { CURRENCY_OPTIONS, detectCurrency } from '../../utils/currency';
 import { sanitizeInput } from '../../utils/sanitize';
 import { 
   Sparkles, 
@@ -324,15 +324,15 @@ const OnboardingWizard = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     ownerName: '',
     businessName: '',
     phone: '',
     location: 'Accra, Greater Accra',
     category: 'Retail & Sales',
     avatarColor: '#6F240A',
-    currency: 'GHS'
-  });
+    currency: detectCurrency().code
+  }));
 
   const handleChange = (e) => {
     const { name, value } = e.target;

@@ -1,0 +1,48 @@
+# KaisySales — https://kaisy-sales.vercel.app
+#
+# Only the marketing pages belong in an index. The React app is served from the
+# same host and answers every unknown path with the app shell and HTTP 200, so
+# the shell carries <meta name="robots" content="noindex"> in index.html. That
+# tag — not a Disallow rule — is what keeps those URLs out: a crawler that is
+# refused a path never sees the noindex on it. Do not disallow /login, /admin
+# or the app routes; they are allowed on purpose so the tag can be read.
+#
+# /landing/ is the on-disk home of the marketing pages. They are served at / and
+# /pages/… by rewrite, so the raw HTML paths are duplicates and are kept out
+# here. Only the HTML — NOT the whole directory: the stylesheet and script those
+# pages need live under /landing/css/ and /landing/js/, and a renderer that is
+# refused them draws an unstyled page and judges it as one.
+
+User-agent: *
+Allow: /
+Disallow: /landing/index.html
+Disallow: /landing/pages/
+
+Sitemap: https://kaisy-sales.vercel.app/sitemap.xml
+
+# Answer engines and AI assistants may read the marketing pages. Being citable
+# is the point: a recommendation has to be able to find out what this is, who
+# it is for and what it costs. /llms.txt summarises that in one fetch.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /

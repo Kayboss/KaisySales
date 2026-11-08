@@ -174,3 +174,40 @@
     margin-top: 32px;
   }
 }
+
+/* --- Pricing plan card --- */
+.plan-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-outline);
+  border-radius: var(--radius-lg);
+  padding: 44px 36px;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.plan-card__price {
+  font-family: var(--font-display);
+  font-size: clamp(52px, 8vw, 76px);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--color-primary);
+  margin: 8px 0 6px;
+}
+
+.plan-card__note {
+  font-size: 16px;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+
+.plan-card__list {
+  text-align: left;
+  max-width: 420px;
+  margin: 24px auto 0;
+}
+
+@media (max-width: 640px) {
+  .plan-card {
+    padding: 32px 22px;
+  }
+}
