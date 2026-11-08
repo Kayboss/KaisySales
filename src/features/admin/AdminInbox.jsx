@@ -4,6 +4,10 @@ import {
   Inbox, MessageSquare, Bug, UserX, ChevronRight, Clock, RefreshCw, CheckCircle2,
 } from 'lucide-react';
 import { fetchOpenSupportRequests, fetchErrorLogs, fetchNeverSignedInUsers, fetchStaffUserIds } from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
+import {
+  inboxStorage, readLastSeen, writeLastSeen, summariseUnseen,
+} from '../../utils/adminInboxSeen';
 import EmptyState from '../../components/ui/EmptyState';
 import SkeletonCards from '../../components/ui/SkeletonCards';
 import SkeletonScreen from '../../components/ui/SkeletonScreen';
@@ -218,12 +222,33 @@ const shorten = (value) => (value ? new Date(value).toLocaleString() : '—');
 const withoutStaff = (rows, staffIds) =>
   (rows || []).filter((row) => !staffIds.has(row.userId || row.id));
 
-const countAttention = (reports, errors, neverSignedIn) => {
-  const errorUsers = new Set(errors.map(e => e.userId).filter(Boolean));
-  return reports.length + errorUsers.size + neverSignedIn.length;
+/**
+ * One pass over the three feeds, plus the stamp they will be judged against.
+ *
+ * `lastSeenAt` is read *before* the fetch and written *after* the result has
+ * been rendered (see the callers), so the count is always "what arrived since
+ * the last time this inbox was on screen" and never "what I am looking at
+ * right now".
+ */
+const loadInbox = async ({ storage, uid }) => {
+  const lastSeenAt = readLastSeen(storage, uid);
+  const [reports, rawErrors, rawNeverSignedIn, staffIds] = await Promise.all([
+    fetchOpenSupportRequests(100),
+    fetchErrorLogs(50),
+    fetchNeverSignedInUsers(200),
+    fetchStaffUserIds(),
+  ]);
+  return {
+    reports,
+    errors: withoutStaff(rawErrors, staffIds),
+    neverSignedIn: withoutStaff(rawNeverSignedIn, staffIds),
+    lastSeenAt,
+  };
 };
 
 const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
+  const uid = useAuthStore((s) => s.user?.uid);
+  const storage = inboxStorage();
   const [reports, setReports] = useState([]);
   const [errors, setErrors] = useState([]);
   const [neverSignedIn, setNeverSignedIn] = useState([]);
@@ -231,47 +256,39 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    let active = true;
+    let isCurrent = true;
     const load = async () => {
       try {
-        const [r, e, n, staffIds] = await Promise.all([
-          fetchOpenSupportRequests(100),
-          fetchErrorLogs(50),
-          fetchNeverSignedInUsers(200),
-          fetchStaffUserIds(),
-        ]);
-        if (!active) return;
-        const errorsOnlyOwners = withoutStaff(e, staffIds);
-        const neverSignedInOwners = withoutStaff(n, staffIds);
-        setReports(r);
-        setErrors(errorsOnlyOwners);
-        setNeverSignedIn(neverSignedInOwners);
-        if (onAttentionCount) onAttentionCount(countAttention(r, errorsOnlyOwners, neverSignedInOwners));
+        const result = await loadInbox({ storage, uid });
+        if (!isCurrent) return;
+        setReports(result.reports);
+        setErrors(result.errors);
+        setNeverSignedIn(result.neverSignedIn);
+        // Stamp only now: everything in `result` is on screen, so it must not
+        // badge again on a later visit. Reading it is what clears the badge.
+        writeLastSeen(storage, uid);
+        if (onAttentionCount) onAttentionCount(summariseUnseen(result).total);
       } catch (err) {
         console.error('Failed to load inbox', err);
       } finally {
-        if (active) setLoading(false);
+        if (isCurrent) setLoading(false);
       }
     };
     load();
-    return () => { active = false; };
-  }, [onAttentionCount]);
+    return () => { isCurrent = false; };
+  }, [onAttentionCount, storage, uid]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const [r, e, n, staffIds] = await Promise.all([
-        fetchOpenSupportRequests(100),
-        fetchErrorLogs(50),
-        fetchNeverSignedInUsers(200),
-        fetchStaffUserIds(),
-      ]);
-      const errorsOnlyOwners = withoutStaff(e, staffIds);
-      const neverSignedInOwners = withoutStaff(n, staffIds);
-      setReports(r);
-      setErrors(errorsOnlyOwners);
-      setNeverSignedIn(neverSignedInOwners);
-      if (onAttentionCount) onAttentionCount(countAttention(r, errorsOnlyOwners, neverSignedInOwners));
+      const result = await loadInbox({ storage, uid });
+      setReports(result.reports);
+      setErrors(result.errors);
+      setNeverSignedIn(result.neverSignedIn);
+      writeLastSeen(storage, uid);
+      // Only what arrived since the previous load is new — pressing Refresh
+      // must not resurrect a count the admin has already read.
+      if (onAttentionCount) onAttentionCount(summariseUnseen(result).total);
     } catch (err) {
       console.error('Failed to refresh inbox', err);
     } finally {

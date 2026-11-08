@@ -638,6 +638,10 @@ const AdminUserDetail = ({ user, initialSection = 'support', onClose, onChanged 
       await updateSupportNoteStatus(note.id, next);
       const updated = await fetchSupportNotes(id);
       setNotes(updated);
+      // Resolving changes what the Inbox counts, and the Inbox stays mounted
+      // behind this drawer — without this its list and badge keep the stale
+      // number until somebody remembers to press Refresh.
+      onChanged?.();
     } catch (err) {
       console.error('Failed to update note status', err);
     } finally {

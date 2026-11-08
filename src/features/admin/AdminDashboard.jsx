@@ -235,6 +235,11 @@ const AdminDashboard = () => {
   const selectTab = (id) => {
     setActiveTab(id);
     setVisited(prev => (prev.has(id) ? prev : new Set(prev).add(id)));
+    // Leaving the Inbox means its contents have been read, so the badge drops
+    // to zero. The rows themselves were already counted against the "last seen"
+    // stamp when they loaded, so the next visit only reports what arrived in
+    // the meantime — reading something never re-badges it.
+    if (id !== 'inbox') setAttentionCount(0);
   };
 
   const openUser = (user, section = 'support') => setActiveUser({ user, section });
