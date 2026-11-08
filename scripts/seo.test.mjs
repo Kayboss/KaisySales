@@ -263,17 +263,19 @@ test('vercel.json serves / and /pricing by rewrite, not by redirect', () => {
     'a redirect on / makes the homepage and its own canonical disagree — use a rewrite'
   );
 
-  const sources = (config.rewrites || []).map((r) => r.source);
+  const rewrites = config.rewrites || [];
+  const sources = rewrites.map((r) => r.source);
   assert.ok(sources.includes('/pricing'), 'vercel.json has no /pricing rewrite');
-  assert.ok(sources.includes('/'), 'vercel.json has no / rewrite');
+  assert.ok(
+    !sources.includes('/'),
+    'do not rewrite / — the postbuild copies the landing page to dist/index.html so / is served from the filesystem'
+  );
 
-  // Order is precedence: an exact path must be listed before the catch-all.
+  const catchAll = rewrites.find((r) => r.source === '/:path*');
+  assert.ok(catchAll, 'vercel.json has no catch-all rewrite');
+  assert.equal(catchAll.destination, '/app.html', 'SPA catch-all must serve the postbuild app shell');
   assert.ok(
     sources.indexOf('/pricing') < sources.indexOf('/:path*'),
     '/pricing rewrite must come before the catch-all or the app shell answers it'
-  );
-  assert.ok(
-    sources.indexOf('/') < sources.indexOf('/:path*'),
-    '/ rewrite must come before the catch-all'
   );
 });

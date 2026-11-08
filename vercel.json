@@ -18,7 +18,6 @@
     { "source": "/landing/:path*", "destination": "/landing/:path*" },
     { "source": "/pages/:path*", "destination": "/landing/pages/:path*" },
     { "source": "/pricing", "destination": "/landing/pages/pricing.html" },
-    { "source": "/", "destination": "/landing/index.html" },
-    { "source": "/:path*", "destination": "/index.html" }
+    { "source": "/:path*", "destination": "/app.html" }
   ]
 }
