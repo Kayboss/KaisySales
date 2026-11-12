@@ -97,7 +97,7 @@ test('summariseUnseen: the first visit shows the whole backlog', () => {
     neverSignedIn: [{ id: 'p1', createdAt: T0 }, { id: 'p2', createdAt: T0 }],
     lastSeenAt: null,
   });
-  assert.deepEqual(summary, { reports: 1, errorUsers: 1, neverSignedIn: 2, total: 4 });
+  assert.deepEqual(summary, { reports: 1, errorUsers: 1, neverSignedIn: 2, contactMessages: 0, total: 4 });
 });
 
 test('summariseUnseen: after reading, only what arrived since counts', () => {
@@ -114,7 +114,7 @@ test('summariseUnseen: after reading, only what arrived since counts', () => {
     ],
     lastSeenAt: T1,
   });
-  assert.deepEqual(summary, { reports: 1, errorUsers: 1, neverSignedIn: 1, total: 3 });
+  assert.deepEqual(summary, { reports: 1, errorUsers: 1, neverSignedIn: 1, contactMessages: 0, total: 3 });
 });
 
 test('summariseUnseen: ten errors from one account are one thing to look at', () => {
@@ -167,9 +167,36 @@ test('summariseUnseen: the production backlog stops being a permanent 19', () =>
 });
 
 test('summariseUnseen: missing feeds are zero, not a crash', () => {
-  assert.deepEqual(summariseUnseen(), { reports: 0, errorUsers: 0, neverSignedIn: 0, total: 0 });
+  assert.deepEqual(summariseUnseen(), {
+    reports: 0, errorUsers: 0, neverSignedIn: 0, contactMessages: 0, total: 0,
+  });
   assert.deepEqual(
-    summariseUnseen({ reports: undefined, errors: null, neverSignedIn: null, lastSeenAt: T1 }),
-    { reports: 0, errorUsers: 0, neverSignedIn: 0, total: 0 },
+    summariseUnseen({ reports: undefined, errors: null, neverSignedIn: null, contactMessages: null, lastSeenAt: T1 }),
+    { reports: 0, errorUsers: 0, neverSignedIn: 0, contactMessages: 0, total: 0 },
+  );
+});
+
+test('summariseUnseen: a contact-form message is an event of its own', () => {
+  // A contact message has no account behind it, so it is never grouped: three
+  // enquiries are three things to read, and only the ones that arrived after
+  // the stamp badge at all.
+  const messages = [
+    { id: 'c1', createdAt: T0 },
+    { id: 'c2', createdAt: T2 },
+    { id: 'c3', createdAt: T2 },
+  ];
+  assert.equal(
+    summariseUnseen({ contactMessages: messages, lastSeenAt: T1 }).total,
+    2,
+  );
+  assert.equal(
+    summariseUnseen({ contactMessages: messages }).total,
+    3,
+    'first visit shows the backlog once',
+  );
+  assert.equal(
+    summariseUnseen({ contactMessages: messages, lastSeenAt: T2 }).total,
+    0,
+    'reading it clears it',
   );
 });

@@ -1,23 +1,31 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import {
-  Inbox, MessageSquare, Bug, UserX, ChevronRight, Clock, RefreshCw, CheckCircle2,
+  Inbox, MessageSquare, Bug, UserX, ChevronRight, Clock, RefreshCw, CheckCircle2, Mail, Trash2,
 } from 'lucide-react';
-import { fetchOpenSupportRequests, fetchErrorLogs, fetchNeverSignedInUsers, fetchStaffUserIds } from '../../services/api';
+import {
+  fetchOpenSupportRequests, fetchErrorLogs, fetchNeverSignedInUsers, fetchStaffUserIds,
+  fetchContactMessages, updateContactMessageStatus, deleteContactMessage,
+} from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import {
   inboxStorage, readLastSeen, writeLastSeen, summariseUnseen,
 } from '../../utils/adminInboxSeen';
 import EmptyState from '../../components/ui/EmptyState';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import SkeletonCards from '../../components/ui/SkeletonCards';
 import SkeletonScreen from '../../components/ui/SkeletonScreen';
 import SkeletonTable from '../../components/ui/SkeletonTable';
 
 const StatRow = styled.div`
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.75rem;
   margin-bottom: 1.5rem;
+
+  @media (max-width: 900px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
 
   @media (max-width: 640px) {
     grid-template-columns: 1fr;
@@ -182,8 +190,8 @@ const Tag = styled.span`
   letter-spacing: 0.4px;
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
-  background: #FFF0E0;
-  color: #875200;
+  background: ${props => (props.$muted ? '#F0EEE8' : '#FFF0E0')};
+  color: ${props => (props.$muted ? '#55423D' : '#875200')};
 `;
 
 const RowPreview = styled.div`
@@ -211,6 +219,58 @@ const Chevron = styled(ChevronRight)`
   margin-top: 0.35rem;
 `;
 
+/* A contact-form message has no account to open, so its row is not a button:
+   it carries its own action instead of navigating to a user drawer. */
+const MessageRow = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #F0EEE8;
+  background: ${props => (props.$closed ? '#FAF9F7' : 'white')};
+
+  &:last-child { border-bottom: none; }
+`;
+
+const ActionBtn = styled.button`
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid ${({ $danger }) => ($danger ? '#E8C4C4' : '#D0C8C4')};
+  background: white;
+  color: ${({ $danger }) => ($danger ? '#BA1A1A' : '#55423D')};
+  font-weight: 700;
+  font-size: 0.72rem;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover { border-color: ${({ $danger }) => ($danger ? '#BA1A1A' : '#6F240A')}; }
+`;
+
+/* The row's actions stack, so a narrow screen keeps both reachable. */
+const RowActions = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+`;
+
+const MailLink = styled.a`
+  color: #6F240A;
+  font-weight: 600;
+  text-decoration: underline;
+`;
+
+const SUBJECT_LABELS = {
+  general: 'General',
+  account: 'Account',
+  billing: 'Billing',
+  technical: 'Technical',
+  privacy: 'Privacy',
+  data: 'Data',
+};
+
 const shorten = (value) => (value ? new Date(value).toLocaleString() : '—');
 
 /**
@@ -232,16 +292,18 @@ const withoutStaff = (rows, staffIds) =>
  */
 const loadInbox = async ({ storage, uid }) => {
   const lastSeenAt = readLastSeen(storage, uid);
-  const [reports, rawErrors, rawNeverSignedIn, staffIds] = await Promise.all([
+  const [reports, rawErrors, rawNeverSignedIn, staffIds, contactMessages] = await Promise.all([
     fetchOpenSupportRequests(100),
     fetchErrorLogs(50),
     fetchNeverSignedInUsers(200),
     fetchStaffUserIds(),
+    fetchContactMessages(100),
   ]);
   return {
     reports,
     errors: withoutStaff(rawErrors, staffIds),
     neverSignedIn: withoutStaff(rawNeverSignedIn, staffIds),
+    contactMessages,
     lastSeenAt,
   };
 };
@@ -252,8 +314,11 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
   const [reports, setReports] = useState([]);
   const [errors, setErrors] = useState([]);
   const [neverSignedIn, setNeverSignedIn] = useState([]);
+  const [contactMessages, setContactMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let isCurrent = true;
@@ -264,6 +329,7 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
         setReports(result.reports);
         setErrors(result.errors);
         setNeverSignedIn(result.neverSignedIn);
+        setContactMessages(result.contactMessages);
         // Stamp only now: everything in `result` is on screen, so it must not
         // badge again on a later visit. Reading it is what clears the badge.
         writeLastSeen(storage, uid);
@@ -285,6 +351,7 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
       setReports(result.reports);
       setErrors(result.errors);
       setNeverSignedIn(result.neverSignedIn);
+      setContactMessages(result.contactMessages);
       writeLastSeen(storage, uid);
       // Only what arrived since the previous load is new — pressing Refresh
       // must not resurrect a count the admin has already read.
@@ -293,6 +360,38 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
       console.error('Failed to refresh inbox', err);
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleContactStatus = async (message, status) => {
+    try {
+      const updated = await updateContactMessageStatus(message.id, status);
+      setContactMessages(prev =>
+        prev.map(m => (m.id === message.id ? { ...m, ...updated } : m))
+      );
+    } catch (err) {
+      console.error('Failed to update contact message', err);
+    }
+  };
+
+  /**
+   * Deleting is the one irreversible action here, so it goes through
+   * ConfirmDialog and only leaves the list once the database has agreed.
+   * `pendingDelete` doubles as the dialog's `isOpen` — ConfirmDialog returns
+   * null for a falsy prop, so a dialog rendered without one never appears.
+   */
+  const handleDeleteConfirmed = async () => {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    setDeleting(true);
+    try {
+      await deleteContactMessage(target.id);
+      setContactMessages(prev => prev.filter(m => m.id !== target.id));
+      setPendingDelete(null);
+    } catch (err) {
+      console.error('Failed to delete contact message', err);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -311,6 +410,8 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
   const labelOf = (entry) =>
     entry?.businessName || entry?.userBusinessName || entry?.email || entry?.userEmail || null;
 
+  const newContactCount = contactMessages.filter(m => m.status === 'new').length;
+
   if (loading) return (
     <SkeletonScreen label="Loading inbox">
       <SkeletonCards count={3} $min="280px" />
@@ -326,6 +427,13 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
           <StatText>
             <StatNumber>{reports.length}</StatNumber>
             <StatLabel>Open reports</StatLabel>
+          </StatText>
+        </StatCard>
+        <StatCard onClick={handleRefresh}>
+          <StatIcon $tone="reports"><Mail size={20} /></StatIcon>
+          <StatText>
+            <StatNumber>{newContactCount}</StatNumber>
+            <StatLabel>New messages</StatLabel>
           </StatText>
         </StatCard>
         <StatCard onClick={handleRefresh}>
@@ -379,6 +487,59 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
                 </RowBody>
                 <Chevron size={18} />
               </Row>
+            ))}
+          </RowCard>
+        )}
+      </Section>
+
+      <Section>
+        <SectionHeader>
+          <Mail size={16} /> Contact messages
+          <CountPill>{contactMessages.length}</CountPill>
+          <Spacer />
+          <RefreshBtn onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw size={13} /> {refreshing ? 'Refreshing...' : 'Refresh'}
+          </RefreshBtn>
+        </SectionHeader>
+        {contactMessages.length === 0 ? (
+          <EmptyState icon={<CheckCircle2 size={26} />}>No messages from the contact form yet.</EmptyState>
+        ) : (
+          <RowCard>
+            {contactMessages.map(m => (
+              <MessageRow key={m.id} $closed={m.status === 'closed'}>
+                <RowIcon $tone="report"><Mail size={17} /></RowIcon>
+                <RowBody>
+                  <RowTitle>
+                    {m.name || 'Unnamed sender'}
+                    <Tag>{SUBJECT_LABELS[m.subject] || m.subject || 'General'}</Tag>
+                    {m.status !== 'new' && <Tag $muted>{m.status}</Tag>}
+                  </RowTitle>
+                  <RowPreview>{m.message}</RowPreview>
+                  <RowMeta>
+                    <Clock size={11} /> {shorten(m.createdAt)}
+                    {m.email && (
+                      <MailLink href={`mailto:${m.email}`}>{m.email}</MailLink>
+                    )}
+                    {m.sourcePage && <span>from {m.sourcePage}</span>}
+                  </RowMeta>
+                </RowBody>
+                <RowActions>
+                  <ActionBtn
+                    type="button"
+                    onClick={() => handleContactStatus(m, m.status === 'closed' ? 'new' : 'closed')}
+                  >
+                    {m.status === 'closed' ? 'Reopen' : 'Mark closed'}
+                  </ActionBtn>
+                  <ActionBtn
+                    type="button"
+                    $danger
+                    onClick={() => setPendingDelete(m)}
+                    aria-label={`Delete the message from ${m.name || 'this sender'}`}
+                  >
+                    <Trash2 size={12} /> Delete
+                  </ActionBtn>
+                </RowActions>
+              </MessageRow>
             ))}
           </RowCard>
         )}
@@ -444,6 +605,20 @@ const AdminInbox = ({ onOpenUser, onAttentionCount }) => {
           </RowCard>
         )}
       </Section>
+
+      <ConfirmDialog
+        isOpen={Boolean(pendingDelete)}
+        title="Delete this message?"
+        message={
+          pendingDelete
+            ? `The message from ${pendingDelete.name || 'this sender'} and their email address will be removed for good. Marking it closed keeps it if you might need it.`
+            : ''
+        }
+        confirmLabel="Delete message"
+        confirmLoading={deleting}
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => { if (!deleting) setPendingDelete(null); }}
+      />
     </div>
   );
 };

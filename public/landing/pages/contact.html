@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact — KaisySales | Get in touch</title>
+  <meta name="description" content="Contact KaisySales about your account, billing, a technical problem, privacy or data requests. One form, one inbox." />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://www.kaisysales.com/contact" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="theme-color" content="#6F240A" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Contact — KaisySales" />
+  <meta property="og:description" content="Questions about your account, billing, a technical problem, privacy or data — send us a message." />
+  <meta property="og:url" content="https://www.kaisysales.com/contact" />
+  <meta property="og:site_name" content="KaisySales" />
+  <meta property="og:image" content="https://www.kaisysales.com/og-image.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="KaisySales — sales, inventory and invoicing in one place" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Contact — KaisySales" />
+  <meta name="twitter:description" content="Questions about your account, billing, a technical problem, privacy or data — send us a message." />
+  <meta name="twitter:image" content="https://www.kaisysales.com/og-image.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Tango+Sans:wght@400;700&family=Manrope:wght@400;600;700;800;900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/landing/css/style.css" />
+  <link rel="stylesheet" href="/landing/css/pages.css" />
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav nav--scrolled" id="navbar">
+    <div class="container nav__inner">
+      <a href="/" class="nav__logo">
+        <img src="/logo.svg" alt="KaisySales" class="logo-default" style="height: 28px; width: auto;" />
+        <img src="/logo2.svg" alt="KaisySales" class="logo-scrolled" style="height: 28px; width: auto;" />
+        <span>KaisySales</span>
+      </a>
+      <div class="nav__links" id="navLinks">
+        <a href="/" class="nav__link">Home</a>
+        <a href="/login" class="nav__link nav__link--signin">Sign In</a>
+        <a href="/login" class="btn btn--primary nav__cta">Get Started</a>
+      </div>
+      <button class="nav__hamburger" id="hamburger" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Page Header -->
+  <section class="page-header page-header--terracotta">
+    <div class="container">
+      <span class="section-label">Contact</span>
+      <h1>Tell us what you need</h1>
+      <p class="page-header__desc">Account questions, billing, a technical problem, privacy or data requests — one form, one inbox.</p>
+    </div>
+  </section>
+
+  <!-- Contact form -->
+  <section class="section page-content page-content--top-gap">
+    <div class="container page-container">
+      <form class="contact-form" id="contactForm" action="#" method="post">
+        <div class="contact-form__field">
+          <label for="contactName">Your name</label>
+          <input id="contactName" name="name" type="text" autocomplete="name" maxlength="120" required />
+        </div>
+
+        <div class="contact-form__field">
+          <label for="contactEmail">Email address</label>
+          <input id="contactEmail" name="email" type="email" autocomplete="email" maxlength="254" required />
+          <span class="contact-form__hint">We reply to this address, so make sure it is one you can check.</span>
+        </div>
+
+        <div class="contact-form__field">
+          <label for="contactSubject">What is this about?</label>
+          <select id="contactSubject" name="subject">
+            <option value="general">General enquiry</option>
+            <option value="account">My account or sign-in</option>
+            <option value="billing">Billing or plans</option>
+            <option value="technical">Something isn't working</option>
+            <option value="privacy">Privacy</option>
+            <option value="data">Data, export or account deletion</option>
+          </select>
+        </div>
+
+        <div class="contact-form__field">
+          <label for="contactMessage">Message</label>
+          <textarea id="contactMessage" name="message" rows="8" minlength="10" maxlength="5000" required></textarea>
+          <span class="contact-form__hint">Please don't include passwords, card numbers or anyone else's personal details.</span>
+        </div>
+
+        <!-- Honeypot: hidden from people, filled by bots. -->
+        <div class="contact-form__hp" aria-hidden="true">
+          <label for="contactWebsite">Website</label>
+          <input id="contactWebsite" name="website" type="text" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <div class="contact-form__actions">
+          <button type="submit" class="btn btn--primary" id="contactSubmit">Send message</button>
+          <span class="contact-form__status" id="contactStatus" role="status" aria-live="polite"></span>
+        </div>
+      </form>
+
+      <div class="contact-success" id="contactSuccess" hidden>
+        <h2>Message received</h2>
+        <p>Thank you — it is in our inbox. We usually reply within two working days, to the address you gave us.</p>
+        <button type="button" class="btn btn--outline" id="contactAgain">Send another message</button>
+      </div>
+
+      <p class="contact-note">
+        What you send is used only to answer you. See our
+        <a href="/pages/privacy.html">Privacy Policy</a> for how we handle personal data.
+      </p>
+
+      <noscript>
+        <p class="contact-note">This form needs JavaScript. Please enable it in your browser, or write to
+          <a href="mailto:support@kaisysales.com">support@kaisysales.com</a>.</p>
+      </noscript>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__grid">
+        <div class="footer__brand">
+          <a href="/" class="nav__logo" style="margin-bottom: 1rem;">
+            <img src="/logo.svg" alt="KaisySales" style="height: 24px; width: auto;" />
+            <span>KaisySales</span>
+          </a>
+          <p class="footer__tagline" style="font-family: 'Tango Sans', sans-serif;">Know your Business, Stay in Control.</p>
+          <p class="footer__built">Designed and built by KAYTHEBOSS.</p>
+        </div>
+        <div class="footer__col">
+          <h4 class="footer__heading">Product</h4>
+          <a href="/" class="footer__link">Home</a>
+          <a href="/login" class="footer__link">Sign In</a>
+        </div>
+        <div class="footer__col">
+          <h4 class="footer__heading">Support</h4>
+          <a href="/pages/help.html" class="footer__link">Help Center</a>
+          <a href="/pages/privacy.html" class="footer__link">Privacy Policy</a>
+          <a href="/pages/terms.html" class="footer__link">Terms of Service</a>
+        </div>
+        <div class="footer__col">
+          <h4 class="footer__heading">Company</h4>
+          <a href="/contact" class="footer__link">Contact</a>
+          <a href="/pricing" class="footer__link">Pricing</a>
+        </div>
+      </div>
+      <div class="footer__bottom">
+        <p>&copy; 2026 KaisySales</p>
+        <p>Built with <span style="color: #6F240A;">&hearts;</span> for entrepreneurs everywhere</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/landing/js/main.js"></script>
+  <script src="/landing/js/contact.js"></script>
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

@@ -64,9 +64,17 @@
   document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
 
   // --- Navbar scroll effect ---
+  // Only the landing page has a hero for a transparent navbar to sit on. Every
+  // other page ships `nav--scrolled` in its markup because its page header is a
+  // solid colour, and the logo swap (`logo.svg` ↔ `logo2.svg`) is driven by that
+  // same class. Toggling it on those pages would strip the solid background and
+  // leave the white logo and white links over a cream header, so the toggle is
+  // scoped to pages that actually have a hero.
   const navbar = document.getElementById('navbar');
+  const hasHero = !!document.querySelector('.hero');
 
   function applyNavScroll() {
+    if (!navbar || !hasHero) return;
     navbar.classList.toggle('nav--scrolled', window.scrollY > 60);
   }
 

@@ -1176,6 +1176,53 @@ export const dbService = {
     return { id: noteId, status };
   },
 
+  /**
+   * Public contact-form submissions. There is no user_id: a visitor may never
+   * have signed in, so RLS scopes these to admins (is_admin()) rather than to
+   * the caller. The `contact` edge function is the only writer.
+   */
+  async fetchContactMessages(limit = 100) {
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('contact_messages')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data || []).map(r => toCamelCase(r));
+  },
+
+  async updateContactMessageStatus(messageId, status) {
+    if (supabase) {
+      const readAt = status === 'new' ? null : new Date().toISOString();
+      const { data, error } = await supabase
+        .from('contact_messages')
+        .update({ status, read_at: readAt })
+        .eq('id', messageId)
+        .select()
+        .single();
+      if (error) throw error;
+      return toCamelCase(data);
+    }
+    return { id: messageId, status };
+  },
+
+  /**
+   * Removing a message is the only way to honour an erasure request or clear a
+   * flood: the table holds personal data of people who never signed up. The
+   * DELETE policy is admin-only (migration 20261111130000); `anon` holds no
+   * grant, so a sender cannot withdraw a message this way either.
+   */
+  async deleteContactMessage(messageId) {
+    if (!supabase) return true;
+    const { error } = await supabase
+      .from('contact_messages')
+      .delete()
+      .eq('id', messageId);
+    if (error) throw error;
+    return true;
+  },
+
   async fetchUserRecords(uid, collection) {
     assertBackendAvailable();
     if (supabase) {

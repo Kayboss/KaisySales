@@ -120,10 +120,21 @@ test('every probed table yields a body, so an anon insert is decided by permissi
   }
 });
 
+test('a table with CHECK constraints is probed with values it accepts', () => {
+  // contact_messages.subject/status are CHECKed. Sending the generic probe
+  // string would answer 23514, which reads as "rejected" but says nothing about
+  // the grant — the same trap that made profiles.status misleading.
+  const { columns } = discover(ROOT);
+  const payload = probePayload('contact_messages', columns.get('contact_messages')?.columns);
+  assert.ok(payload, 'contact_messages must produce a probe body');
+  assert.equal(payload.subject, 'general');
+  assert.equal(payload.status, 'new');
+});
+
 test('the live schema is still discovered in full', () => {
   const { tables, functions } = discover(ROOT);
 
-  assert.equal(tables.length, 25, `discovered ${tables.length} tables: ${tables.join(', ')}`);
+  assert.equal(tables.length, 26, `discovered ${tables.length} tables: ${tables.join(', ')}`);
   assert.equal(functions.size, 48, `discovered ${functions.size} functions`);
 
   for (const table of [
@@ -132,7 +143,7 @@ test('the live schema is still discovered in full', () => {
     'user_actions', 'assistant_parses', 'businesses', 'branches',
     'business_members', 'business_invites', 'products', 'branch_inventory',
     'acquisition', 'subscription_plans', 'subscription_payments', 'support_notes',
-    'error_logs', 'admin_audit_log',
+    'error_logs', 'admin_audit_log', 'contact_messages',
   ]) {
     assert.ok(tables.includes(table), `${table} must still be discovered`);
   }

@@ -86,7 +86,7 @@ export const isNewerThan = (iso, lastSeenAt) => {
 };
 
 /**
- * Counts the three inbox feeds the badge is built from.
+ * Counts the four inbox feeds the badge is built from.
  *
  * `errors` are grouped per user, as the list is, so ten errors from one account
  * are one thing to look at — but only if at least one of them is new.
@@ -94,11 +94,15 @@ export const isNewerThan = (iso, lastSeenAt) => {
  * Reports are counted by recency like everything else: a report the admin has
  * already been shown must not re-badge for ever just because the thread was
  * never opened. It stays visible under "Open support reports" either way.
+ *
+ * Contact-form messages have no account behind them, so each one is its own
+ * event and is counted individually.
  */
 export const summariseUnseen = ({
   reports = [],
   errors = [],
   neverSignedIn = [],
+  contactMessages = [],
   lastSeenAt = null,
 } = {}) => {
   // Destructuring defaults only cover `undefined`; a caller passing an explicit
@@ -114,9 +118,13 @@ export const summariseUnseen = ({
     reports: rows(reports).filter((row) => isNewerThan(row?.createdAt, lastSeenAt)).length,
     errorUsers: errorUsers.size,
     neverSignedIn: rows(neverSignedIn).filter((row) => isNewerThan(row?.createdAt, lastSeenAt)).length,
+    contactMessages: rows(contactMessages).filter((row) => isNewerThan(row?.createdAt, lastSeenAt)).length,
   };
 
-  return { ...unseen, total: unseen.reports + unseen.errorUsers + unseen.neverSignedIn };
+  return {
+    ...unseen,
+    total: unseen.reports + unseen.errorUsers + unseen.neverSignedIn + unseen.contactMessages,
+  };
 };
 
 /** The browser's localStorage, or null where it does not exist (SSR, tests). */

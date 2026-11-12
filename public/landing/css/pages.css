@@ -21,10 +21,33 @@
   margin: 0 auto;
 }
 
+/* Terracotta variant (terms, privacy, help, pricing) */
+.page-header--terracotta {
+  background: var(--color-primary);
+}
+
+.page-header--terracotta .section-label {
+  color: var(--color-accent);
+}
+
+.page-header--terracotta h1 {
+  color: var(--color-bg);
+}
+
+.page-header--terracotta .page-header__desc {
+  color: var(--color-bg);
+  opacity: 0.85;
+}
+
 /* --- Page Content --- */
 .page-content {
   padding-top: 0;
   background: var(--color-bg-card);
+}
+
+/* Breathing room above the first item (terms, privacy, help, pricing) */
+.page-content--top-gap {
+  padding-top: 15px;
 }
 
 .page-container {
@@ -209,5 +232,142 @@
 @media (max-width: 640px) {
   .plan-card {
     padding: 32px 22px;
+  }
+}
+
+/* --- Contact form (contact page) --- */
+.contact-form {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.contact-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.contact-form__field label {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.contact-form__field input,
+.contact-form__field select,
+.contact-form__field textarea {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-text);
+  background: var(--color-white);
+  border: 1px solid var(--color-outline);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  transition: var(--transition-fast);
+}
+
+.contact-form__field textarea {
+  min-height: 170px;
+  resize: vertical;
+}
+
+.contact-form__field input:focus,
+.contact-form__field select:focus,
+.contact-form__field textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(111, 36, 10, 0.12);
+}
+
+.contact-form__hint {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-light);
+}
+
+/* Honeypot: moved off-screen rather than hidden with display:none, so a bot
+   that skips hidden fields still fills it in. */
+.contact-form__hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.contact-form__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.contact-form .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.contact-form__status {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+  min-height: 20px;
+}
+
+.contact-form__status[data-tone="error"] {
+  color: var(--color-error);
+}
+
+.contact-success {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 44px 32px;
+  text-align: center;
+  background: var(--color-bg);
+  border: 1px solid var(--color-outline);
+  border-radius: var(--radius-lg);
+}
+
+.contact-success h2 {
+  font-size: 26px;
+  margin-bottom: 12px;
+  color: var(--color-text);
+}
+
+.contact-success p {
+  font-size: 16px;
+  color: var(--color-text-muted);
+  margin-bottom: 24px;
+}
+
+.contact-note {
+  max-width: 640px;
+  margin: 28px auto 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text-light);
+  text-align: center;
+}
+
+.contact-note a {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .contact-form__actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .contact-form__status {
+    width: 100%;
   }
 }

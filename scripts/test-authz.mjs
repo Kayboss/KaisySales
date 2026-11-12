@@ -89,6 +89,15 @@ const PUBLIC_TABLES = {
 };
 const DEFAULT_OWNER = { profiles: 'id' };
 
+// Tables whose CHECK constraints reject the generic probe string. A 23514 is a
+// schema complaint, not a permission decision, so those columns get a value the
+// table actually accepts — otherwise a broken grant hides behind a SKIP. This
+// is the same trap as `profiles.status`: probe with a legal value or learn
+// nothing.
+const PROBE_OVERRIDES = {
+  contact_messages: { subject: 'general', status: 'new' },
+};
+
 // Values for building an insert payload that clears PostgREST's column check, so
 // the request reaches the permission check instead of dying on validation.
 const PROBE_VALUES = [
@@ -328,6 +337,7 @@ function probePayload(name, columns) {
     const rule = PROBE_VALUES.find(([pattern]) => pattern.test(col.type));
     if (rule) body[col.name] = rule[1];
   }
+  Object.assign(body, PROBE_OVERRIDES[name] || {});
   return Object.keys(body).length ? body : null;
 }
 

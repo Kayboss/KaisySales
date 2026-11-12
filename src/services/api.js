@@ -535,6 +535,42 @@ export const fetchOpenSupportRequests = async (limit = 100) => {
   }
 };
 
+/** Public contact-form submissions (admin only; no user account is required). */
+export const fetchContactMessages = async (limit = 100) => {
+  try {
+    await requireAdmin();
+    return await dbService.fetchContactMessages(limit);
+  } catch (error) {
+    console.error('Failed to fetch contact messages', error);
+    return [];
+  }
+};
+
+export const updateContactMessageStatus = async (messageId, status) => {
+  try {
+    await requireAdmin();
+    return await dbService.updateContactMessageStatus(messageId, status);
+  } catch (error) {
+    console.error('Failed to update contact message status', error);
+    throw error;
+  }
+};
+
+/**
+ * Deletes a contact-form message for good. Marking closed is the normal
+ * triage; this exists for spam and for an erasure request, neither of which
+ * "closed" answers. Admin-only, and there is no undo.
+ */
+export const deleteContactMessage = async (messageId) => {
+  try {
+    await requireAdmin();
+    return await dbService.deleteContactMessage(messageId);
+  } catch (error) {
+    console.error('Failed to delete contact message', error);
+    throw error;
+  }
+};
+
 export const fetchErrorLogs = async (limit = 20, userId = null) => {
   try {
     await requireAdmin();

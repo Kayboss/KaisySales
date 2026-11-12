@@ -18,6 +18,7 @@
     { "source": "/landing/:path*", "destination": "/landing/:path*" },
     { "source": "/pages/:path*", "destination": "/landing/pages/:path*" },
     { "source": "/pricing", "destination": "/landing/pages/pricing.html" },
+    { "source": "/contact", "destination": "/landing/pages/contact.html" },
     { "source": "/:path*", "destination": "/app.html" }
   ]
 }
