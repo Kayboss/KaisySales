@@ -109,10 +109,25 @@ const DeleteBtn = styled.button`
 `;
 
 const ConfirmDialog = ({ isOpen, title, message, confirmLabel, onConfirm, onCancel, confirmLoading }) => {
+  // Lock the page behind the dialog ONLY while it is open, and give back
+  // whatever was there before rather than a bare '' — an overlay can be
+  // stacked on another (the assistant panel does the same), and clearing
+  // blindly would unlock the one underneath.
+  //
+  // The `isOpen` gate is load-bearing. This component returns null when
+  // closed, but hooks run before that return: an unconditional effect locks
+  // the body the moment the dialog is *rendered*, not opened. Most callers
+  // render it conditionally so it unmounts and the cleanup runs, but
+  // AdminInbox renders it permanently (with `isOpen` derived from state) and
+  // AdminDashboard keeps every visited tab mounted. The result was an admin
+  // panel whose pages could not scroll at all, from the first visit to the
+  // Inbox until a full reload.
   useEffect(() => {
+    if (!isOpen) return undefined;
+    const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  }, []);
+    return () => { document.body.style.overflow = previous; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

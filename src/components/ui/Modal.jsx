@@ -78,15 +78,15 @@ const Content = styled.div`
 `;
 
 const Modal = ({ isOpen, onClose, title, children, wide }) => {
+  // Same rule as ConfirmDialog: lock only while open, and hand back the value
+  // that was there before instead of a blanket 'unset' — two overlays can be
+  // open at once (a confirm above a modal), and unlocking on the inner one's
+  // unmount would let the page scroll behind the outer one.
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
+    if (!isOpen) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previous; };
   }, [isOpen]);
 
   if (!isOpen) return null;
