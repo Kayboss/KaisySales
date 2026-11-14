@@ -163,6 +163,25 @@ test('every marketing page has a title, description, canonical, icon and og:imag
     const robots = meta(html, 'robots');
     assert.ok(robots && /index/i.test(robots), `${page.file}: should be indexable`);
 
+    // Google Search supports BMP, GIF, ICO, PNG, JPEG, PPM and TIFF — **not**
+    // SVG. Declaring only the SVG is why search results showed a generic globe
+    // for months with nothing on the page looking wrong.
+    assert.ok(
+      /<link\s+rel=["']icon["'][^>]*href=["']\/favicon\.ico["']/i.test(html),
+      `${page.file}: no /favicon.ico link (Google cannot read an SVG favicon)`
+    );
+    for (const size of ['48x48', '96x96', '192x192']) {
+      assert.match(
+        html,
+        new RegExp(`<link\\s+rel=["']icon["'][^>]*type=["']image/png["'][^>]*sizes=["']${size}["'][^>]*href=["']/favicon-${size}\\.png["']`, 'i'),
+        `${page.file}: no ${size} PNG favicon link`
+      );
+    }
+    assert.match(
+      html,
+      /<link\s+rel=["']apple-touch-icon["'][^>]*href=["']\/apple-touch-icon\.png["']/i,
+      `${page.file}: no apple-touch-icon`
+    );
     assert.ok(
       /<link\s+rel=["']icon["'][^>]*href=["']\/favicon\.svg["']/i.test(html),
       `${page.file}: no favicon link`
@@ -193,6 +212,60 @@ test('the og:image it advertises is a real 1200x630 PNG', () => {
   assert.ok(png.subarray(0, 8).equals(signature), 'public/og-image.png is not a PNG');
   assert.equal(png.readUInt32BE(16), 1200, 'og image width is not 1200');
   assert.equal(png.readUInt32BE(20), 630, 'og image height is not 630');
+});
+
+test('the icons it advertises are real, square rasters, not just an SVG', () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+  const pngInfo = (rel) => {
+    assert.ok(exists(rel), `${rel} is missing — run \`node scripts/make-favicons.mjs\``);
+    const buf = readFileSync(path.join(ROOT, rel));
+    assert.ok(buf.subarray(0, 8).equals(PNG), `${rel} is not a PNG`);
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  };
+
+  for (const size of [16, 32, 48, 96, 192, 512]) {
+    const { width, height } = pngInfo(`public/favicon-${size}x${size}.png`);
+    assert.equal(width, size, `favicon-${size}x${size}.png is ${width}px wide`);
+    assert.equal(height, size, `favicon-${size}x${size}.png is ${height}px tall`);
+  }
+
+  // Recommended over 48x48, and the size Google actually draws from.
+  const large = pngInfo('public/favicon-192x192.png');
+  assert.ok(large.width > 48, 'a favicon must be larger than 48x48 to look right in search');
+
+  const touch = pngInfo('public/apple-touch-icon.png');
+  assert.equal(touch.width, 180, 'apple-touch-icon must be 180x180');
+  assert.equal(touch.height, 180, 'apple-touch-icon must be 180x180');
+
+  // The ICO is the path software asks for without reading the HTML, so it has
+  // to be a real icon container rather than a renamed PNG.
+  const ico = readFileSync(path.join(ROOT, 'public/favicon.ico'));
+  assert.equal(ico.readUInt16LE(0), 0, 'favicon.ico has a wrong reserved field');
+  assert.equal(ico.readUInt16LE(2), 1, 'favicon.ico is not an icon (type 1)');
+  assert.ok(ico.readUInt16LE(4) >= 2, 'favicon.ico must carry more than one size');
+});
+
+test('the structured-data logo is a crawlable raster at least 112x112', () => {
+  // Google's Organization guidelines: 112x112px minimum, a format Google Images
+  // supports, and a URL a crawler can fetch. An SVG logo is not eligible.
+  const blocks = structuredData(read('public/landing/index.html'));
+  const graph = blocks.flatMap((b) => (Array.isArray(b['@graph']) ? b['@graph'] : [b]));
+  const org = graph.find((n) => n['@type'] === 'Organization');
+  assert.ok(org, 'homepage JSON-LD has no Organization');
+
+  const logo = typeof org.logo === 'string' ? org.logo : org.logo?.url || org.logo?.contentUrl;
+  assert.ok(logo, 'Organization has no logo');
+  assert.ok(logo.startsWith(`${ORIGIN}/`), 'the logo must be an absolute URL on this host');
+  assert.match(logo, /\.png$/i, 'the logo must be a PNG; an SVG is not eligible for search');
+
+  const file = logo.slice(ORIGIN.length + 1);
+  assert.ok(exists(`public/${file}`), `the logo ${logo} does not exist in public/`);
+
+  const buf = readFileSync(path.join(ROOT, 'public', file));
+  assert.equal(buf.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', 'the logo is not a PNG');
+  assert.ok(buf.readUInt32BE(16) >= 112, `the logo is ${buf.readUInt32BE(16)}px wide, needs 112`);
+  assert.ok(buf.readUInt32BE(20) >= 112, `the logo is ${buf.readUInt32BE(20)}px tall, needs 112`);
 });
 
 test('structured data on every page is valid JSON and names the product', () => {

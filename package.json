@@ -13,6 +13,7 @@
     "secrets": "node scripts/secret-scan.mjs",
     "secrets:history": "node scripts/secret-scan.mjs --history",
     "scan:dist": "node scripts/scan-dist.mjs",
+    "make:favicons": "node scripts/make-favicons.mjs",
     "test": "node --test scripts/*.test.mjs",
     "test:authz": "node scripts/test-authz.mjs",
     "verify": "npm run lint && npm test && npm run audit && npm run secrets && npm run build && npm run scan:dist",
