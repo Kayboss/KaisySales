@@ -1,6 +1,6 @@
 # KaisySales
 
-> KaisySales is sales, inventory and invoicing software for small businesses
+> KaisySales is sales, inventory and invoicing software for growing businesses
 > across Africa. It records daily sales and expenses, tracks stock, sends
 > invoices and reports real profit. It is free to use, with every feature
 > included and no credit card required.
@@ -44,7 +44,7 @@ ever introduced, existing users are told before anything changes.
 
 ## Countries and currencies
 
-Built for small businesses across Africa: Ghana, Nigeria, Kenya, South Africa,
+Built for growing businesses across Africa: Ghana, Nigeria, Kenya, South Africa,
 Tanzania, Uganda, Cameroon, Sierra Leone, Liberia and The Gambia.
 
 Amounts display in the local currency using ISO codes — GHS, NGN, KES, ZAR, TZS,
