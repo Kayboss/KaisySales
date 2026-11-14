@@ -84,19 +84,15 @@ test('the page is served at /contact, so its links must be absolute', () => {
   assert.match(html, /rel="canonical" href="https:\/\/www\.kaisysales\.com\/contact"/);
 });
 
-test('no landing page still routes an enquiry to a mailbox', () => {
-  // One collection point was the point of the change. Terms §11 is the single
-  // deliberate exception: an account-deletion request needs a verifiable
-  // reply-to, and a form cannot prove who is asking.
+test('no landing page routes an enquiry to a mailbox', () => {
+  // One collection point was the point of the change, and it now includes the
+  // account-deletion path: Terms §11 sends people to the form rather than a
+  // mailbox, so that a request cannot be lost in an inbox nobody watches.
   const pages = ['index.html', 'pages/help.html', 'pages/privacy.html', 'pages/pricing.html', 'pages/terms.html'];
   for (const page of pages) {
     const body = read('public', 'landing', page);
     const mailtos = [...body.matchAll(/href="mailto:([^"]+)"/g)].map((m) => m[1]);
-    if (page === 'pages/terms.html') {
-      assert.deepEqual(mailtos, ['support@kaisysales.com'], 'only the deletion path keeps a mailbox');
-    } else {
-      assert.deepEqual(mailtos, [], `${page} must send enquiries to /contact`);
-    }
+    assert.deepEqual(mailtos, [], `${page} must send enquiries to /contact`);
     assert.match(body, /href="\/contact"/, `${page} must link to /contact`);
   }
 });
