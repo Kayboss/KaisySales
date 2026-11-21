@@ -15,7 +15,7 @@ import { formatCurrency } from '../../utils/currency';
 import { useSettingsStore } from '../../store/settingsStore';
 import CatalogPicker from './CatalogPicker';
 import SizePricingCalculator from './SizePricingCalculator';
-import { freshSizeLine, numOf, solveSizeLines, round2, roundUp, SQFT_DIVISOR } from './sizePricing';
+import { freshSizeLine, numOf, solveSizeLines, round2, roundUp } from './sizePricing';
 
 const Header = styled.div`
   display: flex;
@@ -655,24 +655,15 @@ const CustomerDetail = () => {
   const solveCalcLines = () => solveSizeLines(calcLines, areaConfig().P);
 
   const printQuote = () => {
-    const { P } = areaConfig();
     const rows = solveCalcLines()
       .filter(s => s.valid)
-      .map(s => {
-        const formula = s.unit === 'feet'
-          ? `(L×H)×P×Q = (${s.L.toFixed(2)}×${s.H.toFixed(2)})×${P.toFixed(2)}×${s.Q}`
-          : `(L×H÷${SQFT_DIVISOR})×P×Q = (${s.L.toFixed(2)}×${s.H.toFixed(2)}÷${SQFT_DIVISOR})×${P.toFixed(2)}×${s.Q}`;
-        return `
+      .map(s => `
         <tr>
           <td>${esc(s.label || svcForm.service || 'Item')}</td>
-          <td>${s.L.toFixed(2)} × ${s.H.toFixed(2)} ${s.unit === 'feet' ? 'ft' : s.unit === 'inches' ? 'in' : 'cm'}</td>
-          <td>${P.toFixed(2)}</td>
           <td><b>${s.itemPrice.toFixed(2)}</b></td>
           <td>${s.Q}</td>
           <td><b>${s.total.toFixed(2)}</b></td>
-          <td class="muted">${formula}</td>
-        </tr>`;
-      })
+        </tr>`)
       .join('');
     const grand = roundUp(solveCalcLines().filter(s => s.valid).reduce((sum, s) => sum + s.total, 0));
     const w = window.open('', '_blank', 'width=780,height=920');
@@ -691,7 +682,6 @@ const CustomerDetail = () => {
           table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
           th { text-align: left; background: #F5F3F0; padding: 8px; }
           td { padding: 8px; border-bottom: 1px solid #F0EEE8; }
-          .muted { color: #89726C; font-size: 11px; }
           .total { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 12px 16px; background: #25432F; color: #fff; border-radius: 10px; font-size: 18px; font-weight: 800; }
           .foot { text-align: center; margin-top: 28px; font-size: 12px; color: #89726C; }
         </style></head>
@@ -703,8 +693,8 @@ const CustomerDetail = () => {
           <div class="kv"><span>Client</span><b>${esc(name)}</b></div>
           <div class="kv"><span>Service</span><b>${esc(svcForm.service || '—')}</b></div>
           <table>
-            <tr><th>Item</th><th>Size</th><th>Rate/sq ft</th><th>Sq Ft Price</th><th>Qty</th><th>Total</th><th>Formula</th></tr>
-            ${rows || '<tr><td colspan="7">No items</td></tr>'}
+            <tr><th>Item</th><th>Sq Ft Price</th><th>Qty</th><th>Total</th></tr>
+            ${rows || '<tr><td colspan="4">No items</td></tr>'}
           </table>
           <div class="total"><span>Grand Total</span><span>${formatCurrency(grand)}</span></div>
           <p class="foot">KaisySales - Know your Business, Stay in Control</p>
